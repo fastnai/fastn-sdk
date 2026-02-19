@@ -54,8 +54,8 @@ fastn = "fastn.cli:main"
 [project.urls]
 Homepage = "https://fastn.ai"
 Documentation = "https://docs.fastn.ai"
-Repository = "https://github.com/fastn-ai/fastn-sdk"
-Changelog = "https://github.com/fastn-ai/fastn-sdk/blob/main/python/CHANGELOG.md"
+Repository = "https://github.com/fastnai/fastn-sdk"
+Changelog = "https://github.com/fastnai/fastn-sdk/blob/main/python/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["fastn"]
