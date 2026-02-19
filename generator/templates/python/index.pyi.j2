@@ -1,0 +1,85 @@
+"""Fastn SDK — auto-generated type stubs.
+
+This file provides IDE autocomplete for all connectors.
+Do not edit manually. Regenerate with `fastn sync`.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+{% for connector in connectors %}
+{% if connector.name in installed %}
+from .connectors.{{ connector.name }} import {{ connector.class_name }}
+{% endif %}
+{% endfor %}
+{% if connectors | rejectattr('name', 'in', installed) | list %}
+from .connectors._placeholders import (
+    {% for connector in connectors %}
+    {% if connector.name not in installed %}
+    {{ connector.class_name }},
+    {% endif %}
+    {% endfor %}
+)
+{% endif %}
+
+
+class FastnClient:
+    """Fastn SDK client with typed connector access."""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        project_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+        config_path: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        max_retries: int = 3,
+        verbose: bool = False,
+    ) -> None: ...
+
+    {% for connector in connectors %}
+    @property
+    def {{ connector.name }}(self) -> {{ connector.class_name }}:
+        """{{ connector.display_name }} ({{ connector.category }}){% if connector.name not in installed %} — run `fastn add {{ connector.name }}` for full autocomplete{% endif %}"""
+        ...
+    {% endfor %}
+
+    def get_tools(self, connector_name: str) -> List[str]:
+        """List available tool names for a connector."""
+        ...
+
+    def get_tool(self, connector_name: str, tool_name: str) -> Dict[str, Any]:
+        """Get schema info for a specific tool."""
+        ...
+
+
+class AsyncFastnClient:
+    """Async Fastn SDK client with typed connector access."""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        project_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+        config_path: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        max_retries: int = 3,
+        verbose: bool = False,
+    ) -> None: ...
+
+    {% for connector in connectors %}
+    @property
+    def {{ connector.name }}(self) -> {{ connector.class_name }}:
+        """{{ connector.display_name }} ({{ connector.category }}){% if connector.name not in installed %} — run `fastn add {{ connector.name }}` for full autocomplete{% endif %}"""
+        ...
+    {% endfor %}
+
+    async def get_tools(self, connector_name: str) -> List[str]:
+        """List available tool names for a connector."""
+        ...
+
+    async def get_tool(self, connector_name: str, tool_name: str) -> Dict[str, Any]:
+        """Get schema info for a specific tool."""
+        ...

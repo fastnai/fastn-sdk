@@ -1,0 +1,82 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fastn-sdk"
+version = "0.2.0"
+description = "Fastn SDK — Typed access to 250+ integrations for apps and AI agents"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+authors = [
+    { name = "Fastn", email = "support@fastn.ai" },
+]
+keywords = [
+    "fastn", "sdk", "integrations", "api", "connectors",
+    "slack", "jira", "github", "salesforce",
+    "ai-agents", "llm", "tool-use", "function-calling",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = [
+    "httpx>=0.23.0,<1.0",
+    "click>=7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-httpx>=0.21",
+    "jinja2>=3.0",
+]
+generator = [
+    "jinja2>=3.0",
+]
+
+[project.scripts]
+fastn = "fastn.cli:main"
+
+[project.urls]
+Homepage = "https://fastn.ai"
+Documentation = "https://docs.fastn.ai"
+Repository = "https://github.com/fastn-ai/fastn-sdk"
+Changelog = "https://github.com/fastn-ai/fastn-sdk/blob/main/python/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["fastn"]
+
+[tool.hatch.build.targets.sdist]
+include = ["fastn/", "fastn/py.typed", "LICENSE", "README.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

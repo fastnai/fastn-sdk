@@ -1,0 +1,44 @@
+"""Fastn {{ connector.display_name }} connector — auto-generated type stubs.
+
+Do not edit manually. Regenerate with `fastn add {{ connector.name }}`.
+"""
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional
+
+
+class {{ connector.class_name }}:
+    """{{ connector.display_name }} connector ({{ connector.category }}).
+
+    Provides {{ connector.tool_count }} tools.
+    """
+
+    {% for tool in connector.tools %}
+    def {{ tool.name }}(
+        self,
+        {% for param in tool.params %}
+        {% if param.required %}
+        {{ param.name }}: {{ param.type | map_type }},
+        {% endif %}
+        {% endfor %}
+        {% for param in tool.params %}
+        {% if not param.required %}
+        {{ param.name }}: Optional[{{ param.type | map_type }}] = None,
+        {% endif %}
+        {% endfor %}
+    ) -> Dict[str, Any]:
+        """{{ tool.description }}
+        {% if tool.params %}
+
+        Args:
+            {% for param in tool.params %}
+            {{ param.name }}: {{ param.description }}{% if param.required %} (required){% endif %}
+
+            {% endfor %}
+        {% endif %}
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    {% endfor %}
