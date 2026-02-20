@@ -12,6 +12,9 @@ on:
       - "python/**"
       - ".github/workflows/ci-python.yml"
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
