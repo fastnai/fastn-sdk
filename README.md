@@ -1,6 +1,6 @@
 # Fastn SDK
 
-Pre-built tools for AI agents and apps — 250+ integrations including Slack, Jira, GitHub, Salesforce, HubSpot, Stripe, and more.
+The fastest way to add enterprise integrations to any AI agent or app. MCP-compatible. 250+ connectors. No auth plumbing.
 
 One SDK. One CLI. Every integration. Full IDE autocomplete. First-class LLM agent support.
 
@@ -17,7 +17,7 @@ One SDK. One CLI. Every integration. Full IDE autocomplete. First-class LLM agen
 
 | Language | Package | Status |
 |----------|---------|--------|
-| **Python** | [`fastn-sdk`](https://pypi.org/project/fastn-sdk/) | Stable (v0.2.1) |
+| **Python** | [`fastn-sdk`](https://pypi.org/project/fastn-sdk/) | Stable (v0.2.2) |
 | **Node.js** | `@fastn/sdk` | Planned |
 
 ## Quick Start (Python)

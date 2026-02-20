@@ -10,7 +10,7 @@ Headers sent on every request:
     stage:                LIVE | STAGING | DEV
     x-fastn-custom-auth:  false
     x-fastn-space-id:     <project_id or JWT-derived workspace ID>
-    x-fastn-space-tenantid: <tenant_id, default "organization">
+    x-fastn-space-tenantid: <tenant_id, default "">
     x-fastn-api-key:      <api_key>           (if using API key auth)
     Authorization:        Bearer <auth_token>  (if using JWT auth)
 """

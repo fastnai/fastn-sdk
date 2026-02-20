@@ -16,7 +16,7 @@ from fastn import FastnClient
 API_KEY = "your-api-key"
 PROJECT_ID = "your-project-id"
 CONNECTION_ID = "your-connection-id"       # e.g. "conn_slack_workspace_a"
-TENANT_ID = "organization"                 # e.g. "customer_acme"
+TENANT_ID = ""                              # e.g. "customer_acme"
 CHANNEL = "general"
 # --------------------------------------------------------------------------
 

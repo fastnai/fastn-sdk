@@ -13,7 +13,7 @@ Config file format (.fastn/config.json):
     {
         "api_key": "your-api-key",
         "project_id": "your-project-id",
-        "tenant_id": "organization",
+        "tenant_id": "",
         "stage": "LIVE"
     }
 
@@ -93,7 +93,7 @@ class FastnConfig:
 
     api_key: str = ""
     project_id: str = ""
-    tenant_id: str = "organization"
+    tenant_id: str = ""
     stage: str = DEFAULT_STAGE
     timeout: float = 30.0
     auth_token: str = ""
@@ -253,7 +253,7 @@ def load_config(config_path: Optional[str] = None) -> FastnConfig:
     return FastnConfig(
         api_key=env_data.get("api_key") or file_data.get("api_key", ""),
         project_id=env_data.get("project_id") or file_data.get("project_id", "") or file_data.get("space_id", ""),
-        tenant_id=env_data.get("tenant_id") or file_data.get("tenant_id", "organization"),
+        tenant_id=env_data.get("tenant_id") or file_data.get("tenant_id", ""),
         stage=env_data.get("stage") or file_data.get("stage", DEFAULT_STAGE),
         auth_token=env_data.get("auth_token") or file_data.get("auth_token", ""),
         refresh_token=file_data.get("refresh_token", ""),

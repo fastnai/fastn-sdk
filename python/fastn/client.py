@@ -39,7 +39,7 @@ Constructor parameters:
     api_key:      Fastn API key (or FASTN_API_KEY env var)
     project_id:   Fastn project ID (or FASTN_PROJECT_ID env var)
     auth_token:   JWT from ``fastn login`` (or FASTN_AUTH_TOKEN env var)
-    tenant_id:    Tenant ID, default "organization" (or FASTN_TENANT_ID env var)
+    tenant_id:    Tenant ID, default "" (empty) (or FASTN_TENANT_ID env var)
     stage:        "LIVE" | "STAGING" | "DEV" (or FASTN_STAGE env var)
     config_path:  Path to .fastn/config.json (auto-detected if omitted)
     timeout:      HTTP timeout in seconds (default: 30)

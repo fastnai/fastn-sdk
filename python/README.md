@@ -1,6 +1,6 @@
 # Fastn SDK for Python
 
-Pre-built tools for AI agents and apps — 250+ integrations including Slack, Jira, GitHub, Salesforce, HubSpot, Stripe, and more.
+The fastest way to add enterprise integrations to any AI agent or app. MCP-compatible. 250+ connectors. No auth plumbing.
 
 [![PyPI version](https://img.shields.io/pypi/v/fastn-sdk.svg)](https://pypi.org/project/fastn-sdk/)
 [![Python](https://img.shields.io/pypi/pyversions/fastn-sdk.svg)](https://pypi.org/project/fastn-sdk/)
@@ -207,7 +207,7 @@ fastn = FastnClient(tenant_id="acme")
 # fastn run slack send_message --tenant acme --channel general --text "Hello!"
 ```
 
-**Priority:** per-call `tenant_id` > CLI `--tenant` flag > constructor param > `FASTN_TENANT_ID` env var > config file > `"organization"`
+**Priority:** per-call `tenant_id` > CLI `--tenant` flag > constructor param > `FASTN_TENANT_ID` env var > config file > `"" (empty)`
 
 ## Environments
 

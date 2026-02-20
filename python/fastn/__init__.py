@@ -1,4 +1,4 @@
-"""Fastn SDK — Pre-built tools for AI agents and apps.
+"""Fastn SDK — The fastest way to add enterprise integrations to any AI agent or app.
 
 Provides two clients (sync and async) that give attribute-based access to
 250+ integrations like Slack, Jira, GitHub, Salesforce, and more.
@@ -82,7 +82,7 @@ from fastn.exceptions import (
     ToolNotFoundError,
 )
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 __all__ = [
     "APIError",

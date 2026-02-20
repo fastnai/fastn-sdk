@@ -123,7 +123,7 @@ GET_TOOLS_URL = "https://live.fastn.ai/api/ucl/getTools"
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Show API calls and responses")
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool) -> None:
-    """Fastn SDK — Pre-built tools for AI agents and apps."""
+    """Fastn SDK — The fastest way to add enterprise integrations to any AI agent or app."""
     ctx.ensure_object(dict)
     ctx.obj["verbose"] = verbose
 

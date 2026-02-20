@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fastn-sdk"
-version = "0.2.1"
-description = "Fastn SDK — Pre-built tools for AI agents and apps"
+version = "0.2.2"
+description = "Fastn SDK — The fastest way to add enterprise integrations to any AI agent or app"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"
