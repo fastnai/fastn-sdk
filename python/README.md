@@ -9,7 +9,7 @@ Pre-built tools for AI agents and apps — 250+ integrations including Slack, Ji
 ## Installation
 
 ```bash
-pip install fastn
+pip install fastn-sdk
 ```
 
 Installs the SDK and CLI. Requires Python 3.8+.

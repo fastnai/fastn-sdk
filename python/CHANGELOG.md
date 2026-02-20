@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-02-20
+
+### Changed
+
+- Smart stub generation: only generates stubs for detected SDK languages (Python and/or TypeScript)
+- Reorganized tests into `tests/sdk/` and `tests/cli/` for selective test runs
+- Reorganized examples into `examples/sdk/` and `examples/cli/`
+- Added pytest markers (`sdk`, `cli`) and Makefile for development workflow
+- Updated documentation with AI-friendly API reference and LLM provider examples
+
 ## [0.2.0] - 2026-02-19
 
 ### Added

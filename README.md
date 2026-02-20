@@ -17,13 +17,13 @@ One SDK. One CLI. Every integration. Full IDE autocomplete. First-class LLM agen
 
 | Language | Package | Status |
 |----------|---------|--------|
-| **Python** | [`fastn`](https://pypi.org/project/fastn-sdk/) | Stable (v0.2.0) |
+| **Python** | [`fastn-sdk`](https://pypi.org/project/fastn-sdk/) | Stable (v0.2.1) |
 | **Node.js** | `@fastn/sdk` | Planned |
 
 ## Quick Start (Python)
 
 ```bash
-pip install fastn
+pip install fastn-sdk
 fastn login
 fastn sync
 fastn add slack

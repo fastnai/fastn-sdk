@@ -4,7 +4,7 @@ Provides two clients (sync and async) that give attribute-based access to
 250+ integrations like Slack, Jira, GitHub, Salesforce, and more.
 
 Setup:
-    pip install fastn
+    pip install fastn-sdk
     fastn init          # or: fastn login
     fastn sync
     fastn add slack
@@ -82,7 +82,7 @@ from fastn.exceptions import (
     ToolNotFoundError,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     "APIError",
