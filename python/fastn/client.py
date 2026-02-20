@@ -22,8 +22,8 @@ Control plane — inspect the tool registry:
     tools = fastn.get_tools("slack")
     tool = fastn.get_tool("slack", "send_message")
 
-LLM agent integration — get tool schemas for any LLM provider:
-    tools = fastn.get_tools_for("slack", format="openai")
+LLM agent integration — describe what you need, get tool schemas:
+    tools = fastn.get_tools_for("Send a message on Slack", format="openai")
     # Also: "anthropic", "gemini", "bedrock", "raw"
 
     # Then execute the LLM's tool call:
@@ -52,7 +52,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 
@@ -457,7 +457,7 @@ class FastnClient:
         connectors = fastn.admin.connectors.list()
 
         # LLM agent integration
-        tools = fastn.get_tools_for("slack", format="openai")
+        tools = fastn.get_tools_for("Send a Slack message", format="openai")
         result = fastn.execute(action_id, llm_generated_params)
 
         # AI-powered
@@ -774,58 +774,93 @@ class FastnClient:
 
     def get_tools_for(
         self,
-        connector_name: str,
+        prompt: str,
+        *,
         format: str = "openai",
+        limit: int = 5,
+        connector: Union[str, List[str], None] = None,
     ) -> List[Dict[str, Any]]:
-        """Get actions formatted for a specific LLM provider's tool-use API.
+        """Get tools formatted for a specific LLM provider's tool-use API.
+
+        Describe what you need in natural language and Fastn discovers the
+        right tools.  Alternatively, pass ``connector`` to select tools from
+        specific connectors by name.
 
         Supported formats:
           - ``"openai"``    — OpenAI function-calling format
           - ``"anthropic"`` — Anthropic tool-use format
           - ``"gemini"``    — Google Gemini / Vertex AI format
           - ``"bedrock"``   — AWS Bedrock Converse API format
-          - ``"raw"``       — Raw Fastn schemas (name, description, actionId, inputSchema, outputSchema)
+          - ``"raw"``       — Raw Fastn schemas
 
         Args:
-            connector_name: Name of the tool (e.g. "slack").
-            format: LLM provider format. Defaults to "openai".
+            prompt: Natural language description of what you need
+                (e.g. ``"Send a message on Slack"``).
+            format: LLM provider format. Defaults to ``"openai"``.
+            limit: Maximum number of tools to return. Defaults to 5.
+            connector: Optional connector name or list of names for direct
+                registry lookup instead of prompt-based discovery
+                (e.g. ``"slack"`` or ``["slack", "jira"]``).
 
         Returns:
-            List of action definitions in the requested format.
+            List of tool definitions in the requested format.
 
         Raises:
             ValueError: If format is not supported.
-            ConnectorNotFoundError: If tool is not in the registry.
+            APIError: If prompt-based discovery fails.
+            ConnectorNotFoundError: If a named connector is not in the registry.
 
         Example::
 
-            # OpenAI
-            tools = fastn.get_tools_for("slack", format="openai")
-            response = openai.chat.completions.create(
-                model="gpt-4", messages=messages, tools=tools
+            # Prompt-based (recommended) — discovers the right tools
+            tools = fastn.get_tools_for(
+                "Send a message on Slack",
+                format="openai",
             )
 
-            # Anthropic
-            tools = fastn.get_tools_for("slack", format="anthropic")
-            response = anthropic.messages.create(
-                model="claude-sonnet-4-20250514", messages=messages, tools=tools
+            # Multiple connectors by name (power user)
+            tools = fastn.get_tools_for(
+                "project tools",
+                connector=["slack", "jira"],
+                format="openai",
+                limit=10,
             )
-
-            # Gemini
-            tools = fastn.get_tools_for("slack", format="gemini")
-
-            # AWS Bedrock
-            tools = fastn.get_tools_for("slack", format="bedrock")
         """
         if format not in _SUPPORTED_FORMATS:
             raise ValueError(
                 f"Unsupported format '{format}'. "
                 f"Choose from: {', '.join(_SUPPORTED_FORMATS)}"
             )
-        raw_tools = self.admin.connectors.get_tools(connector_name)
+
+        if connector is not None:
+            # Local registry lookup
+            names = [connector] if isinstance(connector, str) else connector
+            raw_tools: List[Dict[str, Any]] = []
+            for name in names:
+                raw_tools.extend(self.admin.connectors.get_tools(name))
+            raw_tools = raw_tools[:limit]
+            if format == "raw":
+                return raw_tools
+            return _FORMAT_CONVERTERS[format](raw_tools)
+
+        # Prompt-based discovery via /getTools API
+        self._ensure_fresh_token()
+        headers = self._config.get_headers()
+        response = self._http.post(
+            f"{API_BASE_URL}/getTools",
+            json={"input": {"prompt": prompt, "limit": limit}},
+            headers=headers,
+        )
+        if response.status_code >= 400:
+            raise APIError(
+                f"Tool discovery failed: {response.text}",
+                status_code=response.status_code,
+            )
+        data = response.json()
+        tool_list = data if isinstance(data, list) else data.get("tools", [])
         if format == "raw":
-            return raw_tools
-        return _FORMAT_CONVERTERS[format](raw_tools)
+            return tool_list
+        return _FORMAT_CONVERTERS[format](tool_list)
 
     # ----- Lifecycle -----
 
@@ -856,7 +891,7 @@ class AsyncFastnClient:
             response = await fastn.slack.send_message(channel="general", text="Hello!")
 
             # LLM agent integration
-            tools = fastn.get_tools_for("slack", format="anthropic")
+            tools = await fastn.get_tools_for("Send a Slack message", format="anthropic")
             result = await fastn.execute(action_id, llm_params)
     """
 
@@ -1112,12 +1147,15 @@ class AsyncFastnClient:
         """Get a single action's raw input/output schema."""
         return self.admin.connectors.get_tool(connector_name, tool_name)
 
-    def get_tools_for(
+    async def get_tools_for(
         self,
-        connector_name: str,
+        prompt: str,
+        *,
         format: str = "openai",
+        limit: int = 5,
+        connector: Union[str, List[str], None] = None,
     ) -> List[Dict[str, Any]]:
-        """Get actions formatted for a specific LLM provider's tool-use API.
+        """Get tools formatted for a specific LLM provider's tool-use API.
 
         See ``FastnClient.get_tools_for()`` for full documentation.
         """
@@ -1126,10 +1164,35 @@ class AsyncFastnClient:
                 f"Unsupported format '{format}'. "
                 f"Choose from: {', '.join(_SUPPORTED_FORMATS)}"
             )
-        raw_tools = self.admin.connectors.get_tools(connector_name)
+
+        if connector is not None:
+            names = [connector] if isinstance(connector, str) else connector
+            raw_tools: List[Dict[str, Any]] = []
+            for name in names:
+                raw_tools.extend(self.admin.connectors.get_tools(name))
+            raw_tools = raw_tools[:limit]
+            if format == "raw":
+                return raw_tools
+            return _FORMAT_CONVERTERS[format](raw_tools)
+
+        # Prompt-based discovery via /getTools API
+        self._ensure_fresh_token()
+        headers = self._config.get_headers()
+        response = await self._http.post(
+            f"{API_BASE_URL}/getTools",
+            json={"input": {"prompt": prompt, "limit": limit}},
+            headers=headers,
+        )
+        if response.status_code >= 400:
+            raise APIError(
+                f"Tool discovery failed: {response.text}",
+                status_code=response.status_code,
+            )
+        data = response.json()
+        tool_list = data if isinstance(data, list) else data.get("tools", [])
         if format == "raw":
-            return raw_tools
-        return _FORMAT_CONVERTERS[format](raw_tools)
+            return tool_list
+        return _FORMAT_CONVERTERS[format](tool_list)
 
     # ----- Lifecycle -----
 

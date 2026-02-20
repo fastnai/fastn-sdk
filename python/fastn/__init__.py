@@ -24,11 +24,11 @@ Async:
 LLM agent integration:
     fastn = FastnClient(api_key="...", project_id="...")
 
-    # Get tools in OpenAI/Anthropic/Gemini/Bedrock format
-    tools = fastn.get_tools_for("slack", format="openai")
+    # Describe what you need — Fastn discovers the right tools
+    tools = fastn.get_tools_for("Send a message on Slack", format="openai")
 
     # Feed tools to your LLM, get back a tool call, then execute:
-    result = fastn.execute(action_id="act_slack_send_message", params={...})
+    result = fastn.execute(action_id="send_message", params={"channel": "general", "text": "Hi"})
 
 CLI agent mode:
     # AI-powered tool discovery and execution from the command line
@@ -82,7 +82,7 @@ from fastn.exceptions import (
     ToolNotFoundError,
 )
 
-__version__ = "0.2.2"
+__version__ = "0.2.3"
 
 __all__ = [
     "APIError",

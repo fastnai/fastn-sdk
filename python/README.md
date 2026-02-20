@@ -68,11 +68,11 @@ All environment variables:
 
 ## LLM Agent Integration
 
-The SDK provides tool schemas in every major LLM provider's native format. The workflow is:
+Describe what you need in plain English — Fastn discovers the right tools and returns schemas in your LLM's native format.
 
-1. Get tools for a connector in your LLM's format
-2. Send tools to the LLM with the user's prompt
-3. Execute the LLM's tool call through Fastn
+1. **Describe** what you need → Fastn finds matching tools
+2. **Send** the tools to your LLM with the user's prompt
+3. **Execute** the LLM's tool call through Fastn
 
 ```python
 import json
@@ -80,33 +80,40 @@ from fastn import FastnClient
 
 fastn = FastnClient()
 
-# 1. Get tools (supports: openai, anthropic, gemini, bedrock, raw)
-tools = fastn.get_tools_for("slack", format="openai")
+# 1. Describe what you need — Fastn discovers the right tools
+#    Returns up to 5 tools by default (configurable via limit=)
+tools = fastn.get_tools_for(
+    "Send a message on Slack and create a Jira ticket",
+    format="openai",   # also: anthropic, gemini, bedrock, raw
+)
 
-# 2. Send to LLM
+# 2. Send tools + user prompt to the LLM
 response = openai.chat.completions.create(
     model="gpt-4o",
     messages=[{"role": "user", "content": "Send hello to #general on Slack"}],
     tools=tools,
 )
 
-# 3. Execute
+# 3. The LLM returns a tool_call when it wants to use a tool
 tool_call = response.choices[0].message.tool_calls[0]
+
+# 4. Execute the tool call through Fastn
 result = fastn.execute(
-    action_id=tool_call.function.name,
-    params=json.loads(tool_call.function.arguments),
+    action_id=tool_call.function.name,                  # e.g. "send_message"
+    params=json.loads(tool_call.function.arguments),     # e.g. {"channel": "general", "text": "hello"}
 )
+print(result)
 ```
 
 ### Supported LLM Providers
 
 | Format | Provider | Example |
 |--------|----------|---------|
-| `"openai"` | OpenAI, Azure OpenAI | `get_tools_for("slack", format="openai")` |
-| `"anthropic"` | Anthropic Claude | `get_tools_for("slack", format="anthropic")` |
-| `"gemini"` | Google Gemini / Vertex AI | `get_tools_for("slack", format="gemini")` |
-| `"bedrock"` | AWS Bedrock Converse API | `get_tools_for("slack", format="bedrock")` |
-| `"raw"` | Any (raw Fastn schemas) | `get_tools_for("slack", format="raw")` |
+| `"openai"` | OpenAI, Azure OpenAI | `get_tools_for("Send a Slack message", format="openai")` |
+| `"anthropic"` | Anthropic Claude | `get_tools_for("Create a Jira issue", format="anthropic")` |
+| `"gemini"` | Google Gemini / Vertex AI | `get_tools_for("List GitHub repos", format="gemini")` |
+| `"bedrock"` | AWS Bedrock Converse API | `get_tools_for("Send an email", format="bedrock")` |
+| `"raw"` | Any (raw Fastn schemas) | `get_tools_for("Notify team", format="raw")` |
 
 ### Anthropic Claude Example
 
@@ -115,7 +122,7 @@ import anthropic
 from fastn import FastnClient
 
 fastn = FastnClient()
-tools = fastn.get_tools_for("slack", format="anthropic")
+tools = fastn.get_tools_for("Send a message on Slack", format="anthropic")
 
 client = anthropic.Anthropic()
 response = client.messages.create(
@@ -138,7 +145,7 @@ from google import genai
 from fastn import FastnClient
 
 fastn = FastnClient()
-tools = fastn.get_tools_for("slack", format="gemini")
+tools = fastn.get_tools_for("Send a Slack message", format="gemini", limit=10)
 
 client = genai.Client()
 response = client.models.generate_content(
@@ -160,7 +167,7 @@ import boto3
 from fastn import FastnClient
 
 fastn = FastnClient()
-tools = fastn.get_tools_for("slack", format="bedrock")
+tools = fastn.get_tools_for("Notify the team on Slack", format="bedrock")
 
 bedrock = boto3.client("bedrock-runtime")
 response = bedrock.converse(
@@ -174,6 +181,23 @@ for block in response["output"]["message"]["content"]:
         tool_use = block["toolUse"]
         result = fastn.execute(action_id=tool_use["name"], params=tool_use["input"])
         print(result)
+```
+
+### Using connector names directly
+
+For advanced use cases, you can pass connector names instead of a prompt for local registry lookup (no API call):
+
+```python
+# Single connector
+tools = fastn.get_tools_for("slack tools", connector="slack", format="openai")
+
+# Multiple connectors — limit applies to the total across all
+tools = fastn.get_tools_for(
+    "project tools",
+    connector=["slack", "jira", "github"],
+    format="openai",
+    limit=10,
+)
 ```
 
 ## Multi-Connection Support
@@ -208,6 +232,20 @@ fastn = FastnClient(tenant_id="acme")
 ```
 
 **Priority:** per-call `tenant_id` > CLI `--tenant` flag > constructor param > `FASTN_TENANT_ID` env var > config file > `"" (empty)`
+
+## Platform Benefits
+
+Fastn is more than a client library — every API call goes through a centralized gateway that gives you enterprise features out of the box.
+
+| Benefit | Description |
+|---------|-------------|
+| **Centralized Gateway** | All API calls are proxied through fastn.ai — one endpoint for 250+ services |
+| **Monitoring & Logging** | Every tool call is logged with latency, status, and payload size. View in the [fastn.ai dashboard](https://fastn.ai) |
+| **Auth Management** | OAuth tokens, API keys, and refresh flows are managed centrally — no credentials scattered in your code |
+| **Usage Analytics** | Track tool usage per tenant, connector, and action. Identify bottlenecks and optimize |
+| **Rate Limiting & Retries** | Built-in retry with exponential backoff. Per-tenant rate limits configurable in the dashboard |
+| **Audit Trail** | Single audit log for all integration activity across all tenants and connectors |
+| **MCP Compatible** | Fastn connectors work as MCP tool providers for AI agent frameworks |
 
 ## Environments
 
@@ -315,7 +353,7 @@ FastnClient(
 | `fastn.execute(action_id, params, ...)` | Execute by action ID (for LLM agents) |
 | `fastn.get_tools(tool_name)` | Get all actions with raw schemas |
 | `fastn.get_tool(tool_name, action_name)` | Get one action's schema |
-| `fastn.get_tools_for(tool_name, format)` | Get actions in LLM provider format |
+| `fastn.get_tools_for(prompt, format, limit)` | Discover tools by prompt in LLM provider format |
 | `fastn.run(prompt)` | AI-powered action discovery and execution |
 | `fastn.admin.connectors.list()` | List all tools in registry |
 | `fastn.admin.connectors.get(name)` | Get tool details |

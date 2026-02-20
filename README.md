@@ -17,7 +17,7 @@ One SDK. One CLI. Every integration. Full IDE autocomplete. First-class LLM agen
 
 | Language | Package | Status |
 |----------|---------|--------|
-| **Python** | [`fastn-sdk`](https://pypi.org/project/fastn-sdk/) | Stable (v0.2.2) |
+| **Python** | [`fastn-sdk`](https://pypi.org/project/fastn-sdk/) | Stable (v0.2.3) |
 | **Node.js** | `@fastn/sdk` | Planned |
 
 ## Quick Start (Python)
@@ -38,18 +38,33 @@ fastn.slack.send_message(channel="general", text="Hello from Fastn!")
 
 ## LLM Agent Integration
 
-Fastn provides tool schemas in native format for every major LLM provider. The workflow is three steps: get tools, send to LLM, execute the result.
+Describe what you need in plain English — Fastn discovers the right tools and returns schemas in your LLM's native format.
 
 ```python
+import json
 from fastn import FastnClient
 
 fastn = FastnClient()
 
-# Works with: openai, anthropic, gemini, bedrock, raw
-tools = fastn.get_tools_for("slack", format="openai")
+# Step 1: Describe what you need — Fastn finds the right tools
+tools = fastn.get_tools_for(
+    "Send a message on Slack and create a Jira ticket",
+    format="openai",   # also: anthropic, gemini, bedrock, raw
+)
 
-# Send tools to your LLM, get back tool_calls, then:
-result = fastn.execute(action_id=tool_call.function.name, params=parsed_args)
+# Step 2: Send tools + prompt to the LLM
+response = openai.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Send hello to #general on Slack"}],
+    tools=tools,
+)
+
+# Step 3: Execute the LLM's tool call through Fastn
+tool_call = response.choices[0].message.tool_calls[0]
+result = fastn.execute(
+    action_id=tool_call.function.name,                  # e.g. "send_message"
+    params=json.loads(tool_call.function.arguments),     # e.g. {"channel": "general", "text": "hello"}
+)
 ```
 
 Supported providers: **OpenAI**, **Anthropic Claude**, **Google Gemini**, **AWS Bedrock**, and any provider via `raw` format.

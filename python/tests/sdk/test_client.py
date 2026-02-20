@@ -112,6 +112,80 @@ def _create_test_env(tmpdir: str, with_schemas: bool = False) -> str:
     return str(fastn_dir / "config.json")
 
 
+def _create_multi_connector_env(tmpdir: str) -> str:
+    """Create a .fastn dir with config and registry containing slack + jira."""
+    fastn_dir = Path(tmpdir) / ".fastn"
+    fastn_dir.mkdir()
+
+    config = {
+        "api_key": "test-api-key",
+        "project_id": "test-project-id",
+        "stage": "LIVE",
+    }
+    (fastn_dir / "config.json").write_text(json.dumps(config))
+
+    registry = {
+        "version": "2025.02.14",
+        "connectors": {
+            "slack": {
+                "id": "conn_slack_001",
+                "display_name": "Slack",
+                "category": "communication",
+                "tools": {
+                    "send_message": {
+                        "actionId": "act_slack_send_message",
+                        "description": "Send a message to a channel",
+                        "inputSchema": _SAMPLE_INPUT_SCHEMA,
+                    },
+                    "create_channel": {
+                        "actionId": "act_slack_create_channel",
+                        "description": "Create a new channel",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "body": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                    },
+                                    "required": ["name"],
+                                }
+                            },
+                        },
+                    },
+                },
+            },
+            "jira": {
+                "id": "conn_jira_001",
+                "display_name": "Jira",
+                "category": "project_management",
+                "tools": {
+                    "create_issue": {
+                        "actionId": "act_jira_create_issue",
+                        "description": "Create a Jira issue",
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "body": {
+                                    "type": "object",
+                                    "properties": {
+                                        "summary": {"type": "string"},
+                                        "project": {"type": "string"},
+                                    },
+                                    "required": ["summary", "project"],
+                                }
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+    (fastn_dir / "registry.json").write_text(json.dumps(registry))
+
+    return str(fastn_dir / "config.json")
+
+
 # ---------------------------------------------------------------------------
 # Sync client tests
 # ---------------------------------------------------------------------------
@@ -364,11 +438,13 @@ class TestGetToolsFor:
         config_path = _create_test_env(tmpdir, with_schemas=True)
         return FastnClient(config_path=config_path)
 
+    # --- Connector-based tests (local registry lookup) ---
+
     def test_openai_format(self) -> None:
-        """get_tools_for(format='openai') returns OpenAI function-calling format."""
+        """get_tools_for(connector=..., format='openai') returns OpenAI format."""
         with tempfile.TemporaryDirectory() as tmpdir:
             client = self._make_client(tmpdir)
-            tools = client.get_tools_for("slack", format="openai")
+            tools = client.get_tools_for("slack tools", connector="slack", format="openai")
 
             assert len(tools) == 2
             # Find send_message tool
@@ -381,10 +457,10 @@ class TestGetToolsFor:
             assert "text" in params.get("properties", {})
 
     def test_anthropic_format(self) -> None:
-        """get_tools_for(format='anthropic') returns Anthropic tool-use format."""
+        """get_tools_for(connector=..., format='anthropic') returns Anthropic format."""
         with tempfile.TemporaryDirectory() as tmpdir:
             client = self._make_client(tmpdir)
-            tools = client.get_tools_for("slack", format="anthropic")
+            tools = client.get_tools_for("slack tools", connector="slack", format="anthropic")
 
             assert len(tools) == 2
             send = next(t for t in tools if t["name"] == "send_message")
@@ -394,10 +470,10 @@ class TestGetToolsFor:
             assert "channel" in send["input_schema"].get("properties", {})
 
     def test_gemini_format(self) -> None:
-        """get_tools_for(format='gemini') returns Google Gemini format."""
+        """get_tools_for(connector=..., format='gemini') returns Google Gemini format."""
         with tempfile.TemporaryDirectory() as tmpdir:
             client = self._make_client(tmpdir)
-            tools = client.get_tools_for("slack", format="gemini")
+            tools = client.get_tools_for("slack tools", connector="slack", format="gemini")
 
             assert len(tools) == 2
             send = next(t for t in tools if t["name"] == "send_message")
@@ -406,10 +482,10 @@ class TestGetToolsFor:
             assert "channel" in send["parameters"].get("properties", {})
 
     def test_bedrock_format(self) -> None:
-        """get_tools_for(format='bedrock') returns AWS Bedrock format."""
+        """get_tools_for(connector=..., format='bedrock') returns AWS Bedrock format."""
         with tempfile.TemporaryDirectory() as tmpdir:
             client = self._make_client(tmpdir)
-            tools = client.get_tools_for("slack", format="bedrock")
+            tools = client.get_tools_for("slack tools", connector="slack", format="bedrock")
 
             assert len(tools) == 2
             send = next(
@@ -424,10 +500,10 @@ class TestGetToolsFor:
             assert "channel" in spec["inputSchema"]["json"].get("properties", {})
 
     def test_raw_format(self) -> None:
-        """get_tools_for(format='raw') returns raw schemas with actionId."""
+        """get_tools_for(connector=..., format='raw') returns raw schemas with actionId."""
         with tempfile.TemporaryDirectory() as tmpdir:
             client = self._make_client(tmpdir)
-            tools = client.get_tools_for("slack", format="raw")
+            tools = client.get_tools_for("slack tools", connector="slack", format="raw")
 
             assert len(tools) == 2
             send = next(t for t in tools if t["name"] == "send_message")
@@ -440,20 +516,20 @@ class TestGetToolsFor:
         with tempfile.TemporaryDirectory() as tmpdir:
             client = self._make_client(tmpdir)
             with pytest.raises(ValueError, match="Unsupported format"):
-                client.get_tools_for("slack", format="invalid")
+                client.get_tools_for("slack tools", connector="slack", format="invalid")
 
     def test_connector_not_found(self) -> None:
-        """get_tools_for('nonexistent', ...) raises ConnectorNotFoundError."""
+        """get_tools_for(connector='nonexistent') raises ConnectorNotFoundError."""
         with tempfile.TemporaryDirectory() as tmpdir:
             client = self._make_client(tmpdir)
             with pytest.raises(ConnectorNotFoundError):
-                client.get_tools_for("nonexistent", format="openai")
+                client.get_tools_for("tools", connector="nonexistent", format="openai")
 
     def test_unwraps_single_wrapper_key(self) -> None:
         """Schemas with a single 'body' wrapper are unwrapped for LLMs."""
         with tempfile.TemporaryDirectory() as tmpdir:
             client = self._make_client(tmpdir)
-            tools = client.get_tools_for("slack", format="openai")
+            tools = client.get_tools_for("slack tools", connector="slack", format="openai")
             send = next(t for t in tools if t["function"]["name"] == "send_message")
             params = send["function"]["parameters"]
             # Should NOT have 'body' as a property — it should be unwrapped
@@ -465,8 +541,136 @@ class TestGetToolsFor:
         """get_tools_for() defaults to openai format."""
         with tempfile.TemporaryDirectory() as tmpdir:
             client = self._make_client(tmpdir)
-            tools = client.get_tools_for("slack")
+            tools = client.get_tools_for("slack tools", connector="slack")
             assert tools[0]["type"] == "function"
+
+    # --- Connector-based: limit and multi-connector ---
+
+    def test_limit_default(self) -> None:
+        """Default limit=5 returns all when fewer than 5 tools exist."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            client = self._make_client(tmpdir)
+            tools = client.get_tools_for("slack tools", connector="slack", format="openai")
+            assert len(tools) == 2  # only 2 tools in fixture, below limit
+
+    def test_limit_one(self) -> None:
+        """limit=1 returns only 1 tool."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            client = self._make_client(tmpdir)
+            tools = client.get_tools_for("slack tools", connector="slack", format="openai", limit=1)
+            assert len(tools) == 1
+
+    def test_multiple_connectors(self) -> None:
+        """Passing a list of connector names returns tools from all."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_multi_connector_env(tmpdir)
+            client = FastnClient(config_path=config_path)
+            tools = client.get_tools_for(
+                "project tools",
+                connector=["slack", "jira"],
+                format="openai",
+                limit=100,
+            )
+            names = [t["function"]["name"] for t in tools]
+            assert "send_message" in names
+            assert "create_issue" in names
+
+    def test_multiple_connectors_with_limit(self) -> None:
+        """Limit applies to total tools across all connectors."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_multi_connector_env(tmpdir)
+            client = FastnClient(config_path=config_path)
+            tools = client.get_tools_for(
+                "project tools",
+                connector=["slack", "jira"],
+                format="openai",
+                limit=2,
+            )
+            assert len(tools) == 2
+
+    # --- Prompt-based tests (API call) ---
+
+    def test_prompt_openai(self, httpx_mock: HTTPXMock) -> None:
+        """Prompt-based get_tools_for() calls /getTools API and returns OpenAI format."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            client = self._make_client(tmpdir)
+
+            # Mock the /getTools API response
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/ucl/getTools",
+                json={
+                    "tools": [
+                        {
+                            "actionId": "act_slack_send_message",
+                            "name": "send_message",
+                            "description": "Send a message",
+                            "inputSchema": _SAMPLE_INPUT_SCHEMA,
+                        }
+                    ]
+                },
+            )
+
+            tools = client.get_tools_for("Send a message on Slack", format="openai")
+            assert len(tools) == 1
+            assert tools[0]["type"] == "function"
+            assert tools[0]["function"]["name"] == "send_message"
+
+            # Verify the API was called with prompt
+            request = httpx_mock.get_request()
+            body = json.loads(request.content)
+            assert body["input"]["prompt"] == "Send a message on Slack"
+            assert body["input"]["limit"] == 5
+
+    def test_prompt_with_limit(self, httpx_mock: HTTPXMock) -> None:
+        """Prompt-based discovery sends limit to API."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            client = self._make_client(tmpdir)
+
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/ucl/getTools",
+                json={"tools": []},
+            )
+
+            tools = client.get_tools_for("List Jira issues", format="openai", limit=10)
+            assert tools == []
+
+            request = httpx_mock.get_request()
+            body = json.loads(request.content)
+            assert body["input"]["limit"] == 10
+
+    def test_prompt_raw_format(self, httpx_mock: HTTPXMock) -> None:
+        """Prompt-based with format='raw' returns API response directly."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            client = self._make_client(tmpdir)
+
+            raw_tool = {
+                "actionId": "act_slack_send_message",
+                "name": "send_message",
+                "description": "Send a message",
+                "inputSchema": _SAMPLE_INPUT_SCHEMA,
+            }
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/ucl/getTools",
+                json={"tools": [raw_tool]},
+            )
+
+            tools = client.get_tools_for("Send a Slack message", format="raw")
+            assert len(tools) == 1
+            assert tools[0]["actionId"] == "act_slack_send_message"
+
+    def test_prompt_api_error(self, httpx_mock: HTTPXMock) -> None:
+        """Prompt-based discovery raises APIError on failure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            client = self._make_client(tmpdir)
+
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/ucl/getTools",
+                status_code=500,
+                text="Internal Server Error",
+            )
+
+            with pytest.raises(APIError, match="Tool discovery failed"):
+                client.get_tools_for("Send a message", format="openai")
 
 
 # ---------------------------------------------------------------------------
@@ -581,29 +785,53 @@ class TestAsyncFastnClient:
             body = json.loads(request.content)
             assert body["input"]["actionId"] == "act_slack_send_message"
 
-    def test_get_tools_for_openai(self) -> None:
-        """Async client get_tools_for() works (sync method, no await needed)."""
+    @pytest.mark.asyncio
+    async def test_get_tools_for_connector_openai(self) -> None:
+        """Async client get_tools_for(connector=...) returns OpenAI format."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir, with_schemas=True)
             client = AsyncFastnClient(config_path=config_path)
-            tools = client.get_tools_for("slack", format="openai")
+            tools = await client.get_tools_for("slack tools", connector="slack", format="openai")
             assert len(tools) == 2
             assert tools[0]["type"] == "function"
 
-    def test_get_tools_for_anthropic(self) -> None:
+    @pytest.mark.asyncio
+    async def test_get_tools_for_connector_anthropic(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir, with_schemas=True)
             client = AsyncFastnClient(config_path=config_path)
-            tools = client.get_tools_for("slack", format="anthropic")
+            tools = await client.get_tools_for("slack tools", connector="slack", format="anthropic")
             assert len(tools) == 2
             assert "input_schema" in tools[0]
 
-    def test_get_tools_for_invalid(self) -> None:
+    @pytest.mark.asyncio
+    async def test_get_tools_for_invalid(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir, with_schemas=True)
             client = AsyncFastnClient(config_path=config_path)
             with pytest.raises(ValueError, match="Unsupported format"):
-                client.get_tools_for("slack", format="cohere")
+                await client.get_tools_for("slack tools", connector="slack", format="cohere")
+
+    @pytest.mark.asyncio
+    async def test_get_tools_for_multiple_connectors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_multi_connector_env(tmpdir)
+            client = AsyncFastnClient(config_path=config_path)
+            tools = await client.get_tools_for(
+                "project tools",
+                connector=["slack", "jira"],
+                format="openai",
+                limit=100,
+            )
+            assert len(tools) == 3  # 2 slack + 1 jira
+
+    @pytest.mark.asyncio
+    async def test_get_tools_for_with_limit(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_multi_connector_env(tmpdir)
+            client = AsyncFastnClient(config_path=config_path)
+            tools = await client.get_tools_for("slack tools", connector="slack", format="openai", limit=1)
+            assert len(tools) == 1
 
 
 # ---------------------------------------------------------------------------

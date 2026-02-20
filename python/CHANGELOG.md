@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-02-20
+
+### Added
+
+- `get_tools_for()` is now prompt-first: describe what you need in plain English and Fastn discovers the right tools
+- `get_tools_for()` accepts `connector=` for direct registry lookup (single or list of connectors)
+- `get_tools_for()` has a `limit` parameter (default 5) to control how many tools are returned
+- "Platform Benefits" section in Python README documenting centralized gateway, monitoring, auth management
+
+### Changed
+
+- Root README LLM section now shows complete working code with all variables defined
+- Python README LLM section rewritten with prompt-first examples for all 4 LLM providers
+- LLM agent example updated to use prompt-first tool discovery
+
 ## [0.2.2] - 2026-02-20
 
 ### Fixed

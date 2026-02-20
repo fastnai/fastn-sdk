@@ -1,12 +1,12 @@
-"""LLM agent integration — get tools, feed to LLM, execute result.
+"""LLM agent integration — describe what you need, get tools, execute.
 
 Demonstrates the full agent workflow:
-    1. Get tool schemas in your LLM's format
+    1. Describe what you need — Fastn discovers the right tools
     2. Send tools + user prompt to the LLM
     3. Execute the LLM's tool call via fastn.execute()
 
 Update the credentials below and run:
-    python examples/llm_agent.py
+    python examples/sdk/llm_agent.py
 """
 
 import json
@@ -16,15 +16,15 @@ from fastn import FastnClient
 # --- Configuration (update these) ----------------------------------------
 API_KEY = "your-api-key"
 PROJECT_ID = "your-project-id"
-CONNECTOR = "slack"
 PROMPT = "Send 'Hello from AI agent!' to #general on Slack"
 # --------------------------------------------------------------------------
 
 
 def openai_example(fastn: FastnClient) -> None:
     """OpenAI function-calling workflow."""
-    tools = fastn.get_tools_for(CONNECTOR, format="openai")
-    print(f"Got {len(tools)} {CONNECTOR} tools in OpenAI format\n")
+    # Describe what you need — Fastn finds the right tools
+    tools = fastn.get_tools_for(PROMPT, format="openai")
+    print(f"Got {len(tools)} tools in OpenAI format\n")
 
     try:
         import openai
@@ -57,8 +57,8 @@ def openai_example(fastn: FastnClient) -> None:
 
 def anthropic_example(fastn: FastnClient) -> None:
     """Anthropic Claude tool-use workflow."""
-    tools = fastn.get_tools_for(CONNECTOR, format="anthropic")
-    print(f"Got {len(tools)} {CONNECTOR} tools in Anthropic format\n")
+    tools = fastn.get_tools_for(PROMPT, format="anthropic")
+    print(f"Got {len(tools)} tools in Anthropic format\n")
 
     try:
         import anthropic
@@ -86,8 +86,8 @@ def anthropic_example(fastn: FastnClient) -> None:
 
 def gemini_example(fastn: FastnClient) -> None:
     """Google Gemini function-calling workflow."""
-    tools = fastn.get_tools_for(CONNECTOR, format="gemini")
-    print(f"Got {len(tools)} {CONNECTOR} tools in Gemini format\n")
+    tools = fastn.get_tools_for(PROMPT, format="gemini")
+    print(f"Got {len(tools)} tools in Gemini format\n")
 
     try:
         from google import genai
