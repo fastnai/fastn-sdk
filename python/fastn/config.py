@@ -25,7 +25,7 @@ Key classes:
 Key functions:
     load_config()   Load config from env vars + file (priority: env > file).
     save_config()   Write config to .fastn/config.json (chmod 0o600).
-    load_registry() Load the cached connector registry (.fastn/registry.json).
+    load_registry() Load the cached tool registry (.fastn/registry.json).
     load_manifest() Load the manifest (.fastn/manifest.json).
 """
 
@@ -53,6 +53,39 @@ ENV_TENANT_ID = "FASTN_TENANT_ID"
 ENV_AUTH_TOKEN = "FASTN_AUTH_TOKEN"
 ENV_STAGE = "FASTN_STAGE"
 
+# LLM provider environment variables (standard names used by each SDK)
+ENV_OPENAI_API_KEY = "OPENAI_API_KEY"
+ENV_ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
+ENV_GEMINI_API_KEY = "GEMINI_API_KEY"
+
+# Supported LLM providers
+LLM_PROVIDERS = {
+    "openai": {
+        "name": "OpenAI",
+        "env_var": ENV_OPENAI_API_KEY,
+        "pip_package": "openai",
+        "key_url": "https://platform.openai.com/api-keys",
+        "models": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
+        "default_model": "gpt-4o-mini",
+    },
+    "anthropic": {
+        "name": "Anthropic",
+        "env_var": ENV_ANTHROPIC_API_KEY,
+        "pip_package": "anthropic",
+        "key_url": "https://console.anthropic.com/settings/keys",
+        "models": ["claude-sonnet-4-20250514", "claude-haiku-4-20250514"],
+        "default_model": "claude-sonnet-4-20250514",
+    },
+    "gemini": {
+        "name": "Google Gemini",
+        "env_var": ENV_GEMINI_API_KEY,
+        "pip_package": "google-genai",
+        "key_url": "https://aistudio.google.com/apikey",
+        "models": ["gemini-2.0-flash", "gemini-2.0-flash-lite"],
+        "default_model": "gemini-2.0-flash",
+    },
+}
+
 
 @dataclass
 class FastnConfig:
@@ -66,6 +99,10 @@ class FastnConfig:
     auth_token: str = ""
     refresh_token: str = ""
     token_expiry: str = ""
+    # LLM provider configuration (for fastn agent)
+    llm_provider: str = ""  # "openai", "anthropic", "gemini"
+    llm_api_key: str = ""   # API key for the selected provider
+    llm_model: str = ""     # Model name override (optional)
 
     def validate(self) -> None:
         """Raise ConfigError if required fields are missing.
@@ -100,6 +137,12 @@ class FastnConfig:
             d["refresh_token"] = self.refresh_token
         if self.token_expiry:
             d["token_expiry"] = self.token_expiry
+        if self.llm_provider:
+            d["llm_provider"] = self.llm_provider
+        if self.llm_api_key:
+            d["llm_api_key"] = self.llm_api_key
+        if self.llm_model:
+            d["llm_model"] = self.llm_model
         return d
 
     def resolve_project_id(self) -> str:
@@ -135,7 +178,7 @@ class FastnConfig:
             "stage": self.stage,
             "x-fastn-custom-auth": "false",
             "x-fastn-space-id": workspace_id,
-            "x-tenant": self.tenant_id,
+            "x-fastn-space-tenantid": self.tenant_id,
         }
         if self.auth_token:
             headers["Authorization"] = f"Bearer {self.auth_token}"
@@ -197,6 +240,15 @@ def load_config(config_path: Optional[str] = None) -> FastnConfig:
     # Load from env vars
     env_data = _load_env_config()
 
+    # LLM provider env vars (standard names for each SDK)
+    llm_api_key = ""
+    llm_provider = file_data.get("llm_provider", "")
+    if llm_provider and llm_provider in LLM_PROVIDERS:
+        env_var = LLM_PROVIDERS[llm_provider]["env_var"]
+        llm_api_key = os.environ.get(env_var, "") or file_data.get("llm_api_key", "")
+    else:
+        llm_api_key = file_data.get("llm_api_key", "")
+
     # Env vars take precedence over file
     return FastnConfig(
         api_key=env_data.get("api_key") or file_data.get("api_key", ""),
@@ -206,6 +258,9 @@ def load_config(config_path: Optional[str] = None) -> FastnConfig:
         auth_token=env_data.get("auth_token") or file_data.get("auth_token", ""),
         refresh_token=file_data.get("refresh_token", ""),
         token_expiry=file_data.get("token_expiry", ""),
+        llm_provider=llm_provider,
+        llm_api_key=llm_api_key,
+        llm_model=file_data.get("llm_model", ""),
     )
 
 

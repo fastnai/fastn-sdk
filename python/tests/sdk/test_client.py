@@ -314,7 +314,8 @@ class TestExecute:
             request = httpx_mock.get_request()
             body = json.loads(request.content)
             assert body["input"]["actionId"] == "act_slack_send_message"
-            assert body["input"]["parameters"]["body"]["channel"] == "general"
+            # execute() sends params flat (no wrapper key)
+            assert body["input"]["parameters"]["channel"] == "general"
 
     def test_execute_with_connection_id(self, httpx_mock: HTTPXMock) -> None:
         """execute() passes connection_id through to the API."""
@@ -603,3 +604,97 @@ class TestAsyncFastnClient:
             client = AsyncFastnClient(config_path=config_path)
             with pytest.raises(ValueError, match="Unsupported format"):
                 client.get_tools_for("slack", format="cohere")
+
+
+# ---------------------------------------------------------------------------
+# Flows connector tests
+# ---------------------------------------------------------------------------
+
+def _create_flows_test_env(tmpdir: str) -> str:
+    """Create a .fastn directory with config, registry including flows connector."""
+    fastn_dir = Path(tmpdir) / ".fastn"
+    fastn_dir.mkdir()
+
+    config = {
+        "api_key": "test-api-key",
+        "project_id": "my-project-id",
+        "stage": "LIVE",
+    }
+    (fastn_dir / "config.json").write_text(json.dumps(config))
+
+    registry = {
+        "version": "2025.02.14",
+        "connectors": {
+            "slack": {
+                "id": "conn_slack_001",
+                "display_name": "Slack",
+                "category": "communication",
+                "tools": {
+                    "send_message": {
+                        "actionId": "act_slack_send_message",
+                        "description": "Send a message",
+                    },
+                },
+            },
+            "flows": {
+                "id": "conn_flows_001",
+                "display_name": "Flows",
+                "category": "workflow",
+                "connector_type": "FLOW",
+                "tools": {
+                    "run_onboarding": {
+                        "actionId": "act_flows_run_onboarding",
+                        "description": "Run the onboarding flow",
+                    },
+                },
+            },
+        },
+    }
+    (fastn_dir / "registry.json").write_text(json.dumps(registry))
+
+    return str(fastn_dir / "config.json")
+
+
+class TestFlowsConnector:
+    def test_flows_uses_registry_id(self) -> None:
+        """Flows connector should use the registry-assigned connector ID."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_flows_test_env(tmpdir)
+            client = FastnClient(config_path=config_path)
+            proxy = client.flows
+            assert proxy._connector_id == "conn_flows_001"
+
+    def test_regular_connector_uses_registry_id(self) -> None:
+        """Regular connectors should use the registry-assigned connector ID."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_flows_test_env(tmpdir)
+            client = FastnClient(config_path=config_path)
+            proxy = client.slack
+            assert proxy._connector_id == "conn_slack_001"
+
+    def test_flows_sends_connector_id_in_payload(self, httpx_mock: HTTPXMock) -> None:
+        """Flows tool call should send the registry connector ID in the payload."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_flows_test_env(tmpdir)
+            client = FastnClient(config_path=config_path)
+
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/ucl/executeTool",
+                json={"ok": True},
+            )
+
+            client.flows.run_onboarding(name="Alice")
+
+            request = httpx_mock.get_request()
+            body = json.loads(request.content)
+            assert body["input"]["connectorId"] == "conn_flows_001"
+            assert body["input"]["actionId"] == "act_flows_run_onboarding"
+
+    @pytest.mark.asyncio
+    async def test_async_flows_uses_registry_id(self) -> None:
+        """Async client flows connector should also use registry ID."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_flows_test_env(tmpdir)
+            client = AsyncFastnClient(config_path=config_path)
+            proxy = client.flows
+            assert proxy._connector_id == "conn_flows_001"

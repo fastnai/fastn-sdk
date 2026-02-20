@@ -47,7 +47,7 @@ class TestExceptions:
     def test_tool_not_found_no_tools_installed(self) -> None:
         err = ToolNotFoundError("slack", "send_message", has_tools=False)
         assert "fastn add slack" in str(err)
-        assert "no tools installed" in str(err).lower()
+        assert "no actions installed" in str(err).lower()
         assert err.connector_name == "slack"
         assert err.tool_name == "send_message"
 

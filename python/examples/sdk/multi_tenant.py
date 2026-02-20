@@ -25,7 +25,7 @@ def main() -> None:
     fastn = FastnClient(
         api_key=API_KEY,
         project_id=PROJECT_ID,
-        verbose=True,
+        verbose=False,
     )
 
     # ----------------------------------------------------------------

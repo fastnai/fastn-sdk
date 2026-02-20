@@ -9,8 +9,8 @@ Exception hierarchy:
     +-- AuthError               Invalid/expired credentials (API key or JWT).
     |   +-- OAuthError          OAuth device flow failure. Has .error_code attr.
     +-- ConfigError             Missing api_key/project_id. Run ``fastn init``.
-    +-- ConnectorNotFoundError  Connector not in registry. Has .connector_name attr.
-    +-- ToolNotFoundError       Tool not in connector. Has .connector_name, .tool_name.
+    +-- ConnectorNotFoundError  Tool not in registry. Has .connector_name attr.
+    +-- ToolNotFoundError       Action not in tool. Has .connector_name, .tool_name.
     +-- ConnectionNotFoundError Multiple connections, none specified.
     +-- APIError                HTTP error from the API. Has .status_code, .response_body.
     +-- RegistryError           Registry sync/parse failure.
@@ -53,11 +53,11 @@ class ConfigError(FastnError):
 
 
 class ConnectorNotFoundError(FastnError):
-    """Raised when accessing a connector not in the registry."""
+    """Raised when accessing a tool not in the registry."""
 
     def __init__(self, connector_name: str) -> None:
         super().__init__(
-            f"Connector '{connector_name}' not found in local registry. "
+            f"Tool '{connector_name}' not found in local registry. "
             f"Run `fastn sync` to update the registry, "
             f"then `fastn add {connector_name}` to install it."
         )
@@ -65,20 +65,20 @@ class ConnectorNotFoundError(FastnError):
 
 
 class ToolNotFoundError(FastnError):
-    """Raised when accessing a tool not in the connector definition."""
+    """Raised when accessing an action not in the tool definition."""
 
     def __init__(
         self, connector_name: str, tool_name: str, has_tools: bool = True,
     ) -> None:
         if has_tools:
             msg = (
-                f"Tool '{tool_name}' not found in connector '{connector_name}'. "
-                f"Run `fastn sync` to update the registry, or check the tool name."
+                f"Action '{tool_name}' not found in tool '{connector_name}'. "
+                f"Run `fastn sync` to update the registry, or check the action name."
             )
         else:
             msg = (
-                f"Connector '{connector_name}' has no tools installed. "
-                f"Run `fastn add {connector_name}` to fetch its tools."
+                f"Tool '{connector_name}' has no actions installed. "
+                f"Run `fastn add {connector_name}` to fetch its actions."
             )
         super().__init__(msg)
         self.connector_name = connector_name

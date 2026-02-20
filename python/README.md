@@ -1,6 +1,6 @@
 # Fastn SDK for Python
 
-Typed, deterministic access to 250+ integrations — Slack, Jira, GitHub, Salesforce, and more. Works for both traditional applications and AI agent workflows.
+Pre-built tools for AI agents and apps — 250+ integrations including Slack, Jira, GitHub, Salesforce, HubSpot, Stripe, and more.
 
 [![PyPI version](https://img.shields.io/pypi/v/fastn-sdk.svg)](https://pypi.org/project/fastn-sdk/)
 [![Python](https://img.shields.io/pypi/pyversions/fastn-sdk.svg)](https://pypi.org/project/fastn-sdk/)
@@ -9,153 +9,88 @@ Typed, deterministic access to 250+ integrations — Slack, Jira, GitHub, Salesf
 ## Installation
 
 ```bash
-pip install fastn-sdk
+pip install fastn
 ```
+
+Installs the SDK and CLI. Requires Python 3.8+.
 
 ## Quick Start
 
-### 1. Initialize credentials
-
 ```bash
-fastn init
-```
-
-Prompts for your API key and project ID, then saves them to `.fastn/config.json` (automatically gitignored).
-
-Alternatively, log in with your browser:
-
-```bash
+# 1. Authenticate
 fastn login
-```
 
-### 2. Sync the connector registry
-
-```bash
+# 2. Download the tool registry
 fastn sync
-```
 
-Downloads all available connector metadata (names, tools, schemas).
-
-### 3. Add connectors you need
-
-```bash
+# 3. Enable autocomplete for the tools you need
 fastn add slack jira github
 ```
-
-Generates typed stubs so your IDE shows full autocomplete with parameter names and types.
-
-### 4. Use in code
 
 ```python
 from fastn import FastnClient
 
 fastn = FastnClient()
-response = fastn.slack.send_message(channel="general", text="Hello from Fastn!")
-print(response)
+fastn.slack.send_message(channel="general", text="Hello from Fastn!")
 ```
 
-**Async:**
+Async:
 
 ```python
 from fastn import AsyncFastnClient
 
-async def main():
-    async with AsyncFastnClient() as fastn:
-        response = await fastn.slack.send_message(channel="general", text="Hello!")
-        print(response)
+async with AsyncFastnClient() as fastn:
+    await fastn.slack.send_message(channel="general", text="Hello!")
 ```
 
-## Explicit Configuration
+## Configuration
 
-Pass credentials directly instead of using the config file:
+Fastn reads credentials from three sources (highest priority first):
+
+1. **Constructor parameters**: `FastnClient(api_key="...", project_id="...")`
+2. **Environment variables**: `FASTN_API_KEY`, `FASTN_PROJECT_ID`
+3. **Config file**: `.fastn/config.json` (created by `fastn init` or `fastn login`)
 
 ```python
-fastn = FastnClient(
-    api_key="your-api-key",
-    project_id="your-project-id",
-)
+# Explicit credentials (no config file needed)
+fastn = FastnClient(api_key="your-api-key", project_id="your-project-id")
 ```
 
-Or use environment variables:
+All environment variables:
 
-```bash
-export FASTN_API_KEY="your-api-key"
-export FASTN_PROJECT_ID="your-project-id"
-```
-
-## Multi-Connection Support
-
-When you have multiple connections for the same connector (e.g. two Slack workspaces):
-
-```python
-# Per-call connection_id
-fastn.slack.send_message(
-    connection_id="conn_workspace_a",
-    channel="general",
-    text="Hello workspace A!",
-)
-
-# Or bind once with connect()
-slack_a = fastn.connect("conn_workspace_a")
-slack_a.send_message(channel="general", text="Hello!")
-slack_a.create_channel(name="new-channel")
-```
-
-## Environments
-
-The Fastn API supports three environments: `LIVE` (production), `STAGING`, and `DEV`. The environment is controlled via the `stage` header — all environments use the same base URL.
-
-```python
-# Via constructor parameter
-dev = FastnClient(stage="DEV")
-staging = FastnClient(stage="STAGING")
-prod = FastnClient()  # defaults to LIVE
-```
-
-Via environment variable:
-
-```bash
-export FASTN_STAGE=DEV
-```
-
-Via config file (`.fastn/config.json`):
-
-```json
-{"stage": "DEV"}
-```
-
-**Priority:** constructor param > `FASTN_STAGE` env var > config file > `"LIVE"`
-
-Combine with connection and tenant overrides:
-
-```python
-dev = FastnClient(stage="DEV")
-dev.slack.send_message(
-    connection_id="conn_dev_slack",
-    tenant_id="dev_tenant",
-    channel="general",
-    text="DEV environment message",
-)
-```
+| Variable | Description |
+|----------|-------------|
+| `FASTN_API_KEY` | API key |
+| `FASTN_PROJECT_ID` | Project / workspace ID |
+| `FASTN_AUTH_TOKEN` | JWT from `fastn login` |
+| `FASTN_TENANT_ID` | Default tenant ID |
+| `FASTN_STAGE` | Environment: `LIVE`, `STAGING`, or `DEV` |
 
 ## LLM Agent Integration
 
-The SDK provides first-class support for LLM agent workflows. Get tool schemas in your LLM provider's native format, feed them to the model, and execute the result — all through the SDK.
+The SDK provides tool schemas in every major LLM provider's native format. The workflow is:
 
-### Workflow
+1. Get tools for a connector in your LLM's format
+2. Send tools to the LLM with the user's prompt
+3. Execute the LLM's tool call through Fastn
 
 ```python
-# 1. Get tools in your LLM's format
+import json
+from fastn import FastnClient
+
+fastn = FastnClient()
+
+# 1. Get tools (supports: openai, anthropic, gemini, bedrock, raw)
 tools = fastn.get_tools_for("slack", format="openai")
 
-# 2. Send to your LLM
+# 2. Send to LLM
 response = openai.chat.completions.create(
     model="gpt-4o",
     messages=[{"role": "user", "content": "Send hello to #general on Slack"}],
     tools=tools,
 )
 
-# 3. Execute the LLM's tool call
+# 3. Execute
 tool_call = response.choices[0].message.tool_calls[0]
 result = fastn.execute(
     action_id=tool_call.function.name,
@@ -163,41 +98,17 @@ result = fastn.execute(
 )
 ```
 
-### Supported Formats
+### Supported LLM Providers
 
-| Format | Provider | Method |
-|--------|----------|--------|
+| Format | Provider | Example |
+|--------|----------|---------|
 | `"openai"` | OpenAI, Azure OpenAI | `get_tools_for("slack", format="openai")` |
 | `"anthropic"` | Anthropic Claude | `get_tools_for("slack", format="anthropic")` |
 | `"gemini"` | Google Gemini / Vertex AI | `get_tools_for("slack", format="gemini")` |
 | `"bedrock"` | AWS Bedrock Converse API | `get_tools_for("slack", format="bedrock")` |
 | `"raw"` | Any (raw Fastn schemas) | `get_tools_for("slack", format="raw")` |
 
-### OpenAI Example
-
-```python
-import json
-import openai
-from fastn import FastnClient
-
-fastn = FastnClient()
-tools = fastn.get_tools_for("slack", format="openai")
-
-response = openai.chat.completions.create(
-    model="gpt-4o",
-    messages=[{"role": "user", "content": "Post 'Deploy complete' to #releases"}],
-    tools=tools,
-)
-
-for tool_call in response.choices[0].message.tool_calls or []:
-    result = fastn.execute(
-        action_id=tool_call.function.name,
-        params=json.loads(tool_call.function.arguments),
-    )
-    print(result)
-```
-
-### Anthropic Example
+### Anthropic Claude Example
 
 ```python
 import anthropic
@@ -265,45 +176,57 @@ for block in response["output"]["message"]["content"]:
         print(result)
 ```
 
-### Raw Schema Access
+## Multi-Connection Support
 
-For custom integrations or unsupported LLM providers:
+When you have multiple connections for the same tool (e.g. two Slack workspaces):
 
 ```python
-# Get raw schemas with actionId, inputSchema, outputSchema
-raw_tools = fastn.get_tools_for("slack", format="raw")
+# Per-call
+fastn.slack.send_message(connection_id="conn_workspace_a", channel="general", text="Hi!")
 
-# Or access individual tools
-tool = fastn.get_tool("slack", "sendmessage")
-print(tool["actionId"])      # "act_slack_sendmessage"
-print(tool["inputSchema"])   # JSON Schema for parameters
-print(tool["outputSchema"])  # JSON Schema for response
+# Or bind once
+slack_a = fastn.connect("conn_workspace_a")
+slack_a.send_message(channel="general", text="Hello!")
 ```
+
+## Multi-Tenant Support
+
+Route requests to the correct tenant (customer, organization, or team):
+
+```python
+# Per-call override
+fastn.slack.send_message(tenant_id="acme", channel="general", text="Hello!")
+
+# Constructor-level default
+fastn = FastnClient(tenant_id="acme")
+
+# Environment variable
+# export FASTN_TENANT_ID=acme
+
+# CLI flag
+# fastn run slack send_message --tenant acme --channel general --text "Hello!"
+```
+
+**Priority:** per-call `tenant_id` > CLI `--tenant` flag > constructor param > `FASTN_TENANT_ID` env var > config file > `"organization"`
+
+## Environments
+
+Switch between `LIVE`, `STAGING`, and `DEV`:
+
+```python
+dev = FastnClient(stage="DEV")
+staging = FastnClient(stage="STAGING")
+prod = FastnClient()  # defaults to LIVE
+```
+
+Or: `export FASTN_STAGE=DEV`
 
 ## AI-Powered Mode
 
-For quick prototyping, use natural language to discover and execute tools:
+For quick prototyping, use natural language:
 
 ```python
 result = fastn.run("Send hello to #general on Slack")
-```
-
-## Control Plane
-
-Inspect the connector registry programmatically:
-
-```python
-# List all available connectors
-connectors = fastn.admin.connectors.list()
-
-# Get details for a specific connector
-slack = fastn.admin.connectors.get("slack")
-
-# Get all tools for a connector (raw schemas)
-tools = fastn.get_tools("slack")
-
-# Get a single tool's schema
-tool = fastn.get_tool("slack", "sendmessage")
 ```
 
 ## CLI Reference
@@ -314,75 +237,56 @@ tool = fastn.get_tool("slack", "sendmessage")
 | `fastn login` | Authenticate via browser (OAuth device flow) |
 | `fastn logout` | Clear stored authentication tokens |
 | `fastn whoami` | Show current authenticated user |
-| `fastn sync` | Download/update the connector registry |
-| `fastn add <name> [...]` | Add connector stubs for IDE autocomplete |
-| `fastn remove <name>` | Remove connector stubs |
-| `fastn list` | Show all available connectors |
-| `fastn list -v` | Show connectors with tool details |
-| `fastn schema <connector> <tool>` | Print a tool's input/output schema |
+| `fastn sync` | Download/update the tool registry |
+| `fastn add <name> [...]` | Add tool stubs for IDE autocomplete |
+| `fastn remove <name>` | Remove tool stubs |
+| `fastn list` | Show all available tools |
+| `fastn list --active` | Show only active/enabled tools |
+| `fastn list -v` | Show tools with action details |
+| `fastn run <tool> <action>` | Execute a tool action (interactive or inline params) |
+| `fastn agent "<prompt>"` | AI-powered tool execution via natural language |
+| `fastn schema <tool> <action>` | Print an action's input/output schema |
 | `fastn version` | Show SDK and registry versions |
 
-## IDE Autocomplete Setup
+## CLI: `fastn agent`
 
-After running `fastn sync` and `fastn add <connector>`, your IDE will provide full autocomplete:
+Agentic CLI — describe what you want in natural language and the agent discovers tools, sends them to your LLM via native function calling, and executes tool calls in a loop until the task is complete.
 
-- **PyCharm / IntelliJ**: Works automatically with `.pyi` stubs
-- **VS Code (Pylance)**: Add to `python.analysis.extraPaths` in settings:
-  ```json
-  {
-    "python.analysis.extraPaths": [".fastn/python"]
-  }
-  ```
-- **mypy**: Add to `mypy.ini`:
-  ```ini
-  [mypy]
-  mypy_path = .fastn/python
-  ```
-
-## Error Handling
-
-All exceptions inherit from `FastnError`:
-
-```python
-from fastn import (
-    FastnClient,
-    FastnError,
-    AuthError,
-    ConfigError,
-    APIError,
-    ConnectorNotFoundError,
-    ToolNotFoundError,
-    ConnectionNotFoundError,
-    OAuthError,
-    RegistryError,
-)
-
-try:
-    fastn = FastnClient()
-    fastn.slack.send_message(channel="general", text="Hello!")
-except AuthError:
-    print("Invalid credentials — check your API key")
-except ConnectorNotFoundError as e:
-    print(f"Run: fastn sync && fastn add {e.connector_name}")
-except ToolNotFoundError as e:
-    print(f"Tool '{e.tool_name}' not found in '{e.connector_name}'")
-except APIError as e:
-    print(f"HTTP {e.status_code}: {e}")
-except ConfigError:
-    print("Run: fastn init")
+```bash
+fastn agent "Send hello to #general on Slack"
+fastn agent --connector slack "List all channels"
+fastn agent --eval "Create a Jira ticket for the login bug"
 ```
 
-| Exception | When |
-|-----------|------|
-| `FastnError` | Base class for all SDK errors |
-| `AuthError` | Invalid or expired credentials |
-| `ConfigError` | Missing API key or project ID |
-| `APIError` | HTTP error from the Fastn API (has `.status_code`, `.response_body`) |
-| `ConnectorNotFoundError` | Connector not in registry |
-| `ToolNotFoundError` | Tool not found in connector |
-| `ConnectionNotFoundError` | Connection ID not recognized |
-| `OAuthError` | OAuth flow failed (has `.error_code`) |
-| `RegistryError` | Registry sync or parse failure |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--connector` | — | Scope tool discovery to a specific connector |
+| `--tool` | — | Scope discovery to a specific tool/action |
+| `--max-turns` | `10` | Maximum agentic loop iterations |
+| `--max-tools` | `5` | Maximum number of tools passed to the LLM |
+| `--max-errors` | `2` | Stop after this many consecutive tool errors |
+| `-y` / `--yes` | off | Skip confirmation prompts before each tool call |
+| `--eval` | off | Run LLM-based evaluation after the agent finishes |
+| `--connection-id` | — | Connection ID for multi-connection tools |
+| `--tenant` | — | Tenant ID override |
+
+## CLI: `fastn run`
+
+Execute tool actions directly from the command line:
+
+```bash
+# List available actions
+fastn run slack
+
+# Interactive mode (prompts for each parameter)
+fastn run slack send_message
+
+# Inline parameters
+fastn run slack send_message --channel general --text "Hello!"
+
+# With tenant override
+fastn run slack send_message --tenant acme --channel general --text "Hello!"
+```
 
 ## API Reference
 
@@ -390,15 +294,15 @@ except ConfigError:
 
 ```python
 FastnClient(
-    api_key: str = None,        # Fastn API key (or set FASTN_API_KEY)
-    project_id: str = None,     # Fastn project ID (or set FASTN_PROJECT_ID)
-    auth_token: str = None,     # JWT from `fastn login` (or set FASTN_AUTH_TOKEN)
-    tenant_id: str = None,      # Tenant ID (default: "organization", or set FASTN_TENANT_ID)
-    stage: str = None,          # Environment: "LIVE", "STAGING", "DEV" (or set FASTN_STAGE)
-    config_path: str = None,    # Path to config.json (default: .fastn/config.json)
+    api_key: str = None,        # Fastn API key (or FASTN_API_KEY)
+    project_id: str = None,     # Project ID (or FASTN_PROJECT_ID)
+    auth_token: str = None,     # JWT from fastn login (or FASTN_AUTH_TOKEN)
+    tenant_id: str = None,      # Tenant ID (or FASTN_TENANT_ID)
+    stage: str = None,          # "LIVE", "STAGING", "DEV" (or FASTN_STAGE)
+    config_path: str = None,    # Path to config.json
     timeout: float = 30.0,      # HTTP timeout in seconds
     max_retries: int = 3,       # Retry count for transient failures
-    verbose: bool = False,      # Enable debug logging
+    verbose: bool = False,      # Debug logging
 )
 ```
 
@@ -406,35 +310,136 @@ FastnClient(
 
 | Method | Description |
 |--------|-------------|
-| `fastn.<connector>.<tool>(**params)` | Execute a tool on a connector |
-| `fastn.connect(connection_id)` | Bind a connection and return a proxy |
-| `fastn.execute(action_id, params, ...)` | Execute a tool by action ID (for LLM agents) |
-| `fastn.get_tools(connector_name)` | Get all tools with raw schemas |
-| `fastn.get_tool(connector_name, tool_name)` | Get one tool's schema |
-| `fastn.get_tools_for(connector_name, format)` | Get tools in LLM provider format |
-| `fastn.run(prompt)` | AI-powered tool discovery and execution |
-| `fastn.admin.connectors.list()` | List all connectors in registry |
-| `fastn.admin.connectors.get(name)` | Get connector details |
+| `fastn.<tool>.<action>(**params)` | Execute an action on a tool |
+| `fastn.connect(connection_id)` | Bind a connection, return a proxy |
+| `fastn.execute(action_id, params, ...)` | Execute by action ID (for LLM agents) |
+| `fastn.get_tools(tool_name)` | Get all actions with raw schemas |
+| `fastn.get_tool(tool_name, action_name)` | Get one action's schema |
+| `fastn.get_tools_for(tool_name, format)` | Get actions in LLM provider format |
+| `fastn.run(prompt)` | AI-powered action discovery and execution |
+| `fastn.admin.connectors.list()` | List all tools in registry |
+| `fastn.admin.connectors.get(name)` | Get tool details |
 
 ### `AsyncFastnClient`
 
-Same API as `FastnClient`, but all tool calls and `execute()` are `async`/`await`. Use as an async context manager:
+Same API as `FastnClient`, but all tool calls and `execute()` are `async`/`await`:
 
 ```python
 async with AsyncFastnClient() as fastn:
     result = await fastn.slack.send_message(channel="general", text="Hi")
 ```
 
+## Error Handling
+
+All exceptions inherit from `FastnError`:
+
+```python
+from fastn import (
+    FastnClient, FastnError, AuthError, ConfigError, APIError,
+    ConnectorNotFoundError, ToolNotFoundError, ConnectionNotFoundError,
+    OAuthError, RegistryError,
+)
+
+try:
+    fastn.slack.send_message(channel="general", text="Hello!")
+except AuthError:
+    print("Invalid credentials — check your API key")
+except ConnectorNotFoundError as e:
+    print(f"Run: fastn sync && fastn add {e.connector_name}")
+except ToolNotFoundError as e:
+    print(f"Action '{e.tool_name}' not found in '{e.connector_name}'")
+except APIError as e:
+    print(f"HTTP {e.status_code}: {e}")
+except ConfigError:
+    print("Run: fastn init")
+```
+
+| Exception | When | Key Attributes |
+|-----------|------|----------------|
+| `FastnError` | Base class for all SDK errors | — |
+| `AuthError` | Invalid or expired credentials | — |
+| `ConfigError` | Missing API key or project ID | — |
+| `APIError` | HTTP error from the Fastn API | `.status_code`, `.response_body` |
+| `ConnectorNotFoundError` | Tool not in registry | `.connector_name` |
+| `ToolNotFoundError` | Action not found in tool | `.tool_name`, `.connector_name` |
+| `ConnectionNotFoundError` | Connection ID not recognized | — |
+| `OAuthError` | OAuth flow failed | `.error_code` |
+| `RegistryError` | Registry sync or parse failure | — |
+
+## IDE Autocomplete
+
+After `fastn sync` and `fastn add <name>`, your IDE shows full autocomplete:
+
+- **PyCharm / IntelliJ**: Works automatically with `.pyi` stubs
+- **VS Code (Pylance)**: Add `".fastn/python"` to `python.analysis.extraPaths`
+- **mypy**: Set `mypy_path = .fastn/python`
+
+## Control Plane
+
+Inspect the tool registry programmatically:
+
+```python
+connectors = fastn.admin.connectors.list()       # All tools
+slack = fastn.admin.connectors.get("slack")       # Tool details
+tools = fastn.get_tools("slack")                  # All actions (raw schemas)
+tool = fastn.get_tool("slack", "sendmessage")     # Single action schema
+```
+
 ## Examples
 
-See the [`examples/`](examples/) directory for runnable scripts:
+See [`examples/`](examples/) for runnable scripts:
 
-| Script | Description |
-|--------|-------------|
-| [`basic_usage.py`](examples/basic_usage.py) | Send a Slack message using the default connection |
-| [`multi_tenant.py`](examples/multi_tenant.py) | Connection IDs, tenant overrides, bound proxies |
-| [`llm_agent.py`](examples/llm_agent.py) | Full LLM agent workflow (OpenAI, Anthropic, Gemini) |
-| [`environments.py`](examples/environments.py) | Switch between DEV, STAGING, and LIVE |
+| Directory | Contents |
+|-----------|----------|
+| [`examples/sdk/`](examples/sdk/) | SDK usage — basic, async, LLM agents, multi-tenant, environments, error handling |
+| [`examples/cli/`](examples/cli/) | CLI usage — all commands with examples |
+
+## Development
+
+```bash
+# Install in dev mode
+pip install -e ".[dev]"
+
+# Run all tests (375 tests, ~6s)
+make test
+
+# Run only SDK tests (129 tests, ~5s)
+make test-sdk
+
+# Run only CLI tests (246 tests, <1s)
+make test-cli
+
+# Run a single test file
+make test-file F=tests/cli/test_cli_commands.py
+
+# Or use pytest directly
+python3 -m pytest tests/sdk/ -q       # SDK only
+python3 -m pytest tests/cli/ -q       # CLI only
+python3 -m pytest tests/ -q           # All
+python3 -m pytest tests/ -m sdk -q    # By marker
+python3 -m pytest tests/ -m cli -q    # By marker
+```
+
+### Test Structure
+
+```
+tests/
+├── sdk/                           # SDK core tests (129 tests)
+│   ├── test_client.py             # FastnClient, AsyncFastnClient
+│   ├── test_connector.py          # DynamicConnector proxy
+│   ├── test_config.py             # Config loading, env vars, validation
+│   ├── test_exceptions.py         # Exception hierarchy
+│   ├── test_auth.py               # Auth helpers
+│   └── test_oauth.py              # OAuth device flow, token refresh
+└── cli/                           # CLI command tests (246 tests)
+    ├── test_cli_commands.py        # All CLI commands (sync, add, remove, list, run, agent, etc.)
+    ├── test_cli_helpers.py         # CLI helper functions
+    ├── test_agent_command.py       # fastn agent command
+    ├── test_agent_helpers.py       # Agent helper functions
+    ├── test_helpers_extended.py    # Extended helper tests (token, schema, parsing)
+    ├── test_detect_api_error.py    # API error detection across providers
+    └── test_detect_languages.py    # SDK language detection for stub generation
+```
 
 ## License
 

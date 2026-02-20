@@ -1,0 +1,3251 @@
+"""Fastn CLI — init, login, logout, whoami, sync, add, remove, list, run, schema, version.
+
+Provides the ``fastn`` command-line interface for managing
+SDK configuration, tool registry, and type stubs.
+
+Commands:
+    fastn init              Interactive setup — prompts for API key + project ID.
+    fastn login             Authenticate via browser (OAuth device flow).
+    fastn logout            Clear stored authentication tokens.
+    fastn whoami            Show current authenticated user.
+    fastn sync              Download/update the tool registry from the API.
+    fastn add <name> [...]  Generate typed .pyi stubs for IDE autocomplete.
+    fastn remove <name>     Remove tool stubs.
+    fastn list              Show all available tools.
+    fastn list -v           Show tools with action details.
+    fastn run <t> <a>       Execute a tool action from the command line.
+    fastn agent "<prompt>"  AI-powered tool discovery and execution.
+    fastn schema <c> <t>    Print input/output schema for a tool action.
+    fastn version           Show SDK and registry versions.
+
+The CLI entry point is registered in pyproject.toml:
+    [project.scripts]
+    fastn = "fastn.cli:main"
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import click
+import httpx
+
+from fastn import __version__
+from fastn.auth import mask_key
+
+API_BASE_URL = "https://live.fastn.ai/api/ucl"
+from fastn.config import (
+    DEFAULT_STAGE,
+    FASTN_DIR,
+    FastnConfig,
+    add_connector_to_manifest,
+    ensure_gitignore,
+    find_fastn_dir,
+    get_installed_connectors,
+    load_config,
+    load_manifest,
+    load_migrations,
+    load_registry,
+    remove_connector_from_manifest,
+    save_config,
+    save_manifest,
+    save_migrations,
+    save_registry,
+)
+
+
+# Import the generator (it lives in the sibling generator package)
+# At runtime, we add the parent dir to path so the generator is importable
+_SDK_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_SDK_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SDK_ROOT))
+
+try:
+    from generator.generate import StubGenerator, parse_registry
+    from generator.diff import (
+        build_migrations,
+        compute_schema_hash,
+        diff_registries,
+        merge_migrations,
+    )
+except ImportError:
+    # If generator is not available (e.g. installed via pip without generator),
+    # stub generation and diff detection will be skipped
+    StubGenerator = None  # type: ignore[assignment,misc]
+    parse_registry = None  # type: ignore[assignment]
+    compute_schema_hash = None  # type: ignore[assignment]
+    diff_registries = None  # type: ignore[assignment]
+    build_migrations = None  # type: ignore[assignment]
+    merge_migrations = None  # type: ignore[assignment]
+
+
+def _to_snake_case(name: str) -> str:
+    """Convert a camelCase or PascalCase name to snake_case.
+
+    Examples:
+        sendMessage   -> send_message
+        SendMessage   -> send_message
+        getUsers      -> get_users
+        getUserByEmail -> get_user_by_email
+        testauth      -> testauth  (no-op for already lowercase)
+    """
+    import re
+    # Insert underscore before uppercase letters that follow a lowercase letter or digit
+    s = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+    # Insert underscore before uppercase letters followed by lowercase (for runs of caps)
+    s = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", s)
+    # Replace spaces and hyphens with underscores
+    s = s.replace(" ", "_").replace("-", "_")
+    return s.lower()
+
+
+GRAPHQL_URL = "https://live.fastn.ai/api/graphql"
+
+SEARCH_CONNECTORS_QUERY = """
+query searchDataSourceGroups($input: SearchDataModelInput!) {
+  searchDataSourceGroups(input: $input) {
+    pageInfo {
+      totalCount
+    }
+    edges {
+      node {
+        id
+        clientId
+        name
+        connectorType
+      }
+    }
+  }
+}
+"""
+
+CONNECTOR_TOOLS_QUERY = """
+query callCoreProjectFlow($input: CoreProjectFlowProxyInput!) {
+  callCoreProjectFlow(input: $input) {
+    data
+    statusCode
+    message
+  }
+}
+"""
+
+
+GET_ORGANIZATIONS_QUERY = """
+query getOrganizations($userId: String) {
+  getOrganizations(userId: $userId) {
+    id
+    name
+    deletable
+    packageType
+    __typename
+  }
+}
+"""
+
+COMMUNITY_CONNECTOR_ID = "community"
+
+# Connector source categories
+SOURCE_WORKSPACE = "workspace"
+SOURCE_ORG = "org"
+SOURCE_COMMUNITY = "community"
+
+
+def _extract_org_id(config: FastnConfig) -> str:
+    """Extract the organization ID from the JWT token.
+
+    Looks for a role like ``ORG#<orgId>#admin`` in ``realm_access.roles``.
+
+    Returns:
+        The org ID string, or empty string if not found.
+    """
+    if not config.auth_token:
+        return ""
+    try:
+        from fastn.oauth import _decode_jwt_payload
+
+        payload = _decode_jwt_payload(config.auth_token)
+        roles = payload.get("realm_access", {}).get("roles", [])
+        for role in roles:
+            if role.startswith("ORG#"):
+                parts = role.split("#")
+                if len(parts) >= 3 and parts[2].lower() == "admin":
+                    return parts[1]
+    except Exception:
+        pass
+    return ""
+
+
+def _ensure_fresh_token(config: FastnConfig) -> None:
+    """Auto-refresh the access token if it has expired.
+
+    Mutates *config* in place and persists the new tokens to disk.
+    """
+    from fastn.oauth import is_token_expired
+
+    if not config.refresh_token or not is_token_expired(config.token_expiry):
+        return
+
+    from fastn.oauth import compute_token_expiry, refresh_access_token
+
+    try:
+        tokens = refresh_access_token(config.refresh_token)
+        config.auth_token = tokens.access_token
+        config.refresh_token = tokens.refresh_token
+        config.token_expiry = compute_token_expiry(tokens.expires_in)
+        save_config(config)
+    except Exception:
+        raise click.ClickException(
+            "Session expired. Run `fastn login` to re-authenticate."
+        )
+
+
+def _graphql_headers(config: FastnConfig) -> dict:
+    """Build headers for the GraphQL API."""
+    return config.get_headers()
+
+
+def _is_verbose() -> bool:
+    """Check if verbose mode is enabled via the CLI context."""
+    ctx = click.get_current_context(silent=True)
+    if ctx and ctx.obj:
+        return ctx.obj.get("verbose", False)
+    return False
+
+
+def _redact_headers(headers: dict) -> dict:
+    """Redact sensitive header values for verbose output."""
+    redacted = {}
+    for k, v in headers.items():
+        kl = k.lower()
+        if kl in ("authorization", "x-fastn-api-key") and len(str(v)) > 20:
+            redacted[k] = str(v)[:20] + "..."
+        else:
+            redacted[k] = v
+    return redacted
+
+
+def _verbose_post(url: str, headers: dict, payload: dict, timeout: float = 30.0) -> httpx.Response:
+    """Make a POST request with verbose logging when -v is enabled."""
+    verbose = _is_verbose()
+
+    if verbose:
+        click.echo()
+        click.echo(f"  [API] POST {url}")
+        click.echo(f"  [API] Headers: {json.dumps(_redact_headers(headers), indent=2)}")
+        click.echo(f"  [API] Payload: {json.dumps(payload, indent=2)}")
+
+    resp = httpx.post(url, headers=headers, json=payload, timeout=timeout)
+
+    if verbose:
+        click.echo(f"  [API] Response {resp.status_code}: {resp.text[:500]}")
+        if len(resp.text) > 500:
+            click.echo(f"  [API] ... ({len(resp.text)} bytes total)")
+        click.echo()
+
+    return resp
+
+
+def _fetch_workspaces(config: FastnConfig) -> list:
+    """Fetch all workspaces/organizations for the current user.
+
+    Calls the getOrganizations GraphQL query using the userId from the JWT.
+
+    Args:
+        config: FastnConfig with a valid auth_token.
+
+    Returns:
+        List of workspace dicts with 'id', 'name', 'packageType', etc.
+    """
+    from fastn.oauth import _decode_jwt_payload
+
+    # Extract userId from JWT
+    payload = _decode_jwt_payload(config.auth_token)
+    user_id = payload.get("sub", "")
+    if not user_id:
+        raise click.ClickException("Could not extract user ID from token.")
+
+    headers = config.get_headers()
+    gql_payload = {
+        "query": GET_ORGANIZATIONS_QUERY,
+        "variables": {"userId": user_id},
+    }
+    resp = _verbose_post(GRAPHQL_URL, headers, gql_payload)
+    if resp.status_code != 200:
+        raise click.ClickException(
+            f"Failed to fetch workspaces: {resp.status_code} {resp.text}"
+        )
+
+    data = resp.json() or {}
+    if data.get("errors"):
+        error_msg = data["errors"][0].get("message", "Unknown GraphQL error")
+        raise click.ClickException(f"Failed to fetch workspaces: {error_msg}")
+
+    orgs = (data.get("data") or {}).get("getOrganizations") or []
+    return orgs
+
+
+def _select_workspace(config: FastnConfig) -> Optional[str]:
+    """Fetch workspaces and let the user search & select one.
+
+    Displays a numbered list of workspaces. The user can:
+    - Enter a number to select directly
+    - Type text to filter/search by name, then select from results
+
+    Returns the selected workspace ID, or None if no workspaces found.
+    """
+    try:
+        workspaces = _fetch_workspaces(config)
+    except Exception as e:
+        click.echo(f"  ⚠ Could not fetch workspaces: {e}")
+        return None
+
+    if not workspaces:
+        click.echo("  No workspaces found.")
+        return None
+
+    click.echo()
+    click.echo("  Select a workspace:")
+    click.echo()
+
+    # Display numbered list
+    for i, ws in enumerate(workspaces, 1):
+        name = ws.get("name", "Unknown")
+        ws_id = ws.get("id", "")
+        pkg = ws.get("packageType", "")
+        label = f"  {i}. {name}"
+        if pkg:
+            label += f" ({pkg})"
+        click.echo(label)
+
+    click.echo()
+
+    while True:
+        choice = click.prompt("  Enter number or search", type=str).strip()
+
+        # If it's a number, select directly
+        if choice.isdigit():
+            idx = int(choice)
+            if 1 <= idx <= len(workspaces):
+                selected = workspaces[idx - 1]
+                return selected["id"]
+            click.echo(f"  Invalid number. Enter 1-{len(workspaces)}.")
+            continue
+
+        # Otherwise, treat as search text
+        query = choice.lower()
+        matches = [
+            ws for ws in workspaces
+            if query in ws.get("name", "").lower()
+        ]
+
+        if not matches:
+            click.echo(f"  No workspaces matching '{choice}'.")
+            continue
+
+        if len(matches) == 1:
+            selected = matches[0]
+            click.echo(f"  → {selected['name']}")
+            return selected["id"]
+
+        # Multiple matches — show filtered list
+        click.echo()
+        for i, ws in enumerate(matches, 1):
+            name = ws.get("name", "Unknown")
+            pkg = ws.get("packageType", "")
+            label = f"  {i}. {name}"
+            if pkg:
+                label += f" ({pkg})"
+            click.echo(label)
+
+        click.echo()
+        sub_choice = click.prompt("  Enter number", type=str).strip()
+        if sub_choice.isdigit():
+            idx = int(sub_choice)
+            if 1 <= idx <= len(matches):
+                selected = matches[idx - 1]
+                return selected["id"]
+        click.echo(f"  Invalid selection.")
+
+
+def _fetch_connectors_by_scope(
+    config: FastnConfig, scope_id: str, source: str, is_community: bool = False
+) -> dict:
+    """Fetch connectors for a specific scope (workspace, org, or community).
+
+    Args:
+        config: FastnConfig with valid auth credentials.
+        scope_id: The clientId / connectorId to query (workspace ID, org ID, or "community").
+        source: Label for the source category (SOURCE_WORKSPACE, SOURCE_ORG, SOURCE_COMMUNITY).
+        is_community: Whether this is a community connector query.
+
+    Returns:
+        Dict of connector key -> connector data.
+    """
+    headers = _graphql_headers(config)
+    headers["x-fastn-space-id"] = scope_id
+
+    payload = {
+        "query": SEARCH_CONNECTORS_QUERY,
+        "variables": {
+            "input": {
+                "clientId": scope_id,
+                "first": 500,
+                "connectorId": scope_id,
+                "query": '{"input":{"limit":500,"offset":0,"sort":"asc","query":"","filter":{}}}',
+                "isCommunity": is_community,
+                "offset": 0,
+            }
+        },
+    }
+    resp = _verbose_post(GRAPHQL_URL, headers, payload)
+    if resp.status_code != 200:
+        # Non-fatal for workspace/org — just return empty
+        if source != SOURCE_COMMUNITY:
+            return {}
+        raise click.ClickException(f"Failed to fetch registry: {resp.status_code} {resp.text}")
+
+    data = resp.json() or {}
+
+    if data.get("errors"):
+        if source != SOURCE_COMMUNITY:
+            return {}
+        error_msg = data["errors"][0].get("message", "Unknown GraphQL error")
+        raise click.ClickException(f"Registry sync failed: {error_msg}")
+
+    search_result = (data.get("data") or {}).get("searchDataSourceGroups") or {}
+    edges = search_result.get("edges") or []
+
+    connectors: dict = {}
+    for edge in edges:
+        node = edge.get("node", {})
+        connector_id = node.get("id", "")
+        name = node.get("name", "")
+        connector_type = node.get("connectorType", "connector")
+        key = name.lower().replace(" ", "_").replace("-", "_")
+
+        # The workspace flows connector is returned as "my_connectors"
+        # by the API — rename it to "flows" for display.
+        if key == "my_connectors":
+            key = "flows"
+            name = "Flows"
+
+        connectors[key] = {
+            "id": connector_id,
+            "display_name": name,
+            "category": "",
+            "source": source,
+            "connector_type": connector_type,
+            "tools": {},
+            "tool_count": 0,
+        }
+
+    return connectors
+
+
+def _fetch_registry_list(config: FastnConfig) -> dict:
+    """Fetch all connectors from the GraphQL API across all scopes.
+
+    Fetches connectors from three sources:
+        1. My Workspace — connectors in the user's selected workspace
+        2. My Org — connectors in the user's organization
+        3. Community — public community connectors
+    """
+    connectors: dict = {}
+
+    # 1. Workspace connectors
+    workspace_id = config.resolve_project_id()
+    if workspace_id:
+        ws_connectors = _fetch_connectors_by_scope(
+            config, workspace_id, SOURCE_WORKSPACE
+        )
+        connectors.update(ws_connectors)
+
+    # 2. Organization connectors
+    org_id = _extract_org_id(config)
+    if org_id:
+        org_connectors = _fetch_connectors_by_scope(
+            config, org_id, SOURCE_ORG
+        )
+        # Only add org connectors that aren't already in workspace
+        for key, data in org_connectors.items():
+            if key not in connectors:
+                connectors[key] = data
+
+    # 3. Community connectors
+    community_connectors = _fetch_connectors_by_scope(
+        config, COMMUNITY_CONNECTOR_ID, SOURCE_COMMUNITY, is_community=True
+    )
+    # Only add community connectors that aren't already present
+    for key, data in community_connectors.items():
+        if key not in connectors:
+            connectors[key] = data
+
+    return {"version": "1.0.0", "connectors": connectors}
+
+
+def _fetch_connector_tools(
+    config: FastnConfig, connector_id: str, source: str = SOURCE_COMMUNITY,
+) -> list:
+    """Fetch all tools/actions for a connector via callCoreProjectFlow."""
+    headers = _graphql_headers(config)
+    workspace_id = config.resolve_project_id()
+
+    # orgId depends on the connector's source scope:
+    #   workspace → workspace/space ID
+    #   org       → org ID from JWT
+    #   community → "community"
+    if source == SOURCE_WORKSPACE:
+        org_id = workspace_id
+    elif source == SOURCE_ORG:
+        org_id = _extract_org_id(config) or workspace_id
+    else:
+        org_id = COMMUNITY_CONNECTOR_ID
+
+    payload = {
+        "query": CONNECTOR_TOOLS_QUERY,
+        "variables": {
+            "input": {
+                "operationName": "getConnectorRegisteredTools_v1",
+                "input": {
+                    "connectorId": connector_id,
+                    "orgId": org_id,
+                    "workspaceId": workspace_id,
+                    "gatewayId": workspace_id,
+                },
+            }
+        },
+    }
+    resp = _verbose_post(GRAPHQL_URL, headers, payload)
+    if resp.status_code != 200:
+        raise click.ClickException(
+            f"Failed to fetch connector tools: {resp.status_code} {resp.text}"
+        )
+
+    data = resp.json()
+
+    # Check for GraphQL errors
+    if data.get("errors"):
+        error_msg = data["errors"][0].get("message", "Unknown GraphQL error")
+        raise click.ClickException(f"GraphQL error: {error_msg}")
+
+    result = data.get("data", {}).get("callCoreProjectFlow") or {}
+    tools = result.get("data") or []
+    return tools
+
+
+def _parse_tool_node(node: dict) -> dict:
+    """Parse a single tool node from callCoreProjectFlow into registry format."""
+    tool_name = node.get("name", "")
+    action_id = node.get("id", "")
+    description = node.get("description", "")
+
+    # Extract params from inputSchema (already a dict)
+    params = {}
+    input_schema = node.get("inputSchema") or {}
+    if isinstance(input_schema, dict):
+        props = input_schema.get("properties", {})
+        required_fields = input_schema.get("required", [])
+        for pname, pdata in props.items():
+            params[pname] = {
+                "type": pdata.get("type", "string"),
+                "description": pdata.get("description", ""),
+                "required": pname in required_fields,
+            }
+
+    key = _to_snake_case(tool_name)
+    return {
+        "key": key,
+        "data": {
+            "actionId": action_id,
+            "name": tool_name,
+            "description": description,
+            "params": params,
+            "inputSchema": node.get("inputSchema") or {},
+            "outputSchema": node.get("outputSchema") or {},
+        },
+    }
+
+
+def _check_and_migrate(
+    fastn_dir: Path,
+    old_registry: Dict,
+    new_registry: Dict,
+    connector_names: Optional[list] = None,
+) -> bool:
+    """Detect breaking changes, prompt user, and save migration records.
+
+    When breaking changes are found:
+        1. Shows the diff summary
+        2. Asks the user to confirm
+        3. If confirmed, generates migration records so old code keeps
+           working at runtime with deprecation warnings
+        4. Saves migrations to .fastn/migrations.json
+
+    Returns True if stubs should be regenerated, False to skip.
+    """
+    if diff_registries is None:
+        return True
+
+    result = diff_registries(old_registry, new_registry, connector_names)
+    if not result.changes:
+        return True
+
+    summary = result.summary()
+    if summary:
+        click.echo()
+        click.echo(summary)
+
+    if result.has_breaking_changes:
+        click.echo()
+        click.echo("  Your existing code will continue to work with deprecation warnings.")
+        if not click.confirm("  Update stubs with these breaking changes?"):
+            click.echo("  Stubs not updated. Your existing stubs are unchanged.")
+            return False
+
+        # Generate and save migration records for runtime backward compat
+        if build_migrations is not None:
+            new_migrations = build_migrations(result, old_registry)
+            existing_migrations = load_migrations(fastn_dir)
+            if existing_migrations and merge_migrations is not None:
+                merged = merge_migrations(existing_migrations, new_migrations)
+            else:
+                merged = new_migrations
+            save_migrations(merged, fastn_dir)
+            click.echo("  \u2713 Migration records saved. Old code will still work.")
+
+    return True
+
+
+def _update_schema_hashes(fastn_dir: Path, registry: Dict, installed: list) -> None:
+    """Store schema hashes in manifest for each installed connector."""
+    if compute_schema_hash is None:
+        return
+
+    manifest = load_manifest(fastn_dir)
+    installed_data = manifest.get("installed", {})
+    for name in installed:
+        if name in installed_data:
+            installed_data[name]["schema_hash"] = compute_schema_hash(registry, name)
+    save_manifest(manifest, fastn_dir)
+
+
+def _install_stubs_to_package(fastn_dir: Path) -> None:
+    """Copy generated Python stubs into the fastn package directory.
+
+    This places ``.pyi`` files alongside the source in site-packages (or the
+    source checkout) so IDEs discover them automatically via PEP 561.
+    The ``py.typed`` marker already exists in the package.
+    """
+    import fastn as _fastn_pkg
+
+    stub_src = fastn_dir / "python" / "fastn"
+    if not stub_src.is_dir():
+        return
+
+    pkg_dir = Path(_fastn_pkg.__file__).resolve().parent
+
+    try:
+        # Copy __init__.pyi
+        init_stub = stub_src / "__init__.pyi"
+        if init_stub.exists():
+            shutil.copy2(str(init_stub), str(pkg_dir / "__init__.pyi"))
+
+        # Copy connectors/ stubs
+        src_connectors = stub_src / "connectors"
+        if src_connectors.is_dir():
+            dst_connectors = pkg_dir / "connectors"
+            dst_connectors.mkdir(parents=True, exist_ok=True)
+            for pyi_file in src_connectors.glob("*.pyi"):
+                shutil.copy2(str(pyi_file), str(dst_connectors / pyi_file.name))
+    except OSError:
+        # site-packages may be read-only (e.g. system Python) — warn but don't crash
+        click.echo(
+            "  Warning: Could not install stubs to package directory. "
+            "IDE autocomplete may require manual stubPath configuration."
+        )
+
+
+def _regenerate_stubs(
+    fastn_dir: Path,
+    language: str = "python",
+    old_registry: Optional[Dict] = None,
+    _skip: Optional[bool] = None,
+) -> bool:
+    """Regenerate type stubs based on current registry and installed connectors.
+
+    If old_registry is provided, performs breaking change detection
+    before regenerating. The user is prompted to confirm when breaking
+    changes are found. Migration records are saved for runtime backward
+    compatibility.
+
+    Returns False if the user declined the update, True otherwise.
+    """
+    if StubGenerator is None:
+        return True
+
+    registry = load_registry(fastn_dir)
+    installed = get_installed_connectors(fastn_dir)
+    output_dir = fastn_dir / language
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Detect breaking changes before regenerating (only once, on first language)
+    if _skip is None and old_registry is not None and language == "python":
+        if not _check_and_migrate(fastn_dir, old_registry, registry, installed):
+            return False
+
+    if _skip:
+        return False
+
+    generator = StubGenerator(language=language)
+    parsed = parse_registry(registry)
+    generator.generate_all(registry, installed, str(output_dir))
+
+    # Update schema hashes after successful generation
+    if language == "python":
+        _update_schema_hashes(fastn_dir, registry, installed)
+        _install_stubs_to_package(fastn_dir)
+
+    return True
+
+
+@click.group()
+@click.version_option(version=__version__, prog_name="fastn")
+@click.option("-v", "--verbose", is_flag=True, default=False, help="Show API calls and responses")
+@click.pass_context
+def cli(ctx: click.Context, verbose: bool) -> None:
+    """Fastn SDK — Pre-built tools for AI agents and apps."""
+    ctx.ensure_object(dict)
+    ctx.obj["verbose"] = verbose
+
+
+def _run_device_login() -> Optional[FastnConfig]:
+    """Run the Keycloak device authorization flow.
+
+    Returns a partial FastnConfig with auth tokens set, or None if login fails.
+    """
+    import webbrowser
+
+    from fastn.oauth import (
+        compute_token_expiry,
+        poll_for_token,
+        request_device_code,
+    )
+
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            device = request_device_code(client)
+
+            click.echo()
+            click.echo(f"  Visit: {device.verification_uri}")
+            click.echo(f"  Enter code: {device.user_code}")
+            click.echo()
+
+            # Try to auto-open browser
+            try:
+                webbrowser.open(device.verification_uri_complete)
+                click.echo("  (Browser opened automatically)")
+            except Exception:
+                click.echo("  Open the URL above in your browser.")
+
+            click.echo()
+            click.echo("  Waiting for authorization", nl=False)
+
+            tokens = poll_for_token(
+                device.device_code,
+                interval=device.interval,
+                expires_in=device.expires_in,
+                client=client,
+            )
+
+            click.echo()
+            click.echo("  \u2713 Login successful!")
+
+            return FastnConfig(
+                auth_token=tokens.access_token,
+                refresh_token=tokens.refresh_token,
+                token_expiry=compute_token_expiry(tokens.expires_in),
+            )
+    except Exception as e:
+        click.echo()
+        click.echo(f"  \u2717 Login failed: {e}")
+        click.echo()
+        click.echo("  If this persists, use `fastn init` with a manual API key instead.")
+        return None
+
+
+@cli.command()
+def login() -> None:
+    """Authenticate with Fastn via browser-based device login."""
+    click.echo()
+    click.echo("  Fastn Login")
+
+    result = _run_device_login()
+    if result is None:
+        raise SystemExit(1)
+
+    # Merge with existing config (preserve space_id, etc.)
+    existing = load_config()
+    existing.auth_token = result.auth_token
+    existing.refresh_token = result.refresh_token
+    existing.token_expiry = result.token_expiry
+
+    filepath = save_config(existing)
+    ensure_gitignore()
+
+    click.echo(f"  \u2713 Tokens saved to {filepath}")
+
+    # Prompt user to select a workspace
+    workspace_id = _select_workspace(existing)
+    if workspace_id:
+        existing.project_id = workspace_id
+        save_config(existing)
+        click.echo(f"  \u2713 Workspace set: {workspace_id}")
+
+    click.echo()
+
+
+@cli.command()
+def logout() -> None:
+    """Clear stored authentication tokens."""
+    config = load_config()
+    config.auth_token = ""
+    config.refresh_token = ""
+    config.token_expiry = ""
+
+    filepath = save_config(config)
+    click.echo("  \u2713 Logged out successfully.")
+    click.echo(f"  Tokens cleared from {filepath}")
+
+
+@cli.command()
+def whoami() -> None:
+    """Show current authenticated user info."""
+    config = load_config()
+
+    if not config.auth_token:
+        click.echo("  Not logged in. Run `fastn login` to authenticate.")
+        return
+
+    _ensure_fresh_token(config)
+
+    from fastn.oauth import fetch_userinfo
+
+    try:
+        user_info = fetch_userinfo(config.auth_token)
+        click.echo()
+        name = user_info.get("name", user_info.get("preferred_username", "Unknown"))
+        email = user_info.get("email", "")
+        sub = user_info.get("sub", "")
+        click.echo(f"  Logged in as: {name}")
+        if email:
+            click.echo(f"  Email: {email}")
+        if sub:
+            click.echo(f"  User ID: {sub}")
+        click.echo()
+    except Exception as e:
+        click.echo(f"  Failed to fetch user info: {e}")
+        click.echo("  Try running `fastn login` to re-authenticate.")
+
+
+@cli.command()
+def init() -> None:
+    """Interactive setup — prompts for credentials, saves to .fastn/config.json."""
+    click.echo()
+    click.echo("  Welcome to Fastn SDK Setup")
+    click.echo()
+
+    # Offer browser-based login
+    use_browser = click.confirm("  Log in via browser?", default=True)
+
+    auth_token = ""
+    refresh_token = ""
+    token_expiry = ""
+    api_key = ""
+
+    if use_browser:
+        result = _run_device_login()
+        if result:
+            auth_token = result.auth_token
+            refresh_token = result.refresh_token
+            token_expiry = result.token_expiry
+        else:
+            click.echo("  Falling back to manual API key entry.")
+            api_key = click.prompt("  API Key", hide_input=False)
+    else:
+        api_key = click.prompt("  API Key", hide_input=False)
+
+    project_id = ""
+
+    # If we have a token, let the user select a workspace
+    if auth_token:
+        temp_config = FastnConfig(
+            auth_token=auth_token,
+            refresh_token=refresh_token,
+            token_expiry=token_expiry,
+        )
+        workspace_id = _select_workspace(temp_config)
+        if workspace_id:
+            project_id = workspace_id
+
+    # Fall back to manual project ID entry if not set
+    if not project_id:
+        click.echo()
+        project_id = click.prompt("  Project ID")
+
+    config = FastnConfig(
+        api_key=api_key,
+        project_id=project_id,
+        stage=DEFAULT_STAGE,
+        auth_token=auth_token,
+        refresh_token=refresh_token,
+        token_expiry=token_expiry,
+    )
+
+    filepath = save_config(config)
+    ensure_gitignore()
+
+    click.echo()
+    click.echo(f"  \u2713 Config saved to {filepath}")
+    click.echo("  \u2713 Added .fastn/config.json to .gitignore")
+    click.echo()
+    click.echo("  Run `fastn sync` to download available tools.")
+    click.echo()
+
+
+@cli.command()
+def sync() -> None:
+    """Download/update the tool registry and refresh installed stubs."""
+    config = load_config()
+    if not config.auth_token and not config.api_key:
+        raise click.ClickException("Not authenticated. Run `fastn login` first.")
+
+    _ensure_fresh_token(config)
+
+    click.echo("Syncing tool registry...")
+
+    fastn_dir = find_fastn_dir()
+    fastn_dir.mkdir(parents=True, exist_ok=True)
+
+    # Capture old registry for breaking change detection
+    old_registry = load_registry(fastn_dir)
+
+    registry = _fetch_registry_list(config)
+    save_registry(registry, fastn_dir)
+
+    # Update manifest
+    manifest = load_manifest(fastn_dir)
+    manifest["registry_version"] = registry.get("version", "unknown")
+    manifest["last_synced"] = datetime.now(timezone.utc).isoformat()
+    save_manifest(manifest, fastn_dir)
+
+    connector_count = len(registry.get("connectors", {}))
+    click.echo(f"\u2713 Registry synced: {connector_count} tools available.")
+
+    # Regenerate stubs for installed connectors (with breaking change detection)
+    installed = get_installed_connectors(fastn_dir)
+    if installed:
+        updated = _regenerate_stubs(fastn_dir, "python", old_registry=old_registry)
+        _regenerate_stubs(fastn_dir, "typescript", old_registry=old_registry, _skip=not updated)
+        if updated:
+            click.echo(f"\u2713 Refreshed stubs for {len(installed)} installed tool(s).")
+
+    click.echo()
+    click.echo("Run `fastn add <name>` to enable autocomplete for specific tools.")
+
+
+@cli.command()
+@click.argument("connectors", nargs=-1, required=True)
+def add(connectors: tuple) -> None:
+    """Download full type stubs for specific tools."""
+    config = load_config()
+    try:
+        config.validate()
+    except Exception as e:
+        raise click.ClickException(str(e))
+
+    _ensure_fresh_token(config)
+
+    fastn_dir = find_fastn_dir()
+    registry = load_registry(fastn_dir)
+
+    # Capture old registry for breaking change detection
+    import copy
+    old_registry = copy.deepcopy(registry)
+
+    if not registry.get("connectors"):
+        click.echo("Registry is empty. Running sync first...")
+        registry = _fetch_registry_list(config)
+        fastn_dir.mkdir(parents=True, exist_ok=True)
+        save_registry(registry, fastn_dir)
+        old_registry = {}  # No old data to compare against
+
+    reg_connectors = registry.get("connectors", {})
+    added_connectors: List[str] = []
+
+    for connector_name in connectors:
+        click.echo(f"Adding {connector_name}...")
+
+        if connector_name not in reg_connectors:
+            click.echo(f"  ✗ Tool '{connector_name}' not found in registry.")
+            click.echo(f"    Run `fastn sync` to refresh, then try again.")
+            continue
+
+        connector_data = reg_connectors[connector_name]
+        connector_id = connector_data.get("id", "")
+
+        if not connector_id:
+            click.echo(f"  ✗ No ID for '{connector_name}'. Run `fastn sync`.")
+            continue
+
+        # Fetch tools for this connector
+        source = connector_data.get("source", SOURCE_COMMUNITY)
+        click.echo(f"  Fetching tools for {connector_name}...")
+        tool_nodes = _fetch_connector_tools(config, connector_id, source)
+        tools = {}
+        for node in tool_nodes:
+            parsed = _parse_tool_node(node)
+            tools[parsed["key"]] = parsed["data"]
+
+        connector_data["tools"] = tools
+        connector_data["tool_count"] = len(tools)
+        save_registry(registry, fastn_dir)
+
+        version = registry.get("version", "unknown")
+        add_connector_to_manifest(connector_name, version, fastn_dir)
+        added_connectors.append(connector_name)
+        click.echo(f"  ✓ {connector_name} added ({len(tools)} tools).")
+
+    # Regenerate stubs (with breaking change detection for re-added connectors)
+    updated = _regenerate_stubs(fastn_dir, "python", old_registry=old_registry)
+    _regenerate_stubs(fastn_dir, "typescript", old_registry=old_registry, _skip=not updated)
+    if updated:
+        click.echo("✓ Type stubs generated.")
+
+
+@cli.command()
+@click.argument("connector_name")
+def remove(connector_name: str) -> None:
+    """Remove tool stubs."""
+    fastn_dir = find_fastn_dir()
+
+    if remove_connector_from_manifest(connector_name, fastn_dir):
+        # Remove stub files
+        for lang in ("python", "typescript"):
+            ext = "pyi" if lang == "python" else "d.ts"
+            stub_file = fastn_dir / lang / "connectors" / f"{connector_name}.{ext}"
+            if stub_file.exists():
+                stub_file.unlink()
+
+        _regenerate_stubs(fastn_dir, "python")
+        _regenerate_stubs(fastn_dir, "typescript")
+        click.echo(f"\u2713 Removed {connector_name}.")
+    else:
+        click.echo(f"Tool '{connector_name}' is not installed.")
+
+
+def _format_schema_properties(schema: dict, indent: int = 6) -> list:
+    """Extract and format properties from an input or output schema.
+
+    For inputSchema the real fields are typically nested under a wrapper
+    key like ``body`` or ``param``.  This helper unwraps one level when
+    the top-level schema has a single object property so the user sees
+    the actual fields.
+
+    Returns a list of formatted lines ready for ``click.echo``.
+    """
+    props = schema.get("properties", {})
+    required_fields = set(schema.get("required", []))
+
+    # Unwrap single wrapper key (e.g. "body" or "param")
+    if len(props) == 1:
+        wrapper_key = list(props.keys())[0]
+        wrapper = props[wrapper_key]
+        if isinstance(wrapper, dict) and wrapper.get("type") == "object":
+            props = wrapper.get("properties", {})
+            required_fields = set(wrapper.get("required", []))
+
+    if not props:
+        return []
+
+    pad = " " * indent
+    lines = []
+    for name, pdata in props.items():
+        ptype = pdata.get("type", "string")
+        req = " (required)" if name in required_fields else ""
+        desc = pdata.get("description", "")
+        if desc:
+            lines.append(f"{pad}{name}: {ptype}{req} — {desc}")
+        else:
+            lines.append(f"{pad}{name}: {ptype}{req}")
+    return lines
+
+
+@cli.command(name="list")
+@click.argument("connector_name", required=False, default=None)
+@click.option("--active", is_flag=True, help="Show only active/enabled tools (workspace + org)")
+@click.option("--installed", is_flag=True, help="Show only locally installed tools (fastn add)")
+@click.option("-v", "--verbose", is_flag=True, help="Show input/output schemas for each tool")
+def list_connectors(connector_name: Optional[str], active: bool, installed: bool, verbose: bool) -> None:
+    """List tools, or show details for a specific one.
+
+    \b
+    Usage:
+      fastn list              Show all available tools
+      fastn list --active     Show only active/enabled tools
+      fastn list --installed  Show only locally installed tools
+      fastn list slack        Show actions for the 'slack' tool
+      fastn list slack -v     Show actions with input/output schemas
+    """
+    fastn_dir = find_fastn_dir()
+    registry = load_registry(fastn_dir)
+    connectors = registry.get("connectors", {})
+
+    if not connectors:
+        # Auto-sync if registry is empty
+        config = load_config()
+        if not config.auth_token and not config.api_key:
+            raise click.ClickException(
+                "Not authenticated. Run `fastn login` first."
+            )
+
+        _ensure_fresh_token(config)
+
+        click.echo("Syncing tool registry...")
+        registry = _fetch_registry_list(config)
+        fastn_dir.mkdir(parents=True, exist_ok=True)
+        save_registry(registry, fastn_dir)
+
+        # Update manifest
+        manifest = load_manifest(fastn_dir)
+        manifest["registry_version"] = registry.get("version", "unknown")
+        manifest["last_synced"] = datetime.now(timezone.utc).isoformat()
+        save_manifest(manifest, fastn_dir)
+
+        connectors = registry.get("connectors", {})
+        if not connectors:
+            click.echo("No tools found in registry.")
+            return
+
+    # If a tool name is given, show its details (like `sdk list java`)
+    if connector_name:
+        config = load_config()
+        if not config.auth_token and not config.api_key:
+            raise click.ClickException("Not authenticated. Run `fastn login` first.")
+
+        _ensure_fresh_token(config)
+
+        if connector_name not in connectors:
+            raise click.ClickException(
+                f"Tool '{connector_name}' not found. Run `fastn list` to see available tools."
+            )
+
+        connector_data = connectors[connector_name]
+        connector_id = connector_data.get("id", "")
+
+        if not connector_id:
+            raise click.ClickException(
+                f"No ID for '{connector_name}'. Run `fastn sync`."
+            )
+
+        # Check if tools are already cached in registry
+        cached_tools = connector_data.get("tools", {})
+        if cached_tools:
+            tool_list = cached_tools
+        else:
+            source = connector_data.get("source", SOURCE_COMMUNITY)
+            click.echo(f"Fetching tools for {connector_name}...")
+            tool_nodes = _fetch_connector_tools(config, connector_id, source)
+            tool_list = {}
+            for node in tool_nodes:
+                parsed = _parse_tool_node(node)
+                tool_list[parsed["key"]] = parsed["data"]
+
+            # Cache in registry
+            connector_data["tools"] = tool_list
+            connector_data["tool_count"] = len(tool_list)
+            save_registry(registry, fastn_dir)
+
+        display_name = connector_data.get("display_name", connector_name)
+        click.echo()
+        click.echo(f"  {display_name} ({len(tool_list)} tools):")
+        click.echo()
+
+        for key, tool in sorted(tool_list.items()):
+            display_key = _to_snake_case(key) if key != _to_snake_case(key) else key
+            usage = f"fastn.{connector_name}.{display_key}()"
+            desc = tool.get("description", "")
+            if verbose:
+                click.echo(f"  {display_key}")
+                click.echo(f"    Usage: {usage}")
+                if desc:
+                    click.echo(f"    {desc}")
+
+                input_schema = tool.get("inputSchema", {})
+                input_lines = _format_schema_properties(input_schema)
+                if input_lines:
+                    click.echo("    Input:")
+                    for line in input_lines:
+                        click.echo(line)
+
+                output_schema = tool.get("outputSchema", {})
+                output_lines = _format_schema_properties(output_schema)
+                if output_lines:
+                    click.echo("    Output:")
+                    for line in output_lines:
+                        click.echo(line)
+
+                click.echo()
+            else:
+                if desc:
+                    click.echo(f"    {display_key:<30} {desc}")
+                else:
+                    click.echo(f"    {display_key}")
+
+        return
+
+    # No tool name — list all tools
+    installed_names = set(get_installed_connectors(fastn_dir))
+
+    # --active: call getTools API with no prompt to get all enabled tools,
+    # then fetch the workspace's selected connectors to include 0-tool entries.
+    if active:
+        config = load_config()
+        if not config.auth_token and not config.api_key:
+            raise click.ClickException("Not authenticated. Run `fastn login` first.")
+
+        _ensure_fresh_token(config)
+
+        headers = config.get_headers()
+        workspace_id = config.resolve_project_id()
+
+        # --- 1. Get all active/connected tools via the UCL getTools API ------
+        active_payload: dict = {
+            "input": {
+                "agentId": workspace_id,
+                "limit": 500,
+            }
+        }
+
+        click.echo("Fetching active tools...")
+        resp = _verbose_post(f"{API_BASE_URL}/getTools", headers, active_payload)
+
+        if resp.status_code >= 400:
+            raise click.ClickException(
+                f"Failed to fetch active tools: {resp.status_code} {resp.text}"
+            )
+
+        data = resp.json()
+        # Response is a plain array of tool objects
+        tool_list = data if isinstance(data, list) else data.get("tools", data.get("data", []))
+        if isinstance(tool_list, dict):
+            tool_list = []
+
+        # --- 2. Fetch selected connectors from the workspace ----------------
+        # The UI's "Selected Tools" page shows connectors that are added to the
+        # workspace's UCL.  We approximate this by re-fetching workspace and
+        # org-scoped connectors, which includes both native connectors (flows,
+        # test) and community connectors that have been selected.
+        selected_connectors: dict = {}
+        try:
+            ws_selected = _fetch_connectors_by_scope(
+                config, workspace_id, SOURCE_WORKSPACE
+            )
+            selected_connectors.update(ws_selected)
+        except Exception:
+            pass
+
+        org_id = _extract_org_id(config)
+        if org_id:
+            try:
+                org_selected = _fetch_connectors_by_scope(
+                    config, org_id, SOURCE_ORG
+                )
+                for key, sdata in org_selected.items():
+                    if key not in selected_connectors:
+                        selected_connectors[key] = sdata
+            except Exception:
+                pass
+
+        if not tool_list and not selected_connectors:
+            app_url = _workspace_url(workspace_id)
+            click.echo(f"No active tools. Enable tools at: {app_url}")
+            return
+
+        # --- 3. Build actionId → connector_name reverse lookup ---------------
+        # The getTools API response doesn't include connector names — tools only
+        # have actionId, type, and function.{name, description, parameters}.
+        action_to_connector: Dict[str, str] = {}
+        for cname, cdata in connectors.items():
+            for _tkey, tinfo in cdata.get("tools", {}).items():
+                aid = tinfo.get("actionId", "")
+                if aid:
+                    action_to_connector[aid] = cname
+
+        # Collect the set of active actionIds that still need resolving
+        active_action_ids = {
+            t.get("actionId", "") for t in tool_list if t.get("actionId")
+        }
+        unresolved_ids = active_action_ids - set(action_to_connector.keys())
+
+        # For connectors that haven't been `fastn add`-ed yet (tools dict is
+        # empty), fetch their tool list so we can map actionIds.
+        # Phase 1: workspace/org connectors (always fetched)
+        # Phase 2: community connectors (only if unresolved IDs remain)
+        unfetched_local = [
+            (cname, cdata)
+            for cname, cdata in connectors.items()
+            if not cdata.get("tools")
+            and cdata.get("id")
+            and cdata.get("source") in (SOURCE_WORKSPACE, SOURCE_ORG)
+        ]
+        unfetched_community = [
+            (cname, cdata)
+            for cname, cdata in connectors.items()
+            if not cdata.get("tools")
+            and cdata.get("id")
+            and cdata.get("source") == SOURCE_COMMUNITY
+        ]
+
+        registry_updated = False
+
+        def _fetch_and_map(cname: str, cdata: dict) -> None:
+            nonlocal registry_updated
+            try:
+                source = cdata.get("source", SOURCE_COMMUNITY)
+                tool_nodes = _fetch_connector_tools(config, cdata["id"], source)
+                tools_map: Dict[str, Any] = {}
+                for node in tool_nodes:
+                    parsed = _parse_tool_node(node)
+                    aid = parsed["data"].get("actionId", "")
+                    if aid:
+                        action_to_connector[aid] = cname
+                    tools_map[parsed["key"]] = parsed["data"]
+                cdata["tools"] = tools_map
+                cdata["tool_count"] = len(tools_map)
+                registry_updated = True
+            except Exception:
+                pass  # Non-fatal — will show as "other"
+
+        if unfetched_local or unresolved_ids:
+            click.echo("  Resolving connector details...")
+
+        # Always resolve workspace/org connectors
+        for cname, cdata in unfetched_local:
+            _fetch_and_map(cname, cdata)
+            unresolved_ids -= set(action_to_connector.keys())
+
+        # Resolve community connectors only while unresolved IDs remain.
+        # Stop early once all active tools are mapped.
+        if unresolved_ids:
+            for cname, cdata in unfetched_community:
+                if not unresolved_ids:
+                    break
+                _fetch_and_map(cname, cdata)
+                unresolved_ids -= set(action_to_connector.keys())
+
+        if registry_updated:
+            save_registry(registry, fastn_dir)
+
+        # --- 4. Group active tools by connector name -------------------------
+        by_connector: dict = {}
+        for tool in tool_list:
+            action_id = tool.get("actionId", "")
+            func = tool.get("function", {})
+            tname = func.get("name", "") or action_id
+            desc = func.get("description", "")
+
+            # Look up connector name from our reverse map
+            cname = action_to_connector.get(action_id, "")
+
+            # Fallback: try matching by function name against cached registry
+            if not cname:
+                for reg_cname, cdata in connectors.items():
+                    for _tkey, tinfo in cdata.get("tools", {}).items():
+                        if tinfo.get("name") == tname or _tkey == _to_snake_case(tname):
+                            cname = reg_cname
+                            break
+                    if cname:
+                        break
+
+            if not cname:
+                cname = "other"
+
+            by_connector.setdefault(cname, []).append({
+                "name": tname,
+                "description": desc,
+                "actionId": action_id,
+            })
+
+        # --- 5. Include selected connectors with 0 active tools --------------
+        # Workspace/org connectors that appear in searchDataSourceGroups but
+        # have no tools in the getTools response are "selected but not connected"
+        for cname, sdata in selected_connectors.items():
+            if cname not in by_connector:
+                by_connector[cname] = []
+                # Merge display info into connectors dict so display names work
+                if cname not in connectors:
+                    connectors[cname] = sdata
+
+        total_tools = len(tool_list)
+        total_connectors = len(by_connector)
+        click.echo()
+        click.echo(f"  Active tools ({total_tools} actions across {total_connectors} connectors):")
+
+        for cname in sorted(by_connector.keys()):
+            tools_in_group = by_connector[cname]
+            display = connectors.get(cname, {}).get("display_name", cname)
+            marker = "\u2705" if cname.lower() in installed_names else "  "
+            count_label = f"{len(tools_in_group)} actions"
+            if not tools_in_group:
+                count_label = "0 tools — not connected"
+            click.echo()
+            click.echo(f"  {marker} {display} ({count_label})")
+            if verbose and tools_in_group:
+                for t in sorted(tools_in_group, key=lambda x: x["name"]):
+                    desc = t.get("description", "")
+                    tname = _to_snake_case(t["name"]) if t["name"] else t["actionId"]
+                    if desc:
+                        click.echo(f"      {tname:<30} {desc}")
+                    else:
+                        click.echo(f"      {tname}")
+
+        click.echo()
+        app_url = _workspace_url(workspace_id)
+        click.echo(f"  {total_connectors} connectors active. Manage at: {app_url}")
+        click.echo(f"  Run `fastn add <name>` to enable autocomplete.")
+        click.echo()
+        return
+
+    if installed and not installed_names:
+        click.echo("No tools installed. Run `fastn add <name>` to install.")
+        return
+
+    if installed:
+        items = [(k, v) for k, v in connectors.items() if k in installed_names]
+        items.sort(key=lambda x: x[0])
+        click.echo()
+        click.echo(f"  Installed tools ({len(items)}):")
+        click.echo()
+        for name, data in items:
+            click.echo(f"  \u2705 {name}")
+        click.echo()
+        click.echo(f"  {len(items)} installed. Run `fastn add <name>` to enable autocomplete.")
+        click.echo()
+        return
+
+    # Group tools by source
+    source_order = [
+        (SOURCE_WORKSPACE, "My Workspace"),
+        (SOURCE_ORG, "My Organization"),
+        (SOURCE_COMMUNITY, "Marketplace"),
+    ]
+
+    click.echo()
+    total = len(connectors)
+    click.echo(f"  Available tools ({total}):")
+
+    for source_key, source_label in source_order:
+        group = [
+            (k, v) for k, v in connectors.items()
+            if v.get("source", SOURCE_COMMUNITY) == source_key
+        ]
+        if not group:
+            continue
+
+        group.sort(key=lambda x: x[0])
+
+        click.echo()
+        click.echo(f"  {source_label} ({len(group)}):")
+        for name, data in group:
+            marker = "\u2705" if name in installed_names else "  "
+            ctype = data.get("connector_type", "GROUP")
+            if ctype == "DATABASE":
+                type_label = " [database]"
+            elif ctype and ctype != "GROUP":
+                type_label = f" [{ctype.lower()}]"
+            else:
+                type_label = ""
+            click.echo(f"    {marker} {name}{type_label}")
+
+    click.echo()
+    installed_count = len(installed_names)
+    click.echo(f"  {installed_count} installed. Run `fastn add <name>` to enable autocomplete.")
+    click.echo()
+
+
+EXECUTE_URL = "https://live.fastn.ai/api/ucl/executeTool"
+FASTN_APP_BASE = "https://app.ucl.dev"
+
+
+def _workspace_url(workspace_id: str) -> str:
+    """Build the Fastn UI URL for a workspace's tool management page."""
+    if workspace_id:
+        return f"{FASTN_APP_BASE}/projects/{workspace_id}/ucl/{workspace_id}"
+    return FASTN_APP_BASE
+
+
+def _handle_execute_error(resp: httpx.Response, tool_label: str = "",
+                          workspace_id: str = "") -> None:
+    """Check for execution errors and raise with helpful messages.
+
+    Detects common error patterns from the executeTool API and provides
+    actionable guidance, especially for tools that aren't enabled yet.
+    """
+    if resp.status_code == 401:
+        raise click.ClickException(
+            "Authentication failed. Check your credentials or run `fastn login`."
+        )
+
+    if resp.status_code >= 400:
+        # Try to parse the error body for specific error types
+        error_body = None
+        try:
+            error_body = resp.json()
+        except Exception:
+            pass
+
+        error_msg = ""
+        if isinstance(error_body, dict):
+            error_msg = (
+                error_body.get("message", "")
+                or error_body.get("error", "")
+                or error_body.get("body", {}).get("message", "")
+                if isinstance(error_body.get("body"), dict) else ""
+            )
+
+        err_lower = (error_msg or resp.text).lower()
+
+        # Detect "tool not enabled" / "connector not connected" errors
+        not_enabled_keywords = [
+            "not enabled", "not connected", "not configured",
+            "not authorized", "no connection", "connection not found",
+            "connector not found", "tool not found",
+            "not active", "disabled",
+        ]
+        if any(kw in err_lower for kw in not_enabled_keywords):
+            hint = f" '{tool_label}'" if tool_label else ""
+            app_url = _workspace_url(workspace_id)
+            raise click.ClickException(
+                f"Tool{hint} is not enabled in your workspace.\n"
+                f"  Enable it at: {app_url}\n"
+                f"  Then run `fastn sync` to refresh your local registry."
+            )
+
+        raise click.ClickException(
+            f"API error {resp.status_code}: {resp.text}"
+        )
+
+
+def _parse_extra_args(args: list) -> dict:
+    """Parse remaining CLI args like --key value into a dict.
+
+    Supports:
+        --channel general           → {"channel": "general"}
+        --count 5                   → {"count": 5}
+        --verbose true              → {"verbose": true}
+        --tags '["a","b"]'          → {"tags": ["a", "b"]}
+        --flag                      → {"flag": true}  (no value → boolean true)
+    """
+    params: dict = {}
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg.startswith("--"):
+            key = arg[2:].replace("-", "_")
+            # Check if next arg exists and is not another flag
+            if i + 1 < len(args) and not args[i + 1].startswith("--"):
+                raw = args[i + 1]
+                # Auto-detect JSON types
+                try:
+                    value = json.loads(raw)
+                except (json.JSONDecodeError, ValueError):
+                    value = raw
+                params[key] = value
+                i += 2
+            else:
+                # Flag with no value → true
+                params[key] = True
+                i += 1
+        else:
+            i += 1
+    return params
+
+
+def _coerce_value(raw: str, field_type: str) -> Any:
+    """Convert a raw string input to the appropriate Python type."""
+    if not raw:
+        return raw
+    # Try JSON first (handles numbers, booleans, arrays, objects)
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return raw
+
+
+# Header fields that are managed by the SDK / API gateway — never prompt the user
+_INTERNAL_HEADER_FIELDS = {
+    "authorization", "x-fastn-space-id", "x-fastn-space-tenantid",
+    "x-fastn-space-connection-id", "x-fastn-api-key",
+}
+
+
+def _extract_input_fields(input_schema: dict) -> tuple:
+    """Extract the actual user-facing input fields from a tool's inputSchema.
+
+    Handles all schema patterns:
+        Single wrapper   ``{body: {type: object, props: {channel, text}}}``
+        Multi wrapper    ``{headers: {...}, body: {type: object, props: {input}}}``
+        Flat schema      ``{offset: {type: int}, limit: {type: int}}``
+
+    Internal groups like ``headers`` (containing auth fields managed by the SDK)
+    are automatically skipped.  Nested object properties are recursively
+    unwrapped so the user is prompted for the actual leaf fields.
+
+    Returns (param_key, fields, required_fields) where:
+        param_key: the wrapper key name (e.g. "body") or None for flat schemas
+        fields: dict of field_name -> {type, description, ...}
+        required_fields: set of required field names
+    """
+    props = input_schema.get("properties", {})
+    if not props:
+        return None, {}, set()
+
+    # Classify top-level properties into object groups and flat fields
+    object_groups: dict = {}  # group_key → property data
+    flat_fields: dict = {}
+
+    for key, pdata in props.items():
+        if isinstance(pdata, dict) and pdata.get("type") == "object":
+            object_groups[key] = pdata
+        else:
+            flat_fields[key] = pdata
+
+    # If there are no object groups, everything is flat
+    if not object_groups:
+        required = set(input_schema.get("required", []))
+        return None, flat_fields, required
+
+    # Filter out internal groups (headers with SDK-managed auth fields)
+    user_groups: dict = {}
+    for key, pdata in object_groups.items():
+        inner_props = pdata.get("properties", {})
+        # Skip if ALL inner fields are internal header fields
+        if inner_props and all(f in _INTERNAL_HEADER_FIELDS for f in inner_props):
+            continue
+        user_groups[key] = pdata
+
+    # Single user-facing wrapper → unwrap it
+    if len(user_groups) == 1 and not flat_fields:
+        key = next(iter(user_groups))
+        wrapper = user_groups[key]
+        inner_props = wrapper.get("properties", {})
+        required = set(wrapper.get("required", []))
+        # Recursively unwrap inner object fields that have their own properties
+        unwrapped, req = _unwrap_nested_fields(inner_props, required)
+        return key, unwrapped, req
+
+    # Multiple user-facing groups or mix of groups + flat fields
+    # Collect all inner fields across groups for prompting
+    all_fields: dict = {}
+    all_required: set = set()
+
+    for key, pdata in user_groups.items():
+        inner_props = pdata.get("properties", {})
+        inner_required = set(pdata.get("required", []))
+        unwrapped, req = _unwrap_nested_fields(inner_props, inner_required)
+        all_fields.update(unwrapped)
+        all_required.update(req)
+
+    # Include flat fields too
+    all_fields.update(flat_fields)
+    flat_required = set(input_schema.get("required", []))
+    for key in flat_fields:
+        if key in flat_required:
+            all_required.add(key)
+
+    return None, all_fields, all_required
+
+
+def _unwrap_nested_fields(
+    props: dict, required: set,
+) -> tuple:
+    """Recursively unwrap nested object fields for interactive prompting.
+
+    If a field is of type ``object`` and has inner properties, those inner
+    properties are surfaced directly so the user gets prompted for the
+    actual leaf fields instead of seeing ``[object]``.
+
+    Returns (fields, required_fields).
+    """
+    result: dict = {}
+    result_required: set = set()
+
+    for name, fdata in props.items():
+        if not isinstance(fdata, dict):
+            result[name] = fdata
+            if name in required:
+                result_required.add(name)
+            continue
+
+        if fdata.get("type") == "object" and fdata.get("properties"):
+            # Has nested fields — recurse into them
+            inner_props = fdata["properties"]
+            inner_required = set(fdata.get("required", []))
+            inner_result, inner_req = _unwrap_nested_fields(inner_props, inner_required)
+            result.update(inner_result)
+            # If the parent object is required, propagate inner requirements
+            if name in required:
+                result_required.update(inner_req)
+            else:
+                # Parent is optional → all inner fields are optional
+                pass
+        else:
+            # Leaf field (string, integer, etc.) or object without properties
+            result[name] = fdata
+            if name in required:
+                result_required.add(name)
+
+    return result, result_required
+
+
+def _prompt_for_params(fields: dict, required_fields: set) -> dict:
+    """Interactively prompt the user for each field in the schema.
+
+    Required fields are prompted first, then optional fields.
+    Empty input on optional fields is skipped.
+    """
+    params: dict = {}
+
+    # Split into required and optional, preserving order
+    required_list = [(k, v) for k, v in fields.items() if k in required_fields]
+    optional_list = [(k, v) for k, v in fields.items() if k not in required_fields]
+
+    if required_list:
+        click.echo()
+        for name, fdata in required_list:
+            ftype = fdata.get("type", "string")
+            desc = fdata.get("description", "")
+            label = f"  {name}"
+            if desc:
+                label += f" ({desc})"
+            label += f" [{ftype}]"
+
+            while True:
+                value = click.prompt(label)
+                if value:
+                    params[name] = _coerce_value(value, ftype)
+                    break
+                click.echo("    This field is required.")
+
+    if optional_list:
+        click.echo()
+        click.echo("  Optional fields (press Enter to skip):")
+        for name, fdata in optional_list:
+            ftype = fdata.get("type", "string")
+            desc = fdata.get("description", "")
+            label = f"  {name}"
+            if desc:
+                label += f" ({desc})"
+            label += f" [{ftype}]"
+
+            value = click.prompt(label, default="", show_default=False)
+            if value:
+                params[name] = _coerce_value(value, ftype)
+
+    return params
+
+
+@cli.command(
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
+@click.argument("connector_name")
+@click.argument("action_name", required=False, default=None)
+@click.argument("tenant_id", required=False, default=None)
+@click.option("--connection-id", default=None, help="Connection ID for multi-connection tools")
+@click.option("--tenant", default=None, help="Tenant ID (overrides config)")
+@click.pass_context
+def run(ctx: click.Context, connector_name: str, action_name: Optional[str], tenant_id: Optional[str], connection_id: Optional[str], tenant: Optional[str]) -> None:
+    """Execute a tool action directly from the command line.
+
+    \b
+    Usage:
+      fastn run <tool>                              Show available actions
+      fastn run <tool> <action> [--key value]        Execute with inline params
+      fastn run <tool> <action> <tenant_id>          Execute for a specific tenant
+      fastn run <tool> <action>                      Execute with interactive prompts
+
+    \b
+    Examples:
+      fastn run slack                                Show available Slack actions
+      fastn run slack send_message --channel general --text "Hello!"
+      fastn run slack send_message 3ab9d640-...      Execute as specific tenant
+      fastn run slack send_message             Prompts for each field
+      fastn run flows my_flow --input '{"key": "value"}'
+    """
+    config = load_config()
+    if not config.auth_token and not config.api_key:
+        raise click.ClickException("Not authenticated. Run `fastn login` first.")
+
+    _ensure_fresh_token(config)
+
+    fastn_dir = find_fastn_dir()
+    registry = load_registry(fastn_dir)
+    connectors = registry.get("connectors", {})
+
+    if not connectors:
+        raise click.ClickException(
+            "Registry is empty. Run `fastn sync` first."
+        )
+
+    if connector_name not in connectors:
+        raise click.ClickException(
+            f"Tool '{connector_name}' not found. Run `fastn list` to see available tools."
+        )
+
+    connector_data = connectors[connector_name]
+    connector_id = connector_data.get("id", "")
+
+    if not connector_id:
+        raise click.ClickException(
+            f"No ID for '{connector_name}'. Run `fastn sync`."
+        )
+
+    # Ensure tools are loaded
+    tools = connector_data.get("tools", {})
+    if not tools:
+        source = connector_data.get("source", SOURCE_COMMUNITY)
+        click.echo(f"Fetching tools for {connector_name}...")
+        tool_nodes = _fetch_connector_tools(config, connector_id, source)
+        tools = {}
+        for node in tool_nodes:
+            parsed = _parse_tool_node(node)
+            tools[parsed["key"]] = parsed["data"]
+
+        connector_data["tools"] = tools
+        connector_data["tool_count"] = len(tools)
+        save_registry(registry, fastn_dir)
+
+    # If no action given, list available actions
+    if not action_name:
+        display_name = connector_data.get("display_name", connector_name)
+        click.echo()
+        click.echo(f"  {display_name} — available actions:")
+        click.echo()
+        for key in sorted(tools.keys()):
+            tdata = tools[key]
+            display_key = _to_snake_case(key)
+            desc = tdata.get("description", "")
+            if desc:
+                click.echo(f"    {display_key:<30} {desc}")
+            else:
+                click.echo(f"    {display_key}")
+        click.echo()
+        click.echo(f"  Run: fastn run {connector_name} <action> [--key value ...]")
+        click.echo()
+        return
+
+    # Resolve the action
+    tool_info = tools.get(action_name)
+    # Fallback: try without underscores (send_message -> sendmessage)
+    if tool_info is None and "_" in action_name:
+        tool_info = tools.get(action_name.replace("_", ""))
+    if tool_info is None:
+        available = ", ".join(
+            _to_snake_case(k) for k in sorted(tools.keys())
+        )
+        raise click.ClickException(
+            f"Action '{action_name}' not found in '{connector_name}'. "
+            f"Available: {available}"
+        )
+
+    action_id = tool_info.get("actionId", "")
+    if not action_id:
+        raise click.ClickException(
+            f"No actionId for '{action_name}'. Run `fastn sync` and `fastn add {connector_name}`."
+        )
+
+    # Extract input fields from schema for interactive prompting
+    input_schema = tool_info.get("inputSchema", {})
+    _pk, fields, required_fields = _extract_input_fields(input_schema)
+
+    # Parse extra --key value args into params
+    params = _parse_extra_args(ctx.args)
+
+    # If no args were passed and there are fields, prompt interactively
+    if not params and fields:
+        desc = tool_info.get("description", "")
+        click.echo()
+        click.echo(f"  {connector_name}.{action_name}")
+        if desc:
+            click.echo(f"  {desc}")
+        params = _prompt_for_params(fields, required_fields)
+
+    # Build execute payload — dynamically route params based on the schema
+    from fastn.client import _build_params_from_schema
+
+    workspace_id = config.resolve_project_id()
+    parameters = _build_params_from_schema(tool_info, params)
+    payload: dict = {
+        "input": {
+            "actionId": action_id,
+            "connectorId": connector_id,
+            "agentId": workspace_id,
+            "toolName": action_name,
+            "parameters": parameters,
+        }
+    }
+    if connection_id:
+        payload["input"]["connectionId"] = connection_id
+
+    effective_tenant = tenant_id or tenant
+    if effective_tenant:
+        config.tenant_id = effective_tenant
+    headers = config.get_headers()
+
+    click.echo()
+    click.echo(f"Running {connector_name}.{action_name}...")
+    resp = _verbose_post(EXECUTE_URL, headers, payload)
+
+    _handle_execute_error(resp, f"{connector_name}.{action_name}", workspace_id)
+
+    data = resp.json()
+    # Unwrap: API returns {body, statusCode, rawBody} — show the body
+    if isinstance(data, dict) and "body" in data:
+        result = data["body"]
+    else:
+        result = data
+
+    click.echo(json.dumps(result, indent=2))
+
+
+@cli.command()
+@click.argument("connector_name")
+@click.argument("tool_name", required=False, default=None)
+def schema(connector_name: str, tool_name: Optional[str]) -> None:
+    """Show raw JSON schema for a tool's actions.
+
+    \b
+    Usage:
+      fastn schema slack                  Show schemas for all Slack actions
+      fastn schema slack send_message     Show schema for a specific action
+    """
+    fastn_dir = find_fastn_dir()
+    registry = load_registry(fastn_dir)
+    connectors = registry.get("connectors", {})
+
+    if connector_name not in connectors:
+        raise click.ClickException(
+            f"Tool '{connector_name}' not found. Run `fastn add {connector_name}` first."
+        )
+
+    connector_data = connectors[connector_name]
+    tools = connector_data.get("tools", {})
+
+    if not tools:
+        raise click.ClickException(
+            f"No tools cached for '{connector_name}'. Run `fastn add {connector_name}` first."
+        )
+
+    if tool_name:
+        tool = tools.get(tool_name)
+        # Fallback: try without underscores (send_message -> sendmessage)
+        if tool is None and "_" in tool_name:
+            tool = tools.get(tool_name.replace("_", ""))
+        if tool is None:
+            available = ", ".join(
+                _to_snake_case(k) for k in sorted(tools.keys())
+            )
+            raise click.ClickException(
+                f"Tool '{tool_name}' not found in {connector_name}. Available: {available}"
+            )
+        output = {
+            "name": tool_name,
+            "description": tool.get("description", ""),
+            "actionId": tool.get("actionId", ""),
+            "inputSchema": tool.get("inputSchema", {}),
+            "outputSchema": tool.get("outputSchema", {}),
+        }
+        click.echo(json.dumps(output, indent=2))
+    else:
+        output = []
+        for name, tool in sorted(tools.items()):
+            output.append({
+                "name": _to_snake_case(name),
+                "description": tool.get("description", ""),
+                "actionId": tool.get("actionId", ""),
+                "inputSchema": tool.get("inputSchema", {}),
+                "outputSchema": tool.get("outputSchema", {}),
+            })
+        click.echo(json.dumps(output, indent=2))
+
+
+GET_TOOLS_URL = "https://live.fastn.ai/api/ucl/getTools"
+
+
+def _extract_tool_list(data: Any) -> list:
+    """Extract the tool list from a getTools API response.
+
+    The API may return tools in various shapes:
+        - A plain list: ``[{...}, ...]``
+        - ``{"tools": [...]}``, ``{"data": [...]}``
+        - ``{"body": [...]}``, ``{"body": {"tools": [...]}}``
+        - A single tool dict: ``{actionId: ..., ...}``
+    """
+    if isinstance(data, list):
+        return data
+
+    if not isinstance(data, dict):
+        return []
+
+    # Try common wrapper keys
+    for key in ("tools", "data"):
+        val = data.get(key)
+        if isinstance(val, list):
+            return val
+
+    # Unwrap body first, then check inside
+    body = data.get("body")
+    if isinstance(body, list):
+        return body
+    if isinstance(body, dict):
+        for key in ("tools", "data"):
+            val = body.get(key)
+            if isinstance(val, list):
+                return val
+        # body itself might be a single tool
+        if "actionId" in body:
+            return [body]
+
+    # data itself is a single tool
+    if "actionId" in data:
+        return [data]
+
+    return []
+
+
+def _resolve_friendly_names(
+    action_id: str,
+    raw_tool_name: str,
+    raw_connector_name: str,
+    connector_hint: Optional[str],
+    registry: dict,
+) -> tuple:
+    """Resolve friendly connector and tool names from the registry.
+
+    The getTools API may return raw internal IDs (e.g.
+    ``_knexa_2XfaKS...``) as tool/connector names.  This function looks
+    up the local registry to find human-readable names.
+
+    Returns (connector_name, tool_name, connector_id, tool_info).
+    """
+    connectors = registry.get("connectors", {})
+
+    # If we already have a good connector name from the hint or response
+    friendly_connector = raw_connector_name or connector_hint or ""
+    friendly_tool = raw_tool_name
+    resolved_connector_id = ""
+    resolved_tool_info: Optional[dict] = None
+
+    # Search the registry by actionId to find the friendly names
+    for cname, cdata in connectors.items():
+        tools = cdata.get("tools", {})
+        for tname, tinfo in tools.items():
+            if tinfo.get("actionId") == action_id:
+                friendly_connector = cname
+                friendly_tool = tname
+                resolved_connector_id = cdata.get("id", "")
+                resolved_tool_info = tinfo
+                return friendly_connector, friendly_tool, resolved_connector_id, resolved_tool_info
+
+    # Fallback: if connector hint was given, look up its connector_id
+    if connector_hint and connector_hint in connectors:
+        resolved_connector_id = connectors[connector_hint].get("id", "")
+        friendly_connector = connector_hint
+
+    return friendly_connector, friendly_tool, resolved_connector_id, resolved_tool_info
+
+
+def _setup_llm_provider(config: FastnConfig) -> Optional[FastnConfig]:
+    """Interactive LLM provider setup — choose provider, enter API key.
+
+    Returns the updated config with LLM settings, or None if user cancels.
+    """
+    from fastn.config import LLM_PROVIDERS
+
+    click.echo()
+    click.echo("  LLM Setup — fastn agent uses an LLM to fill in tool parameters")
+    click.echo("  from your natural language prompt.")
+    click.echo()
+    click.echo("  Choose an LLM provider:")
+    click.echo()
+
+    providers = list(LLM_PROVIDERS.items())
+    for i, (key, info) in enumerate(providers, 1):
+        click.echo(f"    {i}. {info['name']}")
+
+    click.echo()
+    choice = click.prompt("  Provider number", type=int)
+    if choice < 1 or choice > len(providers):
+        click.echo("  Invalid choice.")
+        return None
+
+    provider_key, provider_info = providers[choice - 1]
+
+    # Check if the API key is already in an environment variable
+    env_var = provider_info["env_var"]
+    existing_key = os.environ.get(env_var, "")
+
+    if existing_key:
+        click.echo(f"  ✓ Found {env_var} in environment.")
+        api_key = existing_key
+    else:
+        click.echo()
+        click.echo(f"  Get your API key from: {provider_info['key_url']}")
+
+        import webbrowser
+        if click.confirm("  Open the page in your browser?", default=True):
+            try:
+                webbrowser.open(provider_info["key_url"])
+                click.echo("  (Browser opened)")
+            except Exception:
+                click.echo("  Open the URL above manually.")
+
+        click.echo()
+        api_key = click.prompt(f"  {provider_info['name']} API Key")
+        if not api_key.strip():
+            click.echo("  No API key provided.")
+            return None
+
+    # Verify the SDK package is installed
+    pip_package = provider_info["pip_package"]
+    try:
+        __import__(pip_package.replace("-", "_").split("-")[0])
+    except ImportError:
+        click.echo(f"\n  ⚠  Package '{pip_package}' not installed.")
+        click.echo(f"  Run: pip install {pip_package}")
+        if not click.confirm("  Continue anyway?", default=False):
+            return None
+
+    config.llm_provider = provider_key
+    config.llm_api_key = api_key
+    config.llm_model = provider_info["default_model"]
+    save_config(config)
+
+    click.echo(f"\n  ✓ {provider_info['name']} configured (model: {config.llm_model})")
+    click.echo(f"  Saved to .fastn/config.json")
+    return config
+
+
+def _llm_fill_parameters(
+    config: FastnConfig,
+    prompt_str: str,
+    input_schema: dict,
+    tool_description: str,
+    tool_display_name: str,
+) -> Optional[dict]:
+    """Use the configured LLM to extract parameters from the prompt.
+
+    Sends the prompt + tool schema to the LLM and asks it to fill in the
+    parameter values.  Returns a dict of parameters, or None on failure.
+    """
+    from fastn.config import LLM_PROVIDERS
+
+    provider = config.llm_provider
+    api_key = config.llm_api_key
+    model = config.llm_model
+
+    if not provider or not api_key:
+        return None
+
+    provider_info = LLM_PROVIDERS.get(provider)
+    if not provider_info:
+        return None
+
+    model = model or provider_info["default_model"]
+
+    # Build a flat schema for the LLM (unwrap wrappers)
+    _pk, fields, required_fields = _extract_input_fields(input_schema)
+
+    if not fields:
+        return None
+
+    # Build the schema description for the LLM
+    schema_desc = []
+    for name, fdata in fields.items():
+        ftype = fdata.get("type", "string") if isinstance(fdata, dict) else "string"
+        desc = fdata.get("description", "") if isinstance(fdata, dict) else ""
+        req = "required" if name in required_fields else "optional"
+        line = f"  - {name} ({ftype}, {req})"
+        if desc:
+            line += f": {desc}"
+        schema_desc.append(line)
+
+    schema_text = "\n".join(schema_desc)
+
+    system_msg = (
+        f"You are a parameter extraction assistant. "
+        f"Given a user request, extract the parameter values for the tool "
+        f"'{tool_display_name}'.\n\n"
+        f"Tool: {tool_display_name}\n"
+    )
+    if tool_description:
+        system_msg += f"Description: {tool_description}\n"
+    system_msg += (
+        f"\nParameters:\n{schema_text}\n\n"
+        f"Respond with ONLY a valid JSON object containing the extracted "
+        f"parameter values. Do not include any other text. "
+        f"Only include parameters that can be determined from the user's request. "
+        f"Use the exact parameter names shown above."
+    )
+
+    try:
+        if provider == "openai":
+            return _llm_fill_openai(api_key, model, system_msg, prompt_str)
+        elif provider == "anthropic":
+            return _llm_fill_anthropic(api_key, model, system_msg, prompt_str)
+        elif provider == "gemini":
+            return _llm_fill_gemini(api_key, model, system_msg, prompt_str)
+    except Exception as e:
+        click.echo(f"  ⚠  LLM parameter extraction failed: {e}")
+        return None
+
+    return None
+
+
+def _llm_fill_openai(api_key: str, model: str, system_msg: str, prompt: str) -> Optional[dict]:
+    """Extract parameters using OpenAI."""
+    try:
+        import openai
+    except ImportError:
+        click.echo("  ⚠  openai package not installed. Run: pip install openai")
+        return None
+
+    client = openai.OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0,
+    )
+
+    content = response.choices[0].message.content or ""
+    return _parse_llm_json(content)
+
+
+def _llm_fill_anthropic(api_key: str, model: str, system_msg: str, prompt: str) -> Optional[dict]:
+    """Extract parameters using Anthropic."""
+    try:
+        import anthropic
+    except ImportError:
+        click.echo("  ⚠  anthropic package not installed. Run: pip install anthropic")
+        return None
+
+    client = anthropic.Anthropic(api_key=api_key)
+    response = client.messages.create(
+        model=model,
+        max_tokens=1024,
+        system=system_msg,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    content = ""
+    for block in response.content:
+        if hasattr(block, "text"):
+            content = block.text
+            break
+    return _parse_llm_json(content)
+
+
+def _llm_fill_gemini(api_key: str, model: str, system_msg: str, prompt: str) -> Optional[dict]:
+    """Extract parameters using Google Gemini."""
+    try:
+        from google import genai
+    except ImportError:
+        click.echo("  ⚠  google-genai package not installed. Run: pip install google-genai")
+        return None
+
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model=model,
+        contents=f"{system_msg}\n\nUser request: {prompt}",
+    )
+
+    content = response.text or ""
+    return _parse_llm_json(content)
+
+
+def _parse_llm_json(content: str) -> Optional[dict]:
+    """Parse JSON from LLM response, handling markdown fences."""
+    content = content.strip()
+    # Strip markdown code fences if present
+    if content.startswith("```"):
+        lines = content.split("\n")
+        # Remove first line (```json or ```) and last line (```)
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        content = "\n".join(lines).strip()
+
+    try:
+        result = json.loads(content)
+        if isinstance(result, dict):
+            return result
+    except (json.JSONDecodeError, ValueError):
+        pass
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Agent: agentic loop helpers
+# ---------------------------------------------------------------------------
+
+_AGENT_MAX_TURNS = 10
+def _format_bytes(n: int) -> str:
+    """Format byte count as human-readable string."""
+    if n < 1024:
+        return f"{n} B"
+    elif n < 1024 * 1024:
+        return f"{n / 1024:.1f} KB"
+    return f"{n / (1024 * 1024):.1f} MB"
+
+
+def _format_duration(seconds: float) -> str:
+    """Format duration as human-readable string."""
+    if seconds < 1:
+        return f"{seconds * 1000:.0f}ms"
+    return f"{seconds:.1f}s"
+
+
+def _format_tokens(n: int) -> str:
+    """Format token count with K suffix for large numbers."""
+    if n >= 10000:
+        return f"{n / 1000:.1f}K"
+    return str(n)
+
+
+def _format_cost(dollars: float) -> str:
+    """Format dollar cost."""
+    if dollars < 0.001:
+        return f"${dollars:.4f}"
+    if dollars < 0.01:
+        return f"${dollars:.3f}"
+    return f"${dollars:.2f}"
+
+
+# OpenAI pricing per 1M tokens (USD)
+_OPENAI_PRICING: Dict[str, tuple] = {
+    # (input_per_1M, output_per_1M)
+    "gpt-4o": (2.50, 10.00),
+    "gpt-4o-mini": (0.15, 0.60),
+    "gpt-4-turbo": (10.00, 30.00),
+    "gpt-4": (30.00, 60.00),
+    "gpt-3.5-turbo": (0.50, 1.50),
+}
+
+
+def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
+    """Estimate cost in USD based on model and token counts."""
+    # Match model prefix (gpt-4o-mini-2024-07-18 → gpt-4o-mini)
+    pricing = None
+    for key in sorted(_OPENAI_PRICING.keys(), key=len, reverse=True):
+        if model.startswith(key):
+            pricing = _OPENAI_PRICING[key]
+            break
+    if not pricing:
+        pricing = _OPENAI_PRICING.get("gpt-4o-mini", (0.15, 0.60))
+    in_cost = (input_tokens / 1_000_000) * pricing[0]
+    out_cost = (output_tokens / 1_000_000) * pricing[1]
+    return in_cost + out_cost
+
+
+# Each entry: (tool_name, tokens_in, tokens_out, context_tokens,
+#               llm_time, tool_time,
+#               request_bytes, response_bytes, cumulative_context_bytes, status)
+_AgentCallLog = List[tuple]
+
+
+def _print_agent_summary(
+    call_log: _AgentCallLog,
+    total_input: int, total_output: int,
+    total_llm_time: float, total_tool_time: float,
+    model: str = "",
+) -> None:
+    """Print a single benchmark table of all tool calls."""
+    total_time = total_llm_time + total_tool_time
+
+    click.echo()
+    click.echo()
+
+    if not call_log:
+        cost = _estimate_cost(model, total_input, total_output)
+        click.echo("  No tool calls.")
+        click.echo(f"  Tokens: {_format_tokens(total_input)} in → {_format_tokens(total_output)} out")
+        click.echo(f"  Time: {_format_duration(total_time)}  Cost: {_format_cost(cost)}")
+        return
+
+    # Single consolidated table
+    # Columns: #, Tool, LLM, Tool, Context(tokens), In, Out, Cost
+    click.echo("  ┌──────────────────────────────────────────────────────────────────────────────────────────┐")
+    click.echo("  │  #   Tool                     LLM      Tool     Context      In    Out       Cost      │")
+    click.echo("  ├──────────────────────────────────────────────────────────────────────────────────────────┤")
+
+    total_cost = 0.0
+    for i, entry in enumerate(call_log, 1):
+        name = entry[0]
+        t_in, t_out, ctx = entry[1], entry[2], entry[3]
+        llm_t, tool_t = entry[4], entry[5]
+        status = entry[9]
+
+        call_cost = _estimate_cost(model, t_in, t_out)
+        total_cost += call_cost
+
+        short_name = name if len(name) <= 23 else name[:20] + "..."
+        mark = "✓" if status == "ok" else "✗"
+
+        click.echo(
+            f"  │  {mark} {i:<2} {short_name:<23}"
+            f" {_format_duration(llm_t):>7}"
+            f" {_format_duration(tool_t):>7}"
+            f" {_format_tokens(ctx):>9}"
+            f" {_format_tokens(t_in):>7}"
+            f" {_format_tokens(t_out):>6}"
+            f" {_format_cost(call_cost):>10}  │"
+        )
+
+    click.echo("  ├──────────────────────────────────────────────────────────────────────────────────────────┤")
+    click.echo(
+        f"  │      {'Total':<23}"
+        f" {_format_duration(total_llm_time):>7}"
+        f" {_format_duration(total_tool_time):>7}"
+        f" {_format_tokens(call_log[-1][3]):>9}"
+        f" {_format_tokens(total_input):>7}"
+        f" {_format_tokens(total_output):>6}"
+        f" {_format_cost(total_cost):>10}  │"
+    )
+    click.echo("  └──────────────────────────────────────────────────────────────────────────────────────────┘")
+    click.echo()
+    click.echo(f"  {_format_duration(total_time)} total  ·  {_format_tokens(total_input + total_output)} tokens  ·  {_format_cost(total_cost)}")
+
+
+_AGENT_SYSTEM_PROMPT = (
+    "You are a helpful assistant with access to tools.\n"
+    "Use them to accomplish the user's request, calling multiple in sequence if needed.\n"
+    "If a tool call fails, try to recover: look up the correct ID or name using a list/search tool and retry.\n"
+    "When done, provide a short summary of what you did."
+)
+
+
+def _build_action_map(
+    tool_list: list, registry: dict,
+) -> Dict[str, dict]:
+    """Build a map from function name → {actionId, connectorId, display_label, tool_info}.
+
+    The getTools API returns tools in OpenAI function-calling format.
+    Each tool has ``actionId`` and ``function.name``.  We use the function
+    name as the key since that's what the LLM will reference in tool calls.
+    """
+    action_map: Dict[str, dict] = {}
+    for tool in tool_list:
+        aid = tool.get("actionId", "")
+        fn = tool.get("function", {})
+        fn_name = fn.get("name", aid)
+
+        # Resolve friendly names from registry
+        friendly_connector, friendly_tool, connector_id, tool_info = (
+            _resolve_friendly_names(aid, fn_name, "", None, registry)
+        )
+        display_label = (
+            f"{friendly_connector}.{friendly_tool}"
+            if friendly_connector
+            else friendly_tool or aid
+        )
+
+        # Store the raw schema so _execute_tool_call can re-wrap params
+        raw_schema = fn.get("parameters", {})
+        action_map[fn_name] = {
+            "actionId": aid,
+            "connectorId": connector_id,
+            "display_label": display_label,
+            "tool_info": tool_info,
+            "inputSchema": raw_schema,
+        }
+    return action_map
+
+
+def _detect_api_error(result: Any) -> Tuple[bool, str]:
+    """Detect whether an API response body indicates an error.
+
+    Works across diverse API response formats (Slack, GitHub, Stripe,
+    generic REST, GraphQL, etc.).  Returns ``(is_error, detail)`` where
+    *detail* is a short human-readable error string extracted from the
+    response (or ``""`` if no detail could be extracted).
+
+    Detection strategy (checked in order):
+
+    1. **Non-dict responses** – strings that look like error messages,
+       empty responses, etc.
+    2. **Explicit error fields** – ``error``, ``errors``, ``error_message``,
+       ``errorMessage``, ``err``, ``fault``, ``failure``.
+    3. **Negative success indicators** – ``ok: false``, ``success: false``,
+       ``succeeded: false``, ``status`` with error-like values.
+    4. **HTTP status codes in body** – ``statusCode >= 400``, ``status_code >= 400``,
+       ``code`` with well-known error codes.
+    5. **GraphQL errors** – top-level ``errors`` array.
+    """
+
+    # ── Non-dict responses ──────────────────────────────────────────────
+    if result is None:
+        return True, "empty response"
+
+    if isinstance(result, str):
+        lower = result.lower().strip()
+        if not lower:
+            return True, "empty response"
+        # Catch plain-text error messages
+        if lower.startswith(("error", "fault", "failure", "exception", "fatal")):
+            return True, result[:120]
+        return False, ""
+
+    if isinstance(result, list):
+        # A list is usually a valid data response (array of items)
+        return False, ""
+
+    if not isinstance(result, dict):
+        return False, ""
+
+    # ── Helper to extract a short detail string ─────────────────────────
+    def _extract_detail(val: Any) -> str:
+        if isinstance(val, str):
+            return val[:200]
+        if isinstance(val, dict):
+            # Common sub-patterns: {"message": "...", "code": "..."}
+            for k in ("message", "msg", "description", "detail", "reason", "text"):
+                if k in val:
+                    return str(val[k])[:200]
+            return json.dumps(val, separators=(", ", ": "))[:200]
+        if isinstance(val, list) and val:
+            first = val[0]
+            if isinstance(first, dict):
+                for k in ("message", "msg", "description", "detail", "reason", "text"):
+                    if k in first:
+                        return str(first[k])[:200]
+            return str(first)[:200]
+        if isinstance(val, bool) and val:
+            return ""  # error: true — no extra detail
+        return str(val)[:200] if val else ""
+
+    # ── 1. Explicit error fields ────────────────────────────────────────
+    _ERROR_KEYS = ("error", "errors", "error_message", "errorMessage",
+                   "err", "fault", "failure")
+    for key in _ERROR_KEYS:
+        val = result.get(key)
+        if val is None:
+            continue
+        # ``error: false`` or ``errors: []`` means no error
+        if val is False or (isinstance(val, (list, str)) and not val):
+            continue
+        return True, _extract_detail(val)
+
+    # ── 2. Negative success indicators ──────────────────────────────────
+    for key in ("ok", "success", "succeeded", "successful"):
+        val = result.get(key)
+        if val is not None and val is False:
+            # Try to find a companion message field
+            detail = ""
+            for mk in ("message", "msg", "description", "detail", "reason"):
+                if mk in result:
+                    detail = str(result[mk])[:200]
+                    break
+            return True, detail
+
+    # ── 3. Status field with error-like values ──────────────────────────
+    status_val = result.get("status")
+    if isinstance(status_val, str):
+        lower_status = status_val.lower()
+        _ERROR_STATUSES = (
+            "error", "failed", "failure", "fail", "rejected",
+            "denied", "unauthorized", "forbidden", "not_found",
+            "not found", "invalid", "expired", "timeout", "timed_out",
+        )
+        if lower_status in _ERROR_STATUSES:
+            detail = ""
+            for mk in ("message", "msg", "error", "description", "detail", "reason"):
+                if mk in result and mk != "status":
+                    detail = str(result[mk])[:200]
+                    break
+            return True, detail or status_val
+
+    # ── 4. HTTP status codes embedded in body ───────────────────────────
+    for key in ("statusCode", "status_code", "httpStatusCode", "http_status_code"):
+        code = result.get(key)
+        if isinstance(code, int) and code >= 400:
+            detail = ""
+            for mk in ("message", "msg", "error", "body", "description", "detail"):
+                if mk in result:
+                    detail = str(result[mk])[:200]
+                    break
+            return True, detail or f"HTTP {code}"
+
+    # Also check "code" but only for well-known error strings
+    code_val = result.get("code")
+    if isinstance(code_val, str):
+        lower_code = code_val.lower()
+        _ERROR_CODES = (
+            "not_found", "invalid", "unauthorized", "forbidden",
+            "rate_limited", "rate_limit_exceeded", "too_many_requests",
+            "internal_error", "server_error", "service_unavailable",
+            "bad_request", "conflict", "gone", "unprocessable",
+            "permission_denied", "unauthenticated", "cancelled",
+        )
+        if lower_code in _ERROR_CODES:
+            detail = ""
+            for mk in ("message", "msg", "description", "detail"):
+                if mk in result:
+                    detail = str(result[mk])[:200]
+                    break
+            return True, detail or code_val
+    if isinstance(code_val, int) and code_val >= 400:
+        detail = ""
+        for mk in ("message", "msg", "description", "detail"):
+            if mk in result:
+                detail = str(result[mk])[:200]
+                break
+        return True, detail or f"code {code_val}"
+
+    # ── No error detected ───────────────────────────────────────────────
+    return False, ""
+
+
+def _execute_tool_call(
+    fn_name: str,
+    fn_args: dict,
+    action_map: Dict[str, dict],
+    headers: dict,
+    workspace_id: str,
+    connection_id: Optional[str],
+    auto_confirm: bool = True,
+) -> dict:
+    """Execute a single tool call and return the result.
+
+    Looks up the actionId from the action_map, calls the executeTool API,
+    and prints status.  When *auto_confirm* is False, prompts the user
+    before each execution.
+
+    The returned dict includes metadata keys (prefixed with ``_``):
+
+    - ``_tool_duration``: API call latency in seconds
+    - ``_payload_bytes``: raw API response size (before truncation)
+    - ``_context_bytes``: size actually fed back to LLM (after truncation)
+    - ``_request_bytes``: size of the request payload sent to the tool API
+    """
+    import time as _time
+
+    mapping = action_map.get(fn_name, {})
+    action_id = mapping.get("actionId", fn_name)
+    connector_id = mapping.get("connectorId", "")
+    display_label = mapping.get("display_label", fn_name)
+
+    # Compact one-line display
+    compact_args = json.dumps(fn_args, separators=(", ", ": "))
+    if len(compact_args) > 60:
+        compact_args = compact_args[:57] + "..."
+    click.echo(f"  ▸ {display_label}({compact_args})")
+
+    # Confirmation gate
+    if not auto_confirm:
+        if not click.confirm("    Execute?", default=True):
+            click.echo("    ⏭  Skipped")
+            return {"skipped": True, "_tool_duration": 0.0, "_payload_bytes": 0,
+                    "_context_bytes": 0, "_request_bytes": 0}
+
+    # Re-wrap flat LLM params into the structure the API expects.
+    # The LLM sees unwrapped schemas (flat {channel, text}) but the API
+    # expects wrapped params ({body: {channel, text}}).
+    raw_schema = mapping.get("inputSchema") or {}
+    if raw_schema:
+        from fastn.client import _build_params_from_schema
+        exec_parameters = _build_params_from_schema(
+            {"inputSchema": raw_schema}, fn_args,
+        )
+    else:
+        exec_parameters = fn_args
+
+    execute_payload: dict = {
+        "input": {
+            "actionId": action_id,
+            "parameters": exec_parameters,
+            "agentId": workspace_id,
+        }
+    }
+    if connector_id:
+        execute_payload["input"]["connectorId"] = connector_id
+    if connection_id:
+        execute_payload["input"]["connectionId"] = connection_id
+
+    request_bytes = len(json.dumps(execute_payload).encode("utf-8"))
+
+    t0 = _time.monotonic()
+    resp = _verbose_post(EXECUTE_URL, headers, execute_payload)
+    tool_duration = _time.monotonic() - t0
+
+    if resp.status_code >= 400:
+        error_text = resp.text
+        click.echo(f"    ✗ Error ({resp.status_code}):")
+        click.echo(f"      {error_text}")
+        return {"error": True, "status_code": resp.status_code, "message": error_text,
+                "_tool_duration": tool_duration, "_payload_bytes": 0,
+                "_context_bytes": 0, "_request_bytes": request_bytes}
+
+    result = resp.json()
+    if isinstance(result, dict) and "body" in result:
+        result = result["body"]
+
+    # Detect errors in the response body (API returned 200 but with error)
+    is_error, error_detail = _detect_api_error(result)
+
+    result_str = json.dumps(result, indent=2)
+    payload_bytes = len(result_str.encode("utf-8"))
+
+    if is_error:
+        err_msg = f" ({error_detail})" if error_detail else ""
+        click.echo(f"    ✗ Error{err_msg}:")
+        click.echo(f"      {result_str}")
+    elif payload_bytes > 200:
+        click.echo(f"    ✓ {_format_bytes(payload_bytes)}")
+    else:
+        one_line = json.dumps(result, separators=(", ", ": "))
+        if len(one_line) > 60:
+            one_line = one_line[:57] + "..."
+        click.echo(f"    ✓ {one_line}")
+
+    # Truncate very large results before feeding back to the LLM
+    _MAX_RESULT_CHARS = 4000
+    if len(result_str) > _MAX_RESULT_CHARS:
+        truncated = result_str[:_MAX_RESULT_CHARS]
+        result = {
+            "_truncated": True,
+            "_original_bytes": len(result_str),
+            "preview": truncated,
+        }
+
+    context_str = json.dumps(result, default=str)
+    context_bytes = len(context_str.encode("utf-8"))
+
+    if is_error:
+        # Ensure there's an "error" key the loop can detect.
+        # If the API already has its own error field, keep it.
+        if not result.get("error"):
+            result["error"] = error_detail or True
+    result["_tool_duration"] = tool_duration
+    result["_payload_bytes"] = payload_bytes
+    result["_context_bytes"] = context_bytes
+    result["_request_bytes"] = request_bytes
+    return result
+
+
+def _convert_tools_for_openai(tool_list: list) -> list:
+    """Convert getTools API response to OpenAI function-calling format.
+
+    Schemas are unwrapped so the LLM sees flat params (e.g. ``channel``,
+    ``text``) instead of nested wrappers (``body.channel``, ``body.text``).
+    The execution side re-wraps via ``_build_params_from_schema``.
+    """
+    from fastn.client import _unwrap_input_schema
+
+    result = []
+    for tool in tool_list:
+        fn = tool.get("function", {})
+        if fn:
+            params = fn.get("parameters", {})
+            result.append({
+                "type": "function",
+                "function": {
+                    "name": fn.get("name", ""),
+                    "description": fn.get("description", ""),
+                    "parameters": _unwrap_input_schema(params),
+                },
+            })
+        else:
+            params = tool.get("inputSchema", tool.get("parameters", {}))
+            result.append({
+                "type": "function",
+                "function": {
+                    "name": tool.get("name", tool.get("actionId", "")),
+                    "description": tool.get("description", ""),
+                    "parameters": _unwrap_input_schema(params),
+                },
+            })
+    return result
+
+
+
+def _agent_loop_openai(
+    api_key: str,
+    model: str,
+    prompt_str: str,
+    tools: list,
+    action_map: Dict[str, dict],
+    headers: dict,
+    workspace_id: str,
+    connection_id: Optional[str],
+    max_turns: int = _AGENT_MAX_TURNS,
+    auto_confirm: bool = True,
+    max_errors: int = 2,
+) -> tuple:
+    """Run the agentic loop using OpenAI's function-calling API.
+
+    Returns (final_response, eval_log).
+    """
+    try:
+        import openai
+    except ImportError:
+        raise click.ClickException(
+            "openai package not installed. Run: pip install openai"
+        )
+
+    import time as _time
+
+    client = openai.OpenAI(api_key=api_key)
+    messages: list = [
+        {"role": "system", "content": _AGENT_SYSTEM_PROMPT},
+        {"role": "user", "content": prompt_str},
+    ]
+
+    total_input = 0
+    total_output = 0
+    total_llm_time = 0.0
+    total_tool_time = 0.0
+    cumulative_ctx_bytes = 0
+    call_log: _AgentCallLog = []
+    eval_log: list = []  # [{tool, args, result, status}] for --eval
+    consecutive_errors = 0
+
+    for turn in range(max_turns):
+        t0 = _time.monotonic()
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools if tools else None,
+        )
+        llm_duration = _time.monotonic() - t0
+        total_llm_time += llm_duration
+
+        usage = getattr(response, "usage", None)
+        turn_in = getattr(usage, "prompt_tokens", 0) or 0
+        turn_out = getattr(usage, "completion_tokens", 0) or 0
+        total_input += turn_in
+        total_output += turn_out
+
+        choice = response.choices[0]
+        message = choice.message
+
+        if message.tool_calls:
+            messages.append(message)
+
+            # Show what the LLM chose
+            num_calls = len(message.tool_calls)
+            chosen = [action_map.get(tc.function.name, {}).get("display_label", tc.function.name) for tc in message.tool_calls]
+            click.echo(f"\n  LLM → {num_calls} tool{'s' if num_calls != 1 else ''}: {', '.join(chosen)}")
+            click.echo()
+
+            for tool_call in message.tool_calls:
+                fn_name = tool_call.function.name
+                fn_display = action_map.get(fn_name, {}).get("display_label", fn_name)
+                try:
+                    fn_args = json.loads(tool_call.function.arguments)
+                except (json.JSONDecodeError, TypeError):
+                    fn_args = {}
+
+                result = _execute_tool_call(
+                    fn_name, fn_args, action_map,
+                    headers, workspace_id, connection_id,
+                    auto_confirm=auto_confirm,
+                )
+
+                tool_dur = result.pop("_tool_duration", 0.0)
+                resp_bytes = result.pop("_payload_bytes", 0)
+                ctx_bytes = result.pop("_context_bytes", 0)
+                req_bytes = result.pop("_request_bytes", 0)
+                total_tool_time += tool_dur
+                status = "err" if result.get("error") else "ok"
+
+                if status == "err":
+                    consecutive_errors += 1
+                else:
+                    consecutive_errors = 0
+
+                cumulative_ctx_bytes += ctx_bytes
+                call_log.append((
+                    fn_display, turn_in, turn_out, total_input,
+                    llm_duration, tool_dur,
+                    req_bytes, resp_bytes, cumulative_ctx_bytes, status,
+                ))
+
+                eval_log.append({
+                    "tool": fn_display,
+                    "args": fn_args,
+                    "result": result,
+                    "status": status,
+                })
+
+                result_content = json.dumps(result, default=str)
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": result_content,
+                })
+
+                if consecutive_errors >= max_errors:
+                    # Dump debug context + LLM diagnosis when giving up
+                    click.echo()
+                    click.echo("  ── Failed Call Debug ──")
+                    click.echo()
+                    click.echo("  System Prompt:")
+                    for line in _AGENT_SYSTEM_PROMPT.split("\n"):
+                        click.echo(f"    {line}")
+                    click.echo()
+                    click.echo("  User Prompt:")
+                    click.echo(f"    {prompt_str}")
+                    click.echo()
+                    click.echo(f"  Tools ({len(tools)}):")
+                    click.echo(json.dumps(tools, indent=2))
+                    click.echo()
+                    click.echo(f"  Failed Call: {fn_display}({json.dumps(fn_args, separators=(', ', ': '))})")
+                    click.echo(f"  Response: {json.dumps(result, indent=2, default=str)}")
+                    click.echo()
+
+                    # Ask LLM to diagnose the failure
+                    click.echo("  ── LLM Diagnosis ──")
+                    try:
+                        diag_response = client.chat.completions.create(
+                            model=model,
+                            messages=[
+                                {"role": "system", "content": (
+                                    "You are a debugging assistant. A tool call failed "
+                                    "and recovery was attempted but also failed. "
+                                    "Analyze the errors and suggest how to prevent "
+                                    "this in future requests. Be concise (3-5 lines max)."
+                                )},
+                                {"role": "user", "content": (
+                                    f"Tool: {fn_display}\n"
+                                    f"Args: {json.dumps(fn_args, indent=2)}\n"
+                                    f"Error: {json.dumps(result, indent=2, default=str)}\n"
+                                    f"Original prompt: {prompt_str}"
+                                )},
+                            ],
+                        )
+                        diag_text = diag_response.choices[0].message.content or ""
+                        for line in diag_text.strip().split("\n"):
+                            click.echo(f"  {line}")
+                    except Exception:
+                        click.echo("  (diagnosis unavailable)")
+                    click.echo()
+                    click.echo(f"  ⛔ Stopping — {consecutive_errors} consecutive error(s)")
+                    break
+
+            # Break outer loop too if max errors reached
+            if consecutive_errors >= max_errors:
+                break
+        else:
+            # Log the final LLM call (no tool, just the response)
+            call_log.append((
+                "llm → response", turn_in, turn_out, total_input,
+                llm_duration, 0.0,
+                0, 0, cumulative_ctx_bytes, "ok",
+            ))
+            _print_agent_summary(call_log, total_input, total_output, total_llm_time, total_tool_time, model)
+            return message.content or "", eval_log
+
+    _print_agent_summary(call_log, total_input, total_output, total_llm_time, total_tool_time, model)
+    return "Agent reached maximum turns without a final response.", eval_log
+
+
+@cli.command(
+    context_settings=dict(
+        ignore_unknown_options=True,
+        allow_extra_args=True,
+    ),
+)
+@click.argument("prompt", nargs=-1, required=True)
+@click.option("--connector", default=None, help="Scope discovery to a specific connector")
+@click.option("--tool", "tool_filter", default=None, help="Scope discovery to a specific tool/action")
+@click.option("--connection-id", default=None, help="Connection ID for multi-connection tools")
+@click.option("--max-turns", default=_AGENT_MAX_TURNS, type=int, show_default=True,
+              help="Maximum agentic loop iterations")
+@click.option("-y", "--yes", "skip_confirm", is_flag=True, default=False,
+              help="Skip confirmation prompts for tool calls")
+@click.option("--eval", "run_eval", is_flag=True, default=False,
+              help="Evaluate whether the agent called the right tools and achieved the task")
+@click.option("--max-errors", default=2, type=int, show_default=True,
+              help="Stop the agent after this many consecutive tool errors")
+@click.option("--max-tools", default=5, type=int, show_default=True,
+              help="Maximum number of tools to pass to the LLM")
+@click.option("--tenant", default=None, help="Tenant ID (overrides config)")
+@click.pass_context
+def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
+          tool_filter: Optional[str], connection_id: Optional[str],
+          max_turns: int, skip_confirm: bool, run_eval: bool,
+          max_errors: int, max_tools: int,
+          tenant: Optional[str]) -> None:
+    """AI-powered tool execution — describe what you want in natural language.
+
+    \b
+    Usage:
+      fastn agent "Send hello to #general on Slack"
+      fastn agent "Get all users" --connector test
+      fastn agent "List slack users and send hello to #general"
+      fastn agent "Say hey to general" -y
+      fastn agent "Say hey to general" --eval
+
+    \b
+    The agent discovers available tools, sends them to your configured LLM
+    using native function calling, and executes tool calls in a loop until
+    the task is complete. Supports multi-step tasks automatically.
+    Use --connector to scope discovery to a specific connector.
+    Each tool call requires confirmation by default. Pass -y to skip.
+    Pass --eval to evaluate whether the agent did the right thing.
+
+    \b
+    First-time setup will prompt you to choose an LLM provider and enter an
+    API key. Configuration is saved to .fastn/config.json.
+    """
+    # Separate prompt words from extra --key value args
+    prompt_words = []
+    extra_args = []
+    found_flag = False
+    args_list = list(prompt) + list(ctx.args)
+
+    i = 0
+    while i < len(args_list):
+        arg = args_list[i]
+        if arg.startswith("--"):
+            found_flag = True
+        if found_flag:
+            extra_args.append(arg)
+        else:
+            prompt_words.append(arg)
+        i += 1
+
+    prompt_str = " ".join(prompt_words)
+    if not prompt_str.strip():
+        raise click.ClickException("Please provide a prompt describing what you want to do.")
+
+    config = load_config()
+    if not config.auth_token and not config.api_key:
+        raise click.ClickException("Not authenticated. Run `fastn login` first.")
+
+    _ensure_fresh_token(config)
+
+    # Check if LLM is configured — if not, run setup
+    if not config.llm_provider or not config.llm_api_key:
+        config = _setup_llm_provider(config) or config
+        if not config.llm_provider:
+            raise click.ClickException(
+                "An LLM provider is required for `fastn agent`. "
+                "Run `fastn agent` again to configure one."
+            )
+
+    if tenant:
+        config.tenant_id = tenant
+
+    headers = config.get_headers()
+    workspace_id = config.resolve_project_id()
+
+    # Load the local registry for friendly name resolution
+    fastn_dir = find_fastn_dir()
+    registry = load_registry(fastn_dir)
+    reg_connectors = registry.get("connectors", {})
+
+    provider = config.llm_provider
+    api_key = config.llm_api_key
+    model = config.llm_model
+    if not model:
+        from fastn.config import LLM_PROVIDERS
+        provider_info = LLM_PROVIDERS.get(provider, {})
+        model = provider_info.get("default_model", "")
+
+    # Step 1: Discover ALL active tools via getTools API
+    click.echo()
+    click.echo(f"  ╭──────────────────────────────────────────────")
+    click.echo(f"  │  {prompt_str}")
+    if tenant:
+        click.echo(f"  │  Tenant: {config.tenant_id}  Workspace: {workspace_id}")
+    if connector:
+        click.echo(f"  │  Connector: {connector}")
+    if tool_filter:
+        click.echo(f"  │  Tool: {tool_filter}")
+    click.echo(f"  ╰──────────────────────────────────────────────")
+    click.echo()
+    click.echo("  Discovering tools...")
+
+    discovery_payload: dict = {
+        "input": {
+            "limit": max_tools,
+            "prompt": prompt_str,
+        }
+    }
+    if workspace_id:
+        discovery_payload["input"]["agentId"] = workspace_id
+    if connector:
+        discovery_payload["input"]["connectorName"] = connector
+        if connector in reg_connectors:
+            cid = reg_connectors[connector].get("id", "")
+            if cid:
+                discovery_payload["input"]["connectorId"] = cid
+    if tool_filter:
+        discovery_payload["input"]["toolName"] = tool_filter
+
+    resp = _verbose_post(GET_TOOLS_URL, headers, discovery_payload)
+
+    if resp.status_code >= 400:
+        raise click.ClickException(
+            f"Tool discovery failed: {resp.status_code} {resp.text}"
+        )
+
+    data = resp.json()
+    tool_list = _extract_tool_list(data)
+    if not tool_list:
+        click.echo("  No tools found. Try rephrasing or use --connector to scope.")
+        return
+
+    # Step 2: Build action map for execution lookups
+    action_map = _build_action_map(tool_list, registry)
+
+    tool_names = [v["display_label"] for v in action_map.values()]
+    click.echo(f"  ✓ {len(tool_list)} tool{'s' if len(tool_list) != 1 else ''}: {', '.join(tool_names)}")
+    click.echo(f"  ✓ LLM: {provider} ({model})")
+
+    if provider != "openai":
+        raise click.ClickException(
+            f"Only OpenAI is supported currently. "
+            f"Configured provider: {provider}. "
+            f"Run `fastn agent` to reconfigure."
+        )
+
+    try:
+        llm_tools = _convert_tools_for_openai(tool_list)
+        result = _agent_loop_openai(
+            api_key, model, prompt_str, llm_tools,
+            action_map, headers, workspace_id, connection_id,
+            max_turns=max_turns, auto_confirm=skip_confirm,
+            max_errors=max_errors,
+        )
+        final_response, eval_log = result
+    except click.ClickException:
+        raise
+    except Exception as e:
+        raise click.ClickException(f"Agent error: {e}")
+
+    # Print the final LLM response
+    if final_response:
+        click.echo()
+        click.echo(f"  {final_response}")
+        click.echo()
+
+    # ── Evaluation ──
+    if run_eval and eval_log:
+        click.echo("  ── Evaluation ──")
+        click.echo()
+
+        # Build a summary of what happened for the judge
+        calls_summary = []
+        for i, entry in enumerate(eval_log, 1):
+            result_preview = json.dumps(entry["result"], default=str)
+            if len(result_preview) > 500:
+                result_preview = result_preview[:500] + "..."
+            calls_summary.append(
+                f"  {i}. {entry['tool']}({json.dumps(entry['args'], separators=(', ', ': '))})"
+                f"\n     Status: {entry['status']}"
+                f"\n     Result: {result_preview}"
+            )
+
+        eval_prompt = (
+            f"User prompt: \"{prompt_str}\"\n\n"
+            f"Available tools: {', '.join(t.get('function', {}).get('name', '?') for t in llm_tools)}\n\n"
+            f"Tool calls made:\n" + "\n".join(calls_summary) + "\n\n"
+            f"Agent final response: {final_response}\n\n"
+            "Evaluate this agent run:\n\n"
+            "1. INTENT — Did the agent understand what the user wanted?\n"
+            "2. TOOL SELECTION — Did it pick the right tool(s) from the available set? Were any calls unnecessary?\n"
+            "3. TARGET — Did it act on the correct resource the user specified? "
+            "Extract the target from the user prompt (e.g. a channel, repo, project, file, user, ticket) "
+            "and verify the arguments match. "
+            "If an ID was used, cross-reference it against any prior list/get/search result in the call history. "
+            "If no lookup exists to verify the ID, mark as UNVERIFIED.\n"
+            "4. RESULT — Did the action succeed? Check the result payload for errors or confirmation.\n\n"
+            "Rules:\n"
+            "- Using a resource name instead of an ID is fine.\n"
+            "- A successful call to the WRONG target is a FAIL.\n"
+            "- Unnecessary lookup calls (list/get/search) that don't contribute to the task are a FAIL.\n"
+            "- If the task required multiple steps (e.g. lookup then act), that's acceptable.\n\n"
+            "Then give an overall verdict: PASS or FAIL.\n"
+            "PASS = correct tool, correct target, task completed.\n"
+            "FAIL = wrong tool, wrong target, task not completed, or unnecessary calls.\n\n"
+            "Be concise. End with a single line: VERDICT: PASS or VERDICT: FAIL"
+        )
+
+        try:
+            import openai
+            eval_client = openai.OpenAI(api_key=api_key)
+            eval_response = eval_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": (
+                        "You are a strict QA evaluator for an AI agent that uses third-party API tools "
+                        "(Slack, Jira, GitHub, Google Sheets, etc). "
+                        "Judge whether the agent picked the correct tool, targeted the correct resource, "
+                        "and accomplished the user's intent. "
+                        "Be strict — wrong target, wrong tool, or unnecessary calls are failures."
+                    )},
+                    {"role": "user", "content": eval_prompt},
+                ],
+            )
+            eval_text = eval_response.choices[0].message.content or ""
+
+            # Print eval results
+            for line in eval_text.strip().split("\n"):
+                click.echo(f"  {line}")
+
+            # Highlight the verdict
+            click.echo()
+            if "VERDICT: PASS" in eval_text.upper():
+                click.echo("  ✅ PASS")
+            elif "VERDICT: FAIL" in eval_text.upper():
+                click.echo("  ❌ FAIL")
+
+        except Exception as e:
+            click.echo(f"  Evaluation error: {e}")
+
+        click.echo()
+
+
+@cli.command()
+def version() -> None:
+    """Show SDK and registry version."""
+    fastn_dir = find_fastn_dir()
+    manifest = load_manifest(fastn_dir)
+
+    click.echo(f"Fastn SDK v{__version__}")
+    reg_version = manifest.get("registry_version", "not synced")
+    click.echo(f"Registry version: {reg_version}")
+    last_synced = manifest.get("last_synced", "never")
+    click.echo(f"Last synced: {last_synced}")
+
+
+def main() -> None:
+    """Entry point for the fastn CLI."""
+    cli()
+
+
+if __name__ == "__main__":
+    main()

@@ -23,6 +23,10 @@ htmlcov/
 .ruff_cache/
 .pytype/
 
+# Generated stubs (created by fastn add)
+fastn/__init__.pyi
+fastn/connectors/
+
 # Environment
 .env
 .venv/
@@ -36,3 +40,4 @@ env/
 *.swo
 *~
 .DS_Store
+.fastn/config.json

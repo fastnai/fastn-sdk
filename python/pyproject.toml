@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "fastn-sdk"
 version = "0.2.0"
-description = "Fastn SDK — Typed access to 250+ integrations for apps and AI agents"
+description = "Fastn SDK — Pre-built tools for AI agents and apps"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.8"
@@ -13,7 +13,7 @@ authors = [
     { name = "Fastn", email = "support@fastn.ai" },
 ]
 keywords = [
-    "fastn", "sdk", "integrations", "api", "connectors",
+    "fastn", "sdk", "integrations", "api", "tools",
     "slack", "jira", "github", "salesforce",
     "ai-agents", "llm", "tool-use", "function-calling",
 ]
@@ -64,8 +64,12 @@ packages = ["fastn"]
 include = ["fastn/", "fastn/py.typed", "LICENSE", "README.md"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests/sdk", "tests/cli"]
 asyncio_mode = "auto"
+markers = [
+    "sdk: SDK core tests (client, config, connector, exceptions, auth, oauth)",
+    "cli: CLI command and helper tests",
+]
 
 [tool.ruff]
 target-version = "py38"

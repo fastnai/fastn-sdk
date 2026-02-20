@@ -1,7 +1,7 @@
-"""Fastn SDK — Typed access to 250+ integrations for apps and AI agents.
+"""Fastn SDK — Pre-built tools for AI agents and apps.
 
 Provides two clients (sync and async) that give attribute-based access to
-connectors like Slack, Jira, GitHub, Salesforce, and more.
+250+ integrations like Slack, Jira, GitHub, Salesforce, and more.
 
 Setup:
     pip install fastn
@@ -30,6 +30,12 @@ LLM agent integration:
     # Feed tools to your LLM, get back a tool call, then execute:
     result = fastn.execute(action_id="act_slack_send_message", params={...})
 
+CLI agent mode:
+    # AI-powered tool discovery and execution from the command line
+    fastn agent "Send hello to #general on Slack"
+    fastn agent --connector slack "Post deploy status to #releases"
+    fastn agent --eval "Create a Jira ticket for the login bug"
+
 Multi-connection / multi-tenant:
     # Per-call overrides
     fastn.slack.send_message(connection_id="conn_abc", tenant_id="acme", ...)
@@ -37,6 +43,13 @@ Multi-connection / multi-tenant:
     # Bound proxy
     slack = fastn.connect("conn_abc")
     slack.send_message(channel="general", text="Hi")
+
+    # Constructor-level tenant
+    fastn = FastnClient(tenant_id="acme")
+
+CLI tool execution:
+    fastn run slack send_message --channel general --text "Hello!"
+    fastn run slack send_message acme-tenant-id    # with tenant
 
 Environments (LIVE / STAGING / DEV):
     fastn = FastnClient(api_key="...", project_id="...", stage="DEV")
@@ -69,7 +82,7 @@ from fastn.exceptions import (
     ToolNotFoundError,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "APIError",

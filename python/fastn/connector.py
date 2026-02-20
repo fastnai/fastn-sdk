@@ -1,18 +1,18 @@
-"""Dynamic connector proxy for Fastn SDK.
+"""Dynamic tool proxy for Fastn SDK.
 
-Provides attribute-based access to tools within a connector,
+Provides attribute-based access to actions within a tool,
 translating method calls into executeTool API calls.
 
-This module is not used directly. Instead, access connectors through the client:
+This module is not used directly. Instead, access tools through the client:
     fastn = FastnClient(api_key="...", project_id="...")
     fastn.slack.send_message(channel="general", text="Hello!")
     #     ^^^^^ DynamicConnector
-    #          ^^^^^^^^^^^^^^ tool method resolved via __getattr__
+    #          ^^^^^^^^^^^^^^ action method resolved via __getattr__
 
 How it works:
     1. ``fastn.slack`` triggers ``FastnClient.__getattr__("slack")``
-    2. The client looks up "slack" in the local registry, gets tool definitions
-    3. A ``DynamicConnector`` is created with those tools
+    2. The client looks up "slack" in the local registry, gets action definitions
+    3. A ``DynamicConnector`` is created with those actions
     4. ``connector.send_message(channel=..., text=...)`` triggers
        ``DynamicConnector.__getattr__("send_message")`` which returns a
        closure that calls ``_execute_tool()`` with the correct actionId
@@ -136,6 +136,32 @@ class DynamicConnector:
         self._migrations = migrations or {}
 
     def __getattr__(self, tool_name: str) -> Callable[..., Any]:
+        """Resolve an action name to a callable that executes the tool.
+
+        This enables the ``fastn.slack.send_message(channel="general", text="Hi")``
+        calling convention.  The returned callable accepts keyword arguments
+        that are forwarded to the Fastn executeTool API.
+
+        Name matching:
+            1. Exact match against registry action names
+            2. Underscore-collapsed fallback (``send_message`` → ``sendmessage``)
+            3. Deprecated tool migration lookup (emits ``DeprecationWarning``)
+
+        Special kwargs extracted before sending to the API:
+            - ``connection_id``: override the bound connection
+            - ``tenant_id``: execute on behalf of a specific tenant
+
+        Args:
+            tool_name: Action name (e.g. ``"send_message"``).
+
+        Returns:
+            A closure that calls :meth:`_execute_fn` with the correct
+            ``actionId`` and any schema migrations applied.
+
+        Raises:
+            ToolNotFoundError: If the action is not in the registry.
+            AttributeError: If *tool_name* starts with ``_``.
+        """
         if tool_name.startswith("_"):
             raise AttributeError(tool_name)
 
@@ -152,7 +178,6 @@ class DynamicConnector:
             if tool_name in deprecated_tools:
                 dep_info = deprecated_tools[tool_name]
                 action_id = dep_info.get("actionId", "")
-                param_key = dep_info.get("paramKey", "body")
                 connection_id = self._connection_id
                 connector_id = self._connector_id
                 message = dep_info.get(
@@ -167,7 +192,7 @@ class DynamicConnector:
                     )
                     call_tenant_id = kwargs.pop("tenant_id", None)
                     return self._execute_fn(
-                        action_id, kwargs, connector_id, param_key,
+                        action_id, kwargs, connector_id, dep_info,
                         call_connection_id, call_tenant_id,
                     )
 
@@ -182,7 +207,6 @@ class DynamicConnector:
             )
 
         action_id = tool_info["actionId"]
-        param_key = tool_info.get("paramKey", "body")
         connection_id = self._connection_id
         connector_id = self._connector_id
         connector_name = self._connector_name
@@ -196,7 +220,7 @@ class DynamicConnector:
             call_connection_id = kwargs.pop("connection_id", None) or connection_id
             call_tenant_id = kwargs.pop("tenant_id", None)
             return self._execute_fn(
-                action_id, kwargs, connector_id, param_key,
+                action_id, kwargs, connector_id, tool_info,
                 call_connection_id, call_tenant_id,
             )
 
@@ -238,6 +262,12 @@ class AsyncDynamicConnector:
         self._migrations = migrations or {}
 
     def __getattr__(self, tool_name: str) -> Callable[..., Any]:
+        """Async version of :meth:`DynamicConnector.__getattr__`.
+
+        Returns an ``async def`` closure so callers use ``await``::
+
+            result = await fastn.slack.send_message(channel="general", text="Hi")
+        """
         if tool_name.startswith("_"):
             raise AttributeError(tool_name)
 
@@ -254,7 +284,6 @@ class AsyncDynamicConnector:
             if tool_name in deprecated_tools:
                 dep_info = deprecated_tools[tool_name]
                 action_id = dep_info.get("actionId", "")
-                param_key = dep_info.get("paramKey", "body")
                 connection_id = self._connection_id
                 connector_id = self._connector_id
                 message = dep_info.get(
@@ -269,7 +298,7 @@ class AsyncDynamicConnector:
                     )
                     call_tenant_id = kwargs.pop("tenant_id", None)
                     return await self._execute_fn(
-                        action_id, kwargs, connector_id, param_key,
+                        action_id, kwargs, connector_id, dep_info,
                         call_connection_id, call_tenant_id,
                     )
 
@@ -284,7 +313,6 @@ class AsyncDynamicConnector:
             )
 
         action_id = tool_info["actionId"]
-        param_key = tool_info.get("paramKey", "body")
         connection_id = self._connection_id
         connector_id = self._connector_id
         connector_name = self._connector_name
@@ -297,7 +325,7 @@ class AsyncDynamicConnector:
             call_connection_id = kwargs.pop("connection_id", None) or connection_id
             call_tenant_id = kwargs.pop("tenant_id", None)
             return await self._execute_fn(
-                action_id, kwargs, connector_id, param_key,
+                action_id, kwargs, connector_id, tool_info,
                 call_connection_id, call_tenant_id,
             )
 

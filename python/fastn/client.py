@@ -17,7 +17,7 @@ Data plane — call tools directly:
     slack = fastn.connect("conn_abc")
     slack.send_message(channel="general", text="Hi")
 
-Control plane — inspect the connector registry:
+Control plane — inspect the tool registry:
     connectors = fastn.admin.connectors.list()
     tools = fastn.get_tools("slack")
     tool = fastn.get_tool("slack", "send_message")
@@ -171,13 +171,13 @@ _FORMAT_CONVERTERS = {
 # ---------------------------------------------------------------------------
 
 class _ConnectorsAdmin:
-    """Control plane: list and inspect available connectors."""
+    """Control plane: list and inspect available tools."""
 
     def __init__(self, registry: Dict[str, Any]) -> None:
         self._registry = registry
 
     def list(self) -> List[Dict[str, Any]]:
-        """List all connectors available in the registry."""
+        """List all tools available in the registry."""
         result = []
         for name, data in self._registry.get("connectors", {}).items():
             result.append({
@@ -189,7 +189,7 @@ class _ConnectorsAdmin:
         return result
 
     def get(self, connector_name: str) -> Dict[str, Any]:
-        """Get details for a specific connector."""
+        """Get details for a specific tool."""
         connectors = self._registry.get("connectors", {})
         data = connectors.get(connector_name)
         if data is None:
@@ -202,9 +202,9 @@ class _ConnectorsAdmin:
         }
 
     def get_tools(self, connector_name: str) -> List[Dict[str, Any]]:
-        """Get all tools for a connector with their raw schemas.
+        """Get all actions for a tool with their raw schemas.
 
-        Returns a list of tool dicts, each containing:
+        Returns a list of action dicts, each containing:
             name, description, actionId, inputSchema, outputSchema
         """
         connectors = self._registry.get("connectors", {})
@@ -223,7 +223,7 @@ class _ConnectorsAdmin:
         return result
 
     def get_tool(self, connector_name: str, tool_name: str) -> Dict[str, Any]:
-        """Get a single tool's details including raw input/output schemas.
+        """Get a single action's details including raw input/output schemas.
 
         Returns a dict with:
             name, description, actionId, inputSchema, outputSchema
@@ -249,7 +249,7 @@ class _ConnectorsAdmin:
 
 
 class _AdminSync:
-    """Control plane namespace (sync): fastn.admin.connectors."""
+    """Control plane namespace (sync): fastn.admin."""
 
     def __init__(self, registry: Dict[str, Any]) -> None:
         self.connectors = _ConnectorsAdmin(registry)
@@ -259,17 +259,78 @@ class _AdminSync:
 # Shared helpers
 # ---------------------------------------------------------------------------
 
-def _get_param_key(tool_info: Dict[str, Any]) -> str:
-    """Extract the top-level parameter wrapper key from a tool's inputSchema.
+def _build_params_from_schema(
+    tool_info: Dict[str, Any], kwargs: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Route user kwargs into the parameter structure defined by the schema.
 
-    Tools use different wrapper keys (e.g. 'body', 'param', 'query').
-    Falls back to 'body' if no schema or no properties found.
+    The schema's top-level properties define the parameter layout the API
+    expects. This function dynamically maps flat user kwargs into that
+    structure without any hardcoded wrapper key assumptions.
+
+    Patterns handled:
+        Single wrapper   ``{body: {type: object, props: {channel, text}}}``
+            → ``{"body": {"channel": ..., "text": ...}}``
+        Multi wrapper    ``{param: {type: object, ...}, url: {type: object, ...}}``
+            → ``{"param": {...}, "url": {...}}``
+        Flat schema      ``{offset: {type: integer}, limit: {type: integer}}``
+            → ``{"offset": ..., "limit": ...}``
+        No schema        → ``{"body": {<all kwargs>}}`` (backward compat)
     """
     schema = tool_info.get("inputSchema", {})
     props = schema.get("properties", {})
-    if props:
-        return next(iter(props))
-    return "body"
+
+    if not props:
+        # No schema — fall back to wrapping under "body"
+        return {"body": kwargs} if kwargs else {}
+
+    # Build a map: inner field name → top-level group key
+    # For object properties, their inner fields get routed into that group.
+    # For primitive properties, they stay at the top level.
+    object_groups: Dict[str, Dict[str, Any]] = {}  # group_key → inner props
+    flat_fields: set = set()
+
+    for key, pdata in props.items():
+        if isinstance(pdata, dict) and pdata.get("type") == "object":
+            inner = pdata.get("properties", {})
+            object_groups[key] = inner
+        else:
+            flat_fields.add(key)
+
+    # If there are no object groups, everything is flat
+    if not object_groups:
+        return kwargs
+
+    # Route each kwarg into the correct group
+    result: Dict[str, Any] = {}
+    used: set = set()
+
+    for group_key, inner_props in object_groups.items():
+        group_params: Dict[str, Any] = {}
+        for field_name in inner_props:
+            if field_name in kwargs:
+                group_params[field_name] = kwargs[field_name]
+                used.add(field_name)
+        if group_params:
+            result[group_key] = group_params
+
+    # Flat fields go at the top level
+    for field_name in flat_fields:
+        if field_name in kwargs:
+            result[field_name] = kwargs[field_name]
+            used.add(field_name)
+
+    # Any remaining kwargs that weren't matched — add to the first group
+    # or at top level if no groups exist
+    remaining = {k: v for k, v in kwargs.items() if k not in used}
+    if remaining:
+        if object_groups:
+            first_group = next(iter(object_groups))
+            result.setdefault(first_group, {}).update(remaining)
+        else:
+            result.update(remaining)
+
+    return result
 
 
 def _resolve_connector(
@@ -278,7 +339,7 @@ def _resolve_connector(
     """Look up a connector in the registry.
 
     Returns (connector_id, tools_dict) where tools_dict maps
-    tool_name -> {"actionId": str, "paramKey": str}.
+    tool_name -> {"actionId": str, "inputSchema": dict}.
     """
     connectors = registry.get("connectors", {})
     connector_data = connectors.get(connector_name)
@@ -289,28 +350,29 @@ def _resolve_connector(
     for tool_name, tool_info in connector_data.get("tools", {}).items():
         tools[tool_name] = {
             "actionId": tool_info.get("actionId", ""),
-            "paramKey": _get_param_key(tool_info),
+            "inputSchema": tool_info.get("inputSchema", {}),
         }
     return connector_id, tools
 
 
 def _build_execute_payload(
     action_id: str,
-    params: Dict[str, Any],
+    parameters: Dict[str, Any],
     connector_id: str = "",
     agent_id: str = "",
-    param_key: str = "body",
     connection_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Build the executeTool request body."""
+    """Build the executeTool request body.
+
+    *parameters* should already be structured to match the API schema
+    (e.g. via ``_build_params_from_schema``).
+    """
     payload: Dict[str, Any] = {
         "input": {
             "actionId": action_id,
             "connectorId": connector_id,
             "agentId": agent_id,
-            "parameters": {
-                param_key: params,
-            },
+            "parameters": parameters,
         }
     }
     if connection_id:
@@ -318,14 +380,14 @@ def _build_execute_payload(
     return payload
 
 
-def _all_tools_from_registry(registry: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
-    """Collect all tool name -> {actionId, paramKey} mappings across all connectors."""
-    all_tools: Dict[str, Dict[str, str]] = {}
+def _all_tools_from_registry(registry: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """Collect all tool name -> {actionId, inputSchema} mappings across all connectors."""
+    all_tools: Dict[str, Dict[str, Any]] = {}
     for connector_data in registry.get("connectors", {}).values():
         for tool_name, tool_info in connector_data.get("tools", {}).items():
             all_tools[tool_name] = {
                 "actionId": tool_info.get("actionId", ""),
-                "paramKey": _get_param_key(tool_info),
+                "inputSchema": tool_info.get("inputSchema", {}),
             }
     return all_tools
 
@@ -457,6 +519,28 @@ class FastnClient:
         )
 
     def __getattr__(self, name: str) -> DynamicConnector:
+        """Resolve a connector name to a :class:`DynamicConnector` proxy.
+
+        This is the mechanism behind ``fastn.slack.send_message(...)``:
+
+        1. ``fastn.slack`` calls ``__getattr__("slack")``
+        2. The local registry is searched for a connector called ``"slack"``
+        3. A :class:`DynamicConnector` is created with the connector's
+           action definitions and cached for subsequent accesses
+
+        Args:
+            name: Connector name (e.g. ``"slack"``, ``"jira"``, ``"github"``).
+
+        Returns:
+            A :class:`DynamicConnector` proxy whose methods correspond to
+            the connector's actions.
+
+        Raises:
+            ConnectorNotFoundError: If *name* is not in the local registry
+                (hint: run ``fastn sync && fastn add <name>``).
+            AttributeError: If *name* is a reserved attribute (``admin``,
+                ``connect``, ``execute``, etc.) or starts with ``_``.
+        """
         if name.startswith("_") or name in (
             "admin", "connect", "run", "close", "execute",
             "get_tools", "get_tool", "get_tools_for",
@@ -467,6 +551,7 @@ class FastnClient:
             return self._connectors[name]
 
         connector_id, tools = _resolve_connector(self._registry, name)
+
         connector_migrations = (
             self._migrations.get("connectors", {}).get(name, {})
         )
@@ -508,21 +593,25 @@ class FastnClient:
         action_id: str,
         params: Dict[str, Any],
         connector_id: str = "",
-        param_key: str = "body",
+        tool_info: Optional[Dict[str, Any]] = None,
         connection_id: Optional[str] = None,
         tenant_id: Optional[str] = None,
     ) -> Any:
         """Execute a tool via the Fastn API with retry logic."""
         self._ensure_fresh_token()
         url = f"{API_BASE_URL}/executeTool"
+        # When tool_info is provided (SDK proxy path), route params dynamically
+        # based on the tool's inputSchema. When tool_info is None (execute() /
+        # LLM agent path), params are already structured by the caller.
+        parameters = _build_params_from_schema(tool_info, params) if tool_info else params
         payload = _build_execute_payload(
-            action_id, params, connector_id, self._agent_id, param_key, connection_id
+            action_id, parameters, connector_id, self._agent_id, connection_id
         )
 
         # Per-call tenant override
         headers = dict(self._headers)
         if tenant_id:
-            headers["x-tenant"] = tenant_id
+            headers["x-fastn-space-tenantid"] = tenant_id
 
         self._log(f"POST {url}")
         self._log(f"Headers: {json.dumps(_redact_headers(headers), indent=2)}")
@@ -552,7 +641,11 @@ class FastnClient:
                         status_code=response.status_code,
                         response_body=body,
                     )
-                return response.json()
+                data = response.json()
+                # Unwrap: API returns {body, statusCode, rawBody} — return just body
+                if isinstance(data, dict) and "body" in data:
+                    return data["body"]
+                return data
             except (httpx.ConnectError, httpx.ReadTimeout) as e:
                 last_error = e
                 if attempt < self._max_retries:
@@ -595,7 +688,8 @@ class FastnClient:
             result = fastn.execute(tool["actionId"], {"channel": "general", "text": "Hi"})
         """
         return self._execute_tool(
-            action_id, params, "", "body", connection_id, tenant_id,
+            action_id, params, "",
+            tool_info=None, connection_id=connection_id, tenant_id=tenant_id,
         )
 
     # ----- Public API: tool discovery -----
@@ -656,25 +750,25 @@ class FastnClient:
     # ----- Public API: schema access -----
 
     def get_tools(self, connector_name: str) -> List[Dict[str, Any]]:
-        """Get all tools for a connector with raw input/output schemas.
+        """Get all actions for a tool with raw input/output schemas.
 
         Args:
-            connector_name: Name of the connector (e.g. "slack").
+            connector_name: Name of the tool (e.g. "slack").
 
         Returns:
-            List of tool dicts with name, description, actionId, inputSchema, outputSchema.
+            List of action dicts with name, description, actionId, inputSchema, outputSchema.
         """
         return self.admin.connectors.get_tools(connector_name)
 
     def get_tool(self, connector_name: str, tool_name: str) -> Dict[str, Any]:
-        """Get a single tool's raw input/output schema.
+        """Get a single action's raw input/output schema.
 
         Args:
-            connector_name: Name of the connector (e.g. "slack").
-            tool_name: Name of the tool (e.g. "sendmessage").
+            connector_name: Name of the tool (e.g. "slack").
+            tool_name: Name of the action (e.g. "sendmessage").
 
         Returns:
-            Tool dict with name, description, actionId, inputSchema, outputSchema.
+            Action dict with name, description, actionId, inputSchema, outputSchema.
         """
         return self.admin.connectors.get_tool(connector_name, tool_name)
 
@@ -683,7 +777,7 @@ class FastnClient:
         connector_name: str,
         format: str = "openai",
     ) -> List[Dict[str, Any]]:
-        """Get tools formatted for a specific LLM provider's tool-use API.
+        """Get actions formatted for a specific LLM provider's tool-use API.
 
         Supported formats:
           - ``"openai"``    — OpenAI function-calling format
@@ -693,15 +787,15 @@ class FastnClient:
           - ``"raw"``       — Raw Fastn schemas (name, description, actionId, inputSchema, outputSchema)
 
         Args:
-            connector_name: Name of the connector (e.g. "slack").
+            connector_name: Name of the tool (e.g. "slack").
             format: LLM provider format. Defaults to "openai".
 
         Returns:
-            List of tool definitions in the requested format.
+            List of action definitions in the requested format.
 
         Raises:
             ValueError: If format is not supported.
-            ConnectorNotFoundError: If connector is not in the registry.
+            ConnectorNotFoundError: If tool is not in the registry.
 
         Example::
 
@@ -747,7 +841,7 @@ class FastnClient:
 
     def __repr__(self) -> str:
         n = len(self._registry.get("connectors", {}))
-        return f"<FastnClient ({n} connectors in registry)>"
+        return f"<FastnClient ({n} tools in registry)>"
 
 
 # ---------------------------------------------------------------------------
@@ -817,6 +911,23 @@ class AsyncFastnClient:
         )
 
     def __getattr__(self, name: str) -> AsyncDynamicConnector:
+        """Resolve a connector name to an :class:`AsyncDynamicConnector` proxy.
+
+        Async equivalent of :meth:`FastnClient.__getattr__`.  Usage::
+
+            async with AsyncFastnClient() as fastn:
+                result = await fastn.slack.send_message(channel="general", text="Hi")
+
+        Args:
+            name: Connector name (e.g. ``"slack"``, ``"jira"``).
+
+        Returns:
+            An :class:`AsyncDynamicConnector` whose methods are coroutines.
+
+        Raises:
+            ConnectorNotFoundError: If *name* is not in the local registry.
+            AttributeError: If *name* is reserved or starts with ``_``.
+        """
         if name.startswith("_") or name in (
             "admin", "connect", "run", "close", "execute",
             "get_tools", "get_tool", "get_tools_for",
@@ -827,6 +938,7 @@ class AsyncFastnClient:
             return self._connectors[name]
 
         connector_id, tools = _resolve_connector(self._registry, name)
+
         connector_migrations = (
             self._migrations.get("connectors", {}).get(name, {})
         )
@@ -863,7 +975,7 @@ class AsyncFastnClient:
         action_id: str,
         params: Dict[str, Any],
         connector_id: str = "",
-        param_key: str = "body",
+        tool_info: Optional[Dict[str, Any]] = None,
         connection_id: Optional[str] = None,
         tenant_id: Optional[str] = None,
     ) -> Any:
@@ -872,14 +984,18 @@ class AsyncFastnClient:
 
         self._ensure_fresh_token()
         url = f"{API_BASE_URL}/executeTool"
+        # When tool_info is provided (SDK proxy path), route params dynamically
+        # based on the tool's inputSchema. When tool_info is None (execute() /
+        # LLM agent path), params are already structured by the caller.
+        parameters = _build_params_from_schema(tool_info, params) if tool_info else params
         payload = _build_execute_payload(
-            action_id, params, connector_id, self._agent_id, param_key, connection_id
+            action_id, parameters, connector_id, self._agent_id, connection_id
         )
 
         # Per-call tenant override
         headers = dict(self._headers)
         if tenant_id:
-            headers["x-tenant"] = tenant_id
+            headers["x-fastn-space-tenantid"] = tenant_id
 
         self._log(f"POST {url}")
         self._log(f"Payload: {json.dumps(payload, indent=2)}")
@@ -907,7 +1023,11 @@ class AsyncFastnClient:
                         status_code=response.status_code,
                         response_body=body,
                     )
-                return response.json()
+                data = response.json()
+                # Unwrap: API returns {body, statusCode, rawBody} — return just body
+                if isinstance(data, dict) and "body" in data:
+                    return data["body"]
+                return data
             except (httpx.ConnectError, httpx.ReadTimeout) as e:
                 last_error = e
                 if attempt < self._max_retries:
@@ -933,7 +1053,8 @@ class AsyncFastnClient:
         See ``FastnClient.execute()`` for full documentation.
         """
         return await self._execute_tool(
-            action_id, params, "", "body", connection_id, tenant_id,
+            action_id, params, "",
+            tool_info=None, connection_id=connection_id, tenant_id=tenant_id,
         )
 
     # ----- Public API: tool discovery -----
@@ -984,11 +1105,11 @@ class AsyncFastnClient:
     # ----- Public API: schema access -----
 
     def get_tools(self, connector_name: str) -> List[Dict[str, Any]]:
-        """Get all tools for a connector with raw input/output schemas."""
+        """Get all actions for a tool with raw input/output schemas."""
         return self.admin.connectors.get_tools(connector_name)
 
     def get_tool(self, connector_name: str, tool_name: str) -> Dict[str, Any]:
-        """Get a single tool's raw input/output schema."""
+        """Get a single action's raw input/output schema."""
         return self.admin.connectors.get_tool(connector_name, tool_name)
 
     def get_tools_for(
@@ -996,7 +1117,7 @@ class AsyncFastnClient:
         connector_name: str,
         format: str = "openai",
     ) -> List[Dict[str, Any]]:
-        """Get tools formatted for a specific LLM provider's tool-use API.
+        """Get actions formatted for a specific LLM provider's tool-use API.
 
         See ``FastnClient.get_tools_for()`` for full documentation.
         """
@@ -1024,4 +1145,4 @@ class AsyncFastnClient:
 
     def __repr__(self) -> str:
         n = len(self._registry.get("connectors", {}))
-        return f"<AsyncFastnClient ({n} connectors in registry)>"
+        return f"<AsyncFastnClient ({n} tools in registry)>"
