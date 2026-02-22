@@ -5,6 +5,99 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — Canonical Terminology Refactor
+
+### Breaking Changes — Terminology
+
+The SDK now uses the canonical Fastn architecture terminology:
+
+**Connectors provide tools. Flows compose tools. Agents run flows and tools with reasoning.**
+
+| Concept | Old term (v0.3.0) | New term (canonical) |
+|---------|-------------------|---------------------|
+| Service integration (Slack, Jira) | Tool | **Connector** |
+| Callable function (send_message) | Action | **Tool** |
+
+#### Renamed Classes
+- `DynamicTool` → `DynamicConnector`
+- `AsyncDynamicTool` → `AsyncDynamicConnector`
+- `ToolNotFoundError` → `ConnectorNotFoundError` (connector not in registry)
+- `ActionNotFoundError` → `ToolNotFoundError` (tool not found in connector)
+
+#### Renamed Methods
+- `fastn.tools.list()` → `fastn.connectors.list()`
+- `fastn.tools.get(name)` → `fastn.connectors.get(name)`
+- `fastn.get_actions(name)` → `fastn.get_tools(name)`
+- `fastn.get_action(connector, tool)` → `fastn.get_tool(connector, tool)`
+- `fastn.execute(action_id=...)` → `fastn.execute(tool=...)`
+- `get_tools_for(..., tool=)` → `get_tools_for(..., connector=)`
+
+#### Renamed CLI Flags
+- `--tool` → `--connector` (scope to a connector)
+- `--action` → `--tool` (scope to a tool)
+
+#### Renamed Files
+- `fastn/tool.py` → `fastn/connector.py`
+- `tests/sdk/test_tool.py` → `tests/sdk/test_connector.py`
+
+#### Renamed Config Functions
+- `add_tool_to_manifest()` → `add_connector_to_manifest()`
+- `remove_tool_from_manifest()` → `remove_connector_from_manifest()`
+- `get_installed_tools()` → `get_installed_connectors()`
+
+#### Migration Guide
+
+```python
+# Before (v0.3.0)
+from fastn import ToolNotFoundError, ActionNotFoundError
+tools = client.tools.list()
+actions = client.get_actions("slack")
+result = client.execute(action_id="send_message", params={...})
+tools = client.get_tools_for("message", tool="slack", format="openai")
+
+# After (canonical)
+from fastn import ConnectorNotFoundError, ToolNotFoundError
+connectors = client.connectors.list()
+tools = client.get_tools("slack")
+result = client.execute(tool="send_message", params={...})
+tools = client.get_tools_for("message", connector="slack", format="openai")
+```
+
+## [0.3.0] - 2026-02-21
+
+### Breaking Changes
+
+- **Terminology refactor**: "Connector" is now "Tool", "Tool" (action) is now "Action" throughout the SDK
+- **Namespace restructure**:
+  - `fastn.admin.connectors.list()` → `fastn.tools.list()`
+  - `fastn.admin.connectors.get(name)` → `fastn.tools.get(name)`
+  - `fastn.get_tools(connector_name)` → `fastn.get_actions(tool_name)`
+  - `fastn.get_tool(connector_name, tool_name)` → `fastn.get_action(tool_name, action_name)`
+  - `fastn.connections.initiate()` → `fastn.auth.connect()`
+  - `fastn.connections.status()` → `fastn.auth.status()`
+  - `fastn.configure_custom_auth()` → `fastn.auth.configure_custom()`
+  - `get_tools_for(..., connector="slack")` → `get_tools_for(..., tool="slack")`
+- **Exception renames**:
+  - `ConnectorNotFoundError` → `ToolNotFoundError` (with `.tool_name` attribute)
+  - `ToolNotFoundError` → `ActionNotFoundError` (with `.tool_name` and `.action_name` attributes)
+- **File rename**: `fastn/connector.py` → `fastn/tool.py`
+  - `DynamicConnector` → `DynamicTool`
+  - `AsyncDynamicConnector` → `AsyncDynamicTool`
+- **CLI option rename**: `fastn agent --connector` → `fastn agent --tool`
+
+### Added
+
+- `fastn.auth.configure_custom(userinfo_url)` — register custom auth provider via GraphQL `updateResolverStep` mutation
+- Comprehensive documentation with terminology glossary, full feature examples (flows, auth, multi-tenant)
+- Platform benefits documentation (performance, governance, security, observability)
+
+### Changed
+
+- `auth.configure_custom()` now uses GraphQL `updateResolverStep` mutation instead of REST endpoint
+- `_ToolsAdmin.get()` returns `"actions"` key instead of `"tools"` for consistency
+- All user-facing CLI strings updated to use "tool" and "action" terminology
+- All examples and documentation updated to match new API surface
+
 ## [0.2.3] - 2026-02-20
 
 ### Added

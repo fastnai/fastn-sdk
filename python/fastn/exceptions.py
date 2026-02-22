@@ -5,15 +5,17 @@ All exceptions inherit from ``FastnError``. Import from the top-level package:
     from fastn import FastnClient, AuthError, ConnectorNotFoundError
 
 Exception hierarchy:
-    FastnError                  Base class. Has .message and .details attrs.
-    +-- AuthError               Invalid/expired credentials (API key or JWT).
-    |   +-- OAuthError          OAuth device flow failure. Has .error_code attr.
-    +-- ConfigError             Missing api_key/project_id. Run ``fastn init``.
-    +-- ConnectorNotFoundError  Tool not in registry. Has .connector_name attr.
-    +-- ToolNotFoundError       Action not in tool. Has .connector_name, .tool_name.
-    +-- ConnectionNotFoundError Multiple connections, none specified.
-    +-- APIError                HTTP error from the API. Has .status_code, .response_body.
-    +-- RegistryError           Registry sync/parse failure.
+    FastnError                      Base class. Has .message and .details attrs.
+    +-- AuthError                   Invalid/expired credentials (API key or JWT).
+    |   +-- OAuthError              OAuth device flow failure. Has .error_code attr.
+    +-- ConfigError                 Missing api_key/project_id. Run ``fastn init``.
+    +-- ConnectorNotFoundError      Connector not in registry. Has .connector_name.
+    +-- ToolNotFoundError           Tool not found in connector. Has .connector_name, .tool_name.
+    +-- ConnectionNotFoundError     Multiple connections, none specified.
+    +-- FlowNotFoundError           Flow not found. Has .flow_id attr.
+    +-- RunNotFoundError            Run not found. Has .run_id attr.
+    +-- APIError                    HTTP error from the API. Has .status_code, .response_body.
+    +-- RegistryError               Registry sync/parse failure.
 
 Usage:
     try:
@@ -53,11 +55,11 @@ class ConfigError(FastnError):
 
 
 class ConnectorNotFoundError(FastnError):
-    """Raised when accessing a tool not in the registry."""
+    """Raised when a connector (e.g. Slack, Jira) is not in the registry."""
 
     def __init__(self, connector_name: str) -> None:
         super().__init__(
-            f"Tool '{connector_name}' not found in local registry. "
+            f"Connector '{connector_name}' not found in local registry. "
             f"Run `fastn sync` to update the registry, "
             f"then `fastn add {connector_name}` to install it."
         )
@@ -65,20 +67,20 @@ class ConnectorNotFoundError(FastnError):
 
 
 class ToolNotFoundError(FastnError):
-    """Raised when accessing an action not in the tool definition."""
+    """Raised when a tool (e.g. send_message) is not found in a connector's definition."""
 
     def __init__(
         self, connector_name: str, tool_name: str, has_tools: bool = True,
     ) -> None:
         if has_tools:
             msg = (
-                f"Action '{tool_name}' not found in tool '{connector_name}'. "
-                f"Run `fastn sync` to update the registry, or check the action name."
+                f"Tool '{tool_name}' not found in connector '{connector_name}'. "
+                f"Run `fastn sync` to update the registry, or check the tool name."
             )
         else:
             msg = (
-                f"Tool '{connector_name}' has no actions installed. "
-                f"Run `fastn add {connector_name}` to fetch its actions."
+                f"Connector '{connector_name}' has no tools installed. "
+                f"Run `fastn add {connector_name}` to fetch its tools."
             )
         super().__init__(msg)
         self.connector_name = connector_name
@@ -115,6 +117,26 @@ class OAuthError(AuthError):
     def __init__(self, message: str, error_code: Optional[str] = None) -> None:
         super().__init__(message)
         self.error_code = error_code
+
+
+class FlowNotFoundError(FastnError):
+    """Raised when a flow_id does not exist or does not belong to this project."""
+
+    def __init__(self, flow_id: str) -> None:
+        super().__init__(
+            f"Flow '{flow_id}' not found or does not belong to this project."
+        )
+        self.flow_id = flow_id
+
+
+class RunNotFoundError(FastnError):
+    """Raised when a run_id does not exist or does not belong to this project."""
+
+    def __init__(self, run_id: str) -> None:
+        super().__init__(
+            f"Run '{run_id}' not found or does not belong to this project."
+        )
+        self.run_id = run_id
 
 
 class RegistryError(FastnError):

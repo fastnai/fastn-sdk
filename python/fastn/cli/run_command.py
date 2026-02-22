@@ -16,7 +16,7 @@ from fastn.cli._helpers import (
     _to_snake_case,
     _verbose_post,
 )
-from fastn.cli._registry import _fetch_connector_tools, _parse_tool_node
+from fastn.cli._registry import _fetch_tool_actions, _parse_tool_node
 from fastn.config import find_fastn_dir, load_config, load_manifest, load_registry, save_registry
 
 
@@ -27,24 +27,24 @@ from fastn.config import find_fastn_dir, load_config, load_manifest, load_regist
     ),
 )
 @click.argument("connector_name")
-@click.argument("action_name", required=False, default=None)
+@click.argument("tool_name", required=False, default=None)
 @click.argument("tenant_id", required=False, default=None)
-@click.option("--connection-id", default=None, help="Connection ID for multi-connection tools")
+@click.option("--connection-id", default=None, help="Connection ID for multi-connection connectors")
 @click.option("--tenant", default=None, help="Tenant ID (overrides config)")
 @click.pass_context
-def run(ctx: click.Context, connector_name: str, action_name: Optional[str], tenant_id: Optional[str], connection_id: Optional[str], tenant: Optional[str]) -> None:
-    """Execute a tool action directly from the command line.
+def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenant_id: Optional[str], connection_id: Optional[str], tenant: Optional[str]) -> None:
+    """Execute a connector tool directly from the command line.
 
     \b
     Usage:
-      fastn run <tool>                              Show available actions
-      fastn run <tool> <action> [--key value]        Execute with inline params
-      fastn run <tool> <action> <tenant_id>          Execute for a specific tenant
-      fastn run <tool> <action>                      Execute with interactive prompts
+      fastn run <connector>                              Show available tools
+      fastn run <connector> <tool> [--key value]          Execute with inline params
+      fastn run <connector> <tool> <tenant_id>            Execute for a specific tenant
+      fastn run <connector> <tool>                        Execute with interactive prompts
 
     \b
     Examples:
-      fastn run slack                                Show available Slack actions
+      fastn run slack                                Show available Slack tools
       fastn run slack send_message --channel general --text "Hello!"
       fastn run slack send_message 3ab9d640-...      Execute as specific tenant
       fastn run slack send_message             Prompts for each field
@@ -67,7 +67,7 @@ def run(ctx: click.Context, connector_name: str, action_name: Optional[str], ten
 
     if connector_name not in connectors:
         raise click.ClickException(
-            f"Tool '{connector_name}' not found. Run `fastn list` to see available tools."
+            f"Connector '{connector_name}' not found. Run `fastn list` to see available connectors."
         )
 
     connector_data = connectors[connector_name]
@@ -83,7 +83,7 @@ def run(ctx: click.Context, connector_name: str, action_name: Optional[str], ten
     if not tools:
         source = connector_data.get("source", SOURCE_COMMUNITY)
         click.echo(f"Fetching tools for {connector_name}...")
-        tool_nodes = _fetch_connector_tools(config, connector_id, source)
+        tool_nodes = _fetch_tool_actions(config, connector_id, source)
         tools = {}
         for node in tool_nodes:
             parsed = _parse_tool_node(node)
@@ -93,11 +93,11 @@ def run(ctx: click.Context, connector_name: str, action_name: Optional[str], ten
         connector_data["tool_count"] = len(tools)
         save_registry(registry, fastn_dir)
 
-    # If no action given, list available actions
-    if not action_name:
+    # If no tool given, list available tools
+    if not tool_name:
         display_name = connector_data.get("display_name", connector_name)
         click.echo()
-        click.echo(f"  {display_name} — available actions:")
+        click.echo(f"  {display_name} \u2014 available tools:")
         click.echo()
         for key in sorted(tools.keys()):
             tdata = tools[key]
@@ -108,28 +108,28 @@ def run(ctx: click.Context, connector_name: str, action_name: Optional[str], ten
             else:
                 click.echo(f"    {display_key}")
         click.echo()
-        click.echo(f"  Run: fastn run {connector_name} <action> [--key value ...]")
+        click.echo(f"  Run: fastn run {connector_name} <tool> [--key value ...]")
         click.echo()
         return
 
-    # Resolve the action
-    tool_info = tools.get(action_name)
+    # Resolve the tool
+    tool_info = tools.get(tool_name)
     # Fallback: try without underscores (send_message -> sendmessage)
-    if tool_info is None and "_" in action_name:
-        tool_info = tools.get(action_name.replace("_", ""))
+    if tool_info is None and "_" in tool_name:
+        tool_info = tools.get(tool_name.replace("_", ""))
     if tool_info is None:
         available = ", ".join(
             _to_snake_case(k) for k in sorted(tools.keys())
         )
         raise click.ClickException(
-            f"Action '{action_name}' not found in '{connector_name}'. "
+            f"Tool '{tool_name}' not found in '{connector_name}'. "
             f"Available: {available}"
         )
 
     action_id = tool_info.get("actionId", "")
     if not action_id:
         raise click.ClickException(
-            f"No actionId for '{action_name}'. Run `fastn sync` and `fastn add {connector_name}`."
+            f"No actionId for '{tool_name}'. Run `fastn sync` and `fastn add {connector_name}`."
         )
 
     # Extract input fields from schema for interactive prompting
@@ -143,7 +143,7 @@ def run(ctx: click.Context, connector_name: str, action_name: Optional[str], ten
     if not params and fields:
         desc = tool_info.get("description", "")
         click.echo()
-        click.echo(f"  {connector_name}.{action_name}")
+        click.echo(f"  {connector_name}.{tool_name}")
         if desc:
             click.echo(f"  {desc}")
         params = _prompt_for_params(fields, required_fields)
@@ -158,7 +158,7 @@ def run(ctx: click.Context, connector_name: str, action_name: Optional[str], ten
             "actionId": action_id,
             "connectorId": connector_id,
             "agentId": workspace_id,
-            "toolName": action_name,
+            "toolName": tool_name,
             "parameters": parameters,
         }
     }
@@ -171,10 +171,10 @@ def run(ctx: click.Context, connector_name: str, action_name: Optional[str], ten
     headers = config.get_headers()
 
     click.echo()
-    click.echo(f"Running {connector_name}.{action_name}...")
+    click.echo(f"Running {connector_name}.{tool_name}...")
     resp = _verbose_post(EXECUTE_URL, headers, payload)
 
-    _handle_execute_error(resp, f"{connector_name}.{action_name}", workspace_id)
+    _handle_execute_error(resp, f"{connector_name}.{tool_name}", workspace_id)
 
     data = resp.json()
     # Unwrap: API returns {body, statusCode, rawBody} — show the body
@@ -190,12 +190,12 @@ def run(ctx: click.Context, connector_name: str, action_name: Optional[str], ten
 @click.argument("connector_name")
 @click.argument("tool_name", required=False, default=None)
 def schema(connector_name: str, tool_name: Optional[str]) -> None:
-    """Show raw JSON schema for a tool's actions.
+    """Show raw JSON schema for a connector's tools.
 
     \b
     Usage:
-      fastn schema slack                  Show schemas for all Slack actions
-      fastn schema slack send_message     Show schema for a specific action
+      fastn schema slack                  Show schemas for all Slack tools
+      fastn schema slack send_message     Show schema for a specific tool
     """
     fastn_dir = find_fastn_dir()
     registry = load_registry(fastn_dir)
@@ -203,7 +203,7 @@ def schema(connector_name: str, tool_name: Optional[str]) -> None:
 
     if connector_name not in connectors:
         raise click.ClickException(
-            f"Tool '{connector_name}' not found. Run `fastn add {connector_name}` first."
+            f"Connector '{connector_name}' not found. Run `fastn add {connector_name}` first."
         )
 
     connector_data = connectors[connector_name]

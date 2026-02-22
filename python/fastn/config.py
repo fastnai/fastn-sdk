@@ -187,6 +187,25 @@ class FastnConfig:
         return headers
 
 
+def _load_json(fastn_dir: Path, filename: str, default: Any = None) -> Any:
+    """Load a JSON file from the .fastn directory, returning *default* if missing."""
+    filepath = fastn_dir / filename
+    if not filepath.exists():
+        return default if default is not None else {}
+    with open(filepath) as f:
+        return json.load(f)
+
+
+def _save_json(data: Any, fastn_dir: Path, filename: str) -> Path:
+    """Write *data* as JSON to the .fastn directory, creating it if needed."""
+    fastn_dir.mkdir(parents=True, exist_ok=True)
+    filepath = fastn_dir / filename
+    with open(filepath, "w") as f:
+        json.dump(data, f, indent=2)
+        f.write("\n")
+    return filepath
+
+
 def find_fastn_dir(start_path: Optional[str] = None) -> Path:
     """Find the .fastn directory by walking up from start_path or cwd."""
     current = Path(start_path) if start_path else Path.cwd()
@@ -296,39 +315,22 @@ def load_manifest(fastn_dir: Optional[Path] = None) -> Dict[str, Any]:
     """Load manifest.json from the .fastn directory."""
     if fastn_dir is None:
         fastn_dir = find_fastn_dir()
-    filepath = fastn_dir / MANIFEST_FILE
-    if not filepath.exists():
-        return {
-            "registry_version": "",
-            "last_synced": "",
-            "sdk": "python",
-            "installed": {},
-        }
-    with open(filepath) as f:
-        return json.load(f)
+    default = {"registry_version": "", "last_synced": "", "sdk": "python", "installed": {}}
+    return _load_json(fastn_dir, MANIFEST_FILE, default)
 
 
 def save_manifest(manifest: Dict[str, Any], fastn_dir: Optional[Path] = None) -> Path:
     """Save manifest.json to the .fastn directory."""
     if fastn_dir is None:
         fastn_dir = find_fastn_dir()
-    fastn_dir.mkdir(parents=True, exist_ok=True)
-    filepath = fastn_dir / MANIFEST_FILE
-    with open(filepath, "w") as f:
-        json.dump(manifest, f, indent=2)
-        f.write("\n")
-    return filepath
+    return _save_json(manifest, fastn_dir, MANIFEST_FILE)
 
 
 def load_registry(fastn_dir: Optional[Path] = None) -> Dict[str, Any]:
     """Load registry.json from the .fastn directory."""
     if fastn_dir is None:
         fastn_dir = find_fastn_dir()
-    filepath = fastn_dir / REGISTRY_FILE
-    if not filepath.exists():
-        return {"version": "", "connectors": {}}
-    with open(filepath) as f:
-        return json.load(f)
+    return _load_json(fastn_dir, REGISTRY_FILE, {"version": "", "connectors": {}})
 
 
 def save_registry(
@@ -337,12 +339,7 @@ def save_registry(
     """Save registry.json to the .fastn directory."""
     if fastn_dir is None:
         fastn_dir = find_fastn_dir()
-    fastn_dir.mkdir(parents=True, exist_ok=True)
-    filepath = fastn_dir / REGISTRY_FILE
-    with open(filepath, "w") as f:
-        json.dump(registry, f, indent=2)
-        f.write("\n")
-    return filepath
+    return _save_json(registry, fastn_dir, REGISTRY_FILE)
 
 
 def get_installed_connectors(fastn_dir: Optional[Path] = None) -> List[str]:
@@ -379,16 +376,12 @@ def remove_connector_from_manifest(
 def load_migrations(fastn_dir: Optional[Path] = None) -> Dict[str, Any]:
     """Load migrations.json from the .fastn directory.
 
-    Returns the migrations map used by DynamicConnector for backward
-    compatibility when tool schemas change.
+    Returns the migrations map used by DynamicTool for backward
+    compatibility when action schemas change.
     """
     if fastn_dir is None:
         fastn_dir = find_fastn_dir()
-    filepath = fastn_dir / MIGRATIONS_FILE
-    if not filepath.exists():
-        return {}
-    with open(filepath) as f:
-        return json.load(f)
+    return _load_json(fastn_dir, MIGRATIONS_FILE)
 
 
 def save_migrations(
@@ -397,12 +390,7 @@ def save_migrations(
     """Save migrations.json to the .fastn directory."""
     if fastn_dir is None:
         fastn_dir = find_fastn_dir()
-    fastn_dir.mkdir(parents=True, exist_ok=True)
-    filepath = fastn_dir / MIGRATIONS_FILE
-    with open(filepath, "w") as f:
-        json.dump(migrations, f, indent=2)
-        f.write("\n")
-    return filepath
+    return _save_json(migrations, fastn_dir, MIGRATIONS_FILE)
 
 
 def ensure_gitignore(directory: Optional[str] = None) -> None:

@@ -1,4 +1,4 @@
-"""Agent command — AI-powered tool discovery and execution.
+"""Agent command — AI-powered connector discovery and tool execution.
 
 Contains the ``fastn agent`` command and all supporting helpers for
 LLM-based parameter extraction, the agentic tool-calling loop, cost
@@ -77,7 +77,7 @@ def _setup_llm_provider(config: FastnConfig) -> Optional[FastnConfig]:
     from fastn.config import LLM_PROVIDERS
 
     click.echo()
-    click.echo("  LLM Setup — fastn agent uses an LLM to fill in tool parameters")
+    click.echo("  LLM Setup \u2014 fastn agent uses an LLM to fill in tool parameters")
     click.echo("  from your natural language prompt.")
     click.echo()
     click.echo("  Choose an LLM provider:")
@@ -442,7 +442,7 @@ _AGENT_SYSTEM_PROMPT = (
 def _build_action_map(
     tool_list: list, registry: dict,
 ) -> Dict[str, dict]:
-    """Build a map from function name \u2192 {actionId, connectorId, display_label, tool_info}.
+    """Build a map from function name \u2192 {actionId, connectorId, display_label, action_info}.
 
     The getTools API returns tools in OpenAI function-calling format.
     Each tool has ``actionId`` and ``function.name``.  We use the function
@@ -455,22 +455,22 @@ def _build_action_map(
         fn_name = fn.get("name", aid)
 
         # Resolve friendly names from registry
-        friendly_connector, friendly_tool, connector_id, tool_info = (
+        friendly_tool, friendly_action, tool_id, action_info = (
             _resolve_friendly_names(aid, fn_name, "", None, registry)
         )
         display_label = (
-            f"{friendly_connector}.{friendly_tool}"
-            if friendly_connector
-            else friendly_tool or aid
+            f"{friendly_tool}.{friendly_action}"
+            if friendly_tool
+            else friendly_action or aid
         )
 
         # Store the raw schema so _execute_tool_call can re-wrap params
         raw_schema = fn.get("parameters", {})
         action_map[fn_name] = {
             "actionId": aid,
-            "connectorId": connector_id,
+            "connectorId": tool_id,
             "display_label": display_label,
-            "tool_info": tool_info,
+            "action_info": action_info,
             "inputSchema": raw_schema,
         }
     return action_map
@@ -915,50 +915,10 @@ def _agent_loop_openai(
                 })
 
                 if consecutive_errors >= max_errors:
-                    # Dump debug context + LLM diagnosis when giving up
-                    click.echo()
-                    click.echo("  \u2500\u2500 Failed Call Debug \u2500\u2500")
-                    click.echo()
-                    click.echo("  System Prompt:")
-                    for line in _AGENT_SYSTEM_PROMPT.split("\n"):
-                        click.echo(f"    {line}")
-                    click.echo()
-                    click.echo("  User Prompt:")
-                    click.echo(f"    {prompt_str}")
-                    click.echo()
-                    click.echo(f"  Tools ({len(tools)}):")
-                    click.echo(json.dumps(tools, indent=2))
-                    click.echo()
-                    click.echo(f"  Failed Call: {fn_display}({json.dumps(fn_args, separators=(', ', ': '))})")
-                    click.echo(f"  Response: {json.dumps(result, indent=2, default=str)}")
-                    click.echo()
-
-                    # Ask LLM to diagnose the failure
-                    click.echo("  \u2500\u2500 LLM Diagnosis \u2500\u2500")
-                    try:
-                        diag_response = client.chat.completions.create(
-                            model=model,
-                            messages=[
-                                {"role": "system", "content": (
-                                    "You are a debugging assistant. A tool call failed "
-                                    "and recovery was attempted but also failed. "
-                                    "Analyze the errors and suggest how to prevent "
-                                    "this in future requests. Be concise (3-5 lines max)."
-                                )},
-                                {"role": "user", "content": (
-                                    f"Tool: {fn_display}\n"
-                                    f"Args: {json.dumps(fn_args, indent=2)}\n"
-                                    f"Error: {json.dumps(result, indent=2, default=str)}\n"
-                                    f"Original prompt: {prompt_str}"
-                                )},
-                            ],
-                        )
-                        diag_text = diag_response.choices[0].message.content or ""
-                        for line in diag_text.strip().split("\n"):
-                            click.echo(f"  {line}")
-                    except Exception:
-                        click.echo("  (diagnosis unavailable)")
-                    click.echo()
+                    _diagnose_agent_failure(
+                        client, model, prompt_str, tools,
+                        fn_display, fn_args, result,
+                    )
                     click.echo(f"  \u26d4 Stopping \u2014 {consecutive_errors} consecutive error(s)")
                     break
 
@@ -980,6 +940,209 @@ def _agent_loop_openai(
 
 
 # ---------------------------------------------------------------------------
+# Extracted helpers for the agent command
+# ---------------------------------------------------------------------------
+
+def _discover_agent_tools(
+    headers: dict,
+    workspace_id: str,
+    prompt_str: str,
+    connector: Optional[str],
+    tool_filter: Optional[str],
+    max_tools: int,
+    registry: dict,
+    verbose: bool = False,
+) -> Tuple[list, Dict[str, dict]]:
+    """Discover available connectors/tools via the getTools API.
+
+    Returns ``(tool_list, action_map)`` where *tool_list* is the raw list
+    of tool dicts from the API and *action_map* maps function names to
+    execution metadata (actionId, connectorId, display_label, etc.).
+    """
+    reg_connectors = registry.get("connectors", {})
+
+    discovery_payload: dict = {
+        "input": {
+            "limit": max_tools,
+            "prompt": prompt_str,
+        }
+    }
+    if workspace_id:
+        discovery_payload["input"]["agentId"] = workspace_id
+    if connector:
+        discovery_payload["input"]["connectorName"] = connector
+        if connector in reg_connectors:
+            cid = reg_connectors[connector].get("id", "")
+            if cid:
+                discovery_payload["input"]["connectorId"] = cid
+    if tool_filter:
+        discovery_payload["input"]["toolName"] = tool_filter
+
+    resp = _verbose_post(GET_TOOLS_URL, headers, discovery_payload)
+
+    if resp.status_code >= 400:
+        raise click.ClickException(
+            f"Connector discovery failed: {resp.status_code} {resp.text}"
+        )
+
+    data = resp.json()
+    tool_list = _extract_tool_list(data)
+    if not tool_list:
+        return [], {}
+
+    action_map = _build_action_map(tool_list, registry)
+    return tool_list, action_map
+
+
+def _run_agent_eval(
+    api_key: str,
+    model: str,
+    prompt_str: str,
+    eval_log: list,
+    llm_tools: list,
+    final_response: str = "",
+) -> None:
+    """Evaluate whether the agent called the right tools and achieved the task.
+
+    Uses the LLM as a strict QA judge.  Prints the evaluation results and
+    a final PASS/FAIL verdict.
+    """
+    click.echo("  \u2500\u2500 Evaluation \u2500\u2500")
+    click.echo()
+
+    # Build a summary of what happened for the judge
+    calls_summary = []
+    for i, entry in enumerate(eval_log, 1):
+        result_preview = json.dumps(entry["result"], default=str)
+        if len(result_preview) > 500:
+            result_preview = result_preview[:500] + "..."
+        calls_summary.append(
+            f"  {i}. {entry['tool']}({json.dumps(entry['args'], separators=(', ', ': '))})"
+            f"\n     Status: {entry['status']}"
+            f"\n     Result: {result_preview}"
+        )
+
+    eval_prompt = (
+        f"User prompt: \"{prompt_str}\"\n\n"
+        f"Available tools: {', '.join(t.get('function', {}).get('name', '?') for t in llm_tools)}\n\n"
+        f"Tool calls made:\n" + "\n".join(calls_summary) + "\n\n"
+        f"Agent final response: {final_response}\n\n"
+        "Evaluate this agent run:\n\n"
+        "1. INTENT \u2014 Did the agent understand what the user wanted?\n"
+        "2. TOOL SELECTION \u2014 Did it pick the right tool(s) from the available set? Were any calls unnecessary?\n"
+        "3. TARGET \u2014 Did it act on the correct resource the user specified? "
+        "Extract the target from the user prompt (e.g. a channel, repo, project, file, user, ticket) "
+        "and verify the arguments match. "
+        "If an ID was used, cross-reference it against any prior list/get/search result in the call history. "
+        "If no lookup exists to verify the ID, mark as UNVERIFIED.\n"
+        "4. RESULT \u2014 Did the action succeed? Check the result payload for errors or confirmation.\n\n"
+        "Rules:\n"
+        "- Using a resource name instead of an ID is fine.\n"
+        "- A successful call to the WRONG target is a FAIL.\n"
+        "- Unnecessary lookup calls (list/get/search) that don't contribute to the task are a FAIL.\n"
+        "- If the task required multiple steps (e.g. lookup then act), that's acceptable.\n\n"
+        "Then give an overall verdict: PASS or FAIL.\n"
+        "PASS = correct tool, correct target, task completed.\n"
+        "FAIL = wrong tool, wrong target, task not completed, or unnecessary calls.\n\n"
+        "Be concise. End with a single line: VERDICT: PASS or VERDICT: FAIL"
+    )
+
+    try:
+        import openai
+        eval_client = openai.OpenAI(api_key=api_key)
+        eval_response = eval_client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": (
+                    "You are a strict QA evaluator for an AI agent that uses third-party API tools "
+                    "(Slack, Jira, GitHub, Google Sheets, etc). "
+                    "Judge whether the agent picked the correct tool, targeted the correct resource, "
+                    "and accomplished the user's intent. "
+                    "Be strict \u2014 wrong target, wrong tool, or unnecessary calls are failures."
+                )},
+                {"role": "user", "content": eval_prompt},
+            ],
+        )
+        eval_text = eval_response.choices[0].message.content or ""
+
+        # Print eval results
+        for line in eval_text.strip().split("\n"):
+            click.echo(f"  {line}")
+
+        # Highlight the verdict
+        click.echo()
+        if "VERDICT: PASS" in eval_text.upper():
+            click.echo("  \u2705 PASS")
+        elif "VERDICT: FAIL" in eval_text.upper():
+            click.echo("  \u274c FAIL")
+
+    except Exception as e:
+        click.echo(f"  Evaluation error: {e}")
+
+    click.echo()
+
+
+def _diagnose_agent_failure(
+    client: Any,
+    model: str,
+    prompt_str: str,
+    tools: list,
+    fn_display: str,
+    fn_args: dict,
+    result: dict,
+) -> None:
+    """Print debug context and ask the LLM to diagnose a repeated tool failure.
+
+    Called when consecutive errors reach the max-error threshold.  Dumps
+    the system prompt, user prompt, tool list, failing call details, and
+    then asks the LLM for a short diagnosis.
+    """
+    click.echo()
+    click.echo("  \u2500\u2500 Failed Call Debug \u2500\u2500")
+    click.echo()
+    click.echo("  System Prompt:")
+    for line in _AGENT_SYSTEM_PROMPT.split("\n"):
+        click.echo(f"    {line}")
+    click.echo()
+    click.echo("  User Prompt:")
+    click.echo(f"    {prompt_str}")
+    click.echo()
+    click.echo(f"  Tools ({len(tools)}):")
+    click.echo(json.dumps(tools, indent=2))
+    click.echo()
+    click.echo(f"  Failed Call: {fn_display}({json.dumps(fn_args, separators=(', ', ': '))})")
+    click.echo(f"  Response: {json.dumps(result, indent=2, default=str)}")
+    click.echo()
+
+    # Ask LLM to diagnose the failure
+    click.echo("  \u2500\u2500 LLM Diagnosis \u2500\u2500")
+    try:
+        diag_response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": (
+                    "You are a debugging assistant. A tool call failed "
+                    "and recovery was attempted but also failed. "
+                    "Analyze the errors and suggest how to prevent "
+                    "this in future requests. Be concise (3-5 lines max)."
+                )},
+                {"role": "user", "content": (
+                    f"Tool: {fn_display}\n"
+                    f"Args: {json.dumps(fn_args, indent=2)}\n"
+                    f"Error: {json.dumps(result, indent=2, default=str)}\n"
+                    f"Original prompt: {prompt_str}"
+                )},
+            ],
+        )
+        diag_text = diag_response.choices[0].message.content or ""
+        for line in diag_text.strip().split("\n"):
+            click.echo(f"  {line}")
+    except Exception:
+        click.echo("  (diagnosis unavailable)")
+    click.echo()
+
+
+# ---------------------------------------------------------------------------
 # agent command
 # ---------------------------------------------------------------------------
 
@@ -991,8 +1154,8 @@ def _agent_loop_openai(
 )
 @click.argument("prompt", nargs=-1, required=True)
 @click.option("--connector", default=None, help="Scope discovery to a specific connector")
-@click.option("--tool", "tool_filter", default=None, help="Scope discovery to a specific tool/action")
-@click.option("--connection-id", default=None, help="Connection ID for multi-connection tools")
+@click.option("--tool", "tool_filter", default=None, help="Scope discovery to a specific tool")
+@click.option("--connection-id", default=None, help="Connection ID for multi-connection connectors")
 @click.option("--max-turns", default=_AGENT_MAX_TURNS, type=int, show_default=True,
               help="Maximum agentic loop iterations")
 @click.option("-y", "--yes", "skip_confirm", is_flag=True, default=False,
@@ -1021,9 +1184,9 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
       fastn agent "Say hey to general" --eval
 
     \b
-    The agent discovers available tools, sends them to your configured LLM
-    using native function calling, and executes tool calls in a loop until
-    the task is complete. Supports multi-step tasks automatically.
+    The agent discovers available connectors and tools, sends them to your
+    configured LLM using native function calling, and executes tool calls
+    in a loop until the task is complete. Supports multi-step tasks automatically.
     Use --connector to scope discovery to a specific connector.
     Each tool call requires confirmation by default. Pass -y to skip.
     Pass --eval to evaluate whether the agent did the right thing.
@@ -1077,7 +1240,6 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
     # Load the local registry for friendly name resolution
     fastn_dir = find_fastn_dir()
     registry = load_registry(fastn_dir)
-    reg_connectors = registry.get("connectors", {})
 
     provider = config.llm_provider
     api_key = config.llm_api_key
@@ -1087,7 +1249,7 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
         provider_info = LLM_PROVIDERS.get(provider, {})
         model = provider_info.get("default_model", "")
 
-    # Step 1: Discover ALL active tools via getTools API
+    # Step 1: Discover ALL active connectors and tools via getTools API
     click.echo()
     click.echo(f"  \u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")
     click.echo(f"  \u2502  {prompt_str}")
@@ -1099,40 +1261,15 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
         click.echo(f"  \u2502  Tool: {tool_filter}")
     click.echo(f"  \u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")
     click.echo()
-    click.echo("  Discovering tools...")
+    click.echo("  Discovering connectors...")
 
-    discovery_payload: dict = {
-        "input": {
-            "limit": max_tools,
-            "prompt": prompt_str,
-        }
-    }
-    if workspace_id:
-        discovery_payload["input"]["agentId"] = workspace_id
-    if connector:
-        discovery_payload["input"]["connectorName"] = connector
-        if connector in reg_connectors:
-            cid = reg_connectors[connector].get("id", "")
-            if cid:
-                discovery_payload["input"]["connectorId"] = cid
-    if tool_filter:
-        discovery_payload["input"]["toolName"] = tool_filter
-
-    resp = _verbose_post(GET_TOOLS_URL, headers, discovery_payload)
-
-    if resp.status_code >= 400:
-        raise click.ClickException(
-            f"Tool discovery failed: {resp.status_code} {resp.text}"
-        )
-
-    data = resp.json()
-    tool_list = _extract_tool_list(data)
+    tool_list, action_map = _discover_agent_tools(
+        headers, workspace_id, prompt_str,
+        connector, tool_filter, max_tools, registry,
+    )
     if not tool_list:
         click.echo("  No tools found. Try rephrasing or use --connector to scope.")
         return
-
-    # Step 2: Build action map for execution lookups
-    action_map = _build_action_map(tool_list, registry)
 
     tool_names = [v["display_label"] for v in action_map.values()]
     click.echo(f"  \u2713 {len(tool_list)} tool{'s' if len(tool_list) != 1 else ''}: {', '.join(tool_names)}")
@@ -1167,76 +1304,4 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
 
     # ── Evaluation ──
     if run_eval and eval_log:
-        click.echo("  \u2500\u2500 Evaluation \u2500\u2500")
-        click.echo()
-
-        # Build a summary of what happened for the judge
-        calls_summary = []
-        for i, entry in enumerate(eval_log, 1):
-            result_preview = json.dumps(entry["result"], default=str)
-            if len(result_preview) > 500:
-                result_preview = result_preview[:500] + "..."
-            calls_summary.append(
-                f"  {i}. {entry['tool']}({json.dumps(entry['args'], separators=(', ', ': '))})"
-                f"\n     Status: {entry['status']}"
-                f"\n     Result: {result_preview}"
-            )
-
-        eval_prompt = (
-            f"User prompt: \"{prompt_str}\"\n\n"
-            f"Available tools: {', '.join(t.get('function', {}).get('name', '?') for t in llm_tools)}\n\n"
-            f"Tool calls made:\n" + "\n".join(calls_summary) + "\n\n"
-            f"Agent final response: {final_response}\n\n"
-            "Evaluate this agent run:\n\n"
-            "1. INTENT \u2014 Did the agent understand what the user wanted?\n"
-            "2. TOOL SELECTION \u2014 Did it pick the right tool(s) from the available set? Were any calls unnecessary?\n"
-            "3. TARGET \u2014 Did it act on the correct resource the user specified? "
-            "Extract the target from the user prompt (e.g. a channel, repo, project, file, user, ticket) "
-            "and verify the arguments match. "
-            "If an ID was used, cross-reference it against any prior list/get/search result in the call history. "
-            "If no lookup exists to verify the ID, mark as UNVERIFIED.\n"
-            "4. RESULT \u2014 Did the action succeed? Check the result payload for errors or confirmation.\n\n"
-            "Rules:\n"
-            "- Using a resource name instead of an ID is fine.\n"
-            "- A successful call to the WRONG target is a FAIL.\n"
-            "- Unnecessary lookup calls (list/get/search) that don't contribute to the task are a FAIL.\n"
-            "- If the task required multiple steps (e.g. lookup then act), that's acceptable.\n\n"
-            "Then give an overall verdict: PASS or FAIL.\n"
-            "PASS = correct tool, correct target, task completed.\n"
-            "FAIL = wrong tool, wrong target, task not completed, or unnecessary calls.\n\n"
-            "Be concise. End with a single line: VERDICT: PASS or VERDICT: FAIL"
-        )
-
-        try:
-            import openai
-            eval_client = openai.OpenAI(api_key=api_key)
-            eval_response = eval_client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": (
-                        "You are a strict QA evaluator for an AI agent that uses third-party API tools "
-                        "(Slack, Jira, GitHub, Google Sheets, etc). "
-                        "Judge whether the agent picked the correct tool, targeted the correct resource, "
-                        "and accomplished the user's intent. "
-                        "Be strict \u2014 wrong target, wrong tool, or unnecessary calls are failures."
-                    )},
-                    {"role": "user", "content": eval_prompt},
-                ],
-            )
-            eval_text = eval_response.choices[0].message.content or ""
-
-            # Print eval results
-            for line in eval_text.strip().split("\n"):
-                click.echo(f"  {line}")
-
-            # Highlight the verdict
-            click.echo()
-            if "VERDICT: PASS" in eval_text.upper():
-                click.echo("  \u2705 PASS")
-            elif "VERDICT: FAIL" in eval_text.upper():
-                click.echo("  \u274c FAIL")
-
-        except Exception as e:
-            click.echo(f"  Evaluation error: {e}")
-
-        click.echo()
+        _run_agent_eval(api_key, model, prompt_str, eval_log, llm_tools, final_response)

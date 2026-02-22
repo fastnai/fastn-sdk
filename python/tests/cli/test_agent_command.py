@@ -430,7 +430,7 @@ class TestPrintAgentSummary:
 
     def test_long_tool_name_truncated(self, capsys):
         call_log = [
-            ("very_long_connector_name.very_long_action_name_that_exceeds_limit",
+            ("very_long_tool_name.very_long_action_name_that_exceeds_limit",
              100, 50, 100, 0.25, 0.1, 500, 200, 200, "ok"),
         ]
         _print_agent_summary(call_log, 100, 50, 0.25, 0.1, "gpt-4o")

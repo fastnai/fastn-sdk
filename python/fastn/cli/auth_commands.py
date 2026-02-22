@@ -211,5 +211,5 @@ def init() -> None:
     click.echo(f"  \u2713 Config saved to {filepath}")
     click.echo("  \u2713 Added .fastn/config.json to .gitignore")
     click.echo()
-    click.echo("  Run `fastn sync` to download available tools.")
+    click.echo("  Run `fastn sync` to download available connectors.")
     click.echo()

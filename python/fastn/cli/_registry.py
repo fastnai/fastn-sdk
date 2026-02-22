@@ -27,19 +27,18 @@ from fastn.config import (
 # Constants from the main CLI module
 from fastn.cli import (
     COMMUNITY_CONNECTOR_ID,
-    CONNECTOR_TOOLS_QUERY,
-    GET_ORGANIZATIONS_QUERY,
+    TOOL_ACTIONS_QUERY,
     GRAPHQL_URL,
-    SEARCH_CONNECTORS_QUERY,
+    SEARCH_TOOLS_QUERY,
     SOURCE_COMMUNITY,
     SOURCE_ORG,
     SOURCE_WORKSPACE,
 )
+from fastn.client import GET_ORGANIZATIONS_QUERY
 
 # Helpers from the helpers module
 from fastn.cli._helpers import (
     _extract_org_id,
-    _graphql_headers,
     _to_snake_case,
     _verbose_post,
 )
@@ -188,7 +187,7 @@ def _select_workspace(config: FastnConfig) -> Optional[str]:
         click.echo(f"  Invalid selection.")
 
 
-def _fetch_connectors_by_scope(
+def _fetch_tools_by_scope(
     config: FastnConfig, scope_id: str, source: str, is_community: bool = False
 ) -> dict:
     """Fetch connectors for a specific scope (workspace, org, or community).
@@ -202,11 +201,11 @@ def _fetch_connectors_by_scope(
     Returns:
         Dict of connector key -> connector data.
     """
-    headers = _graphql_headers(config)
+    headers = config.get_headers()
     headers["x-fastn-space-id"] = scope_id
 
     payload = {
-        "query": SEARCH_CONNECTORS_QUERY,
+        "query": SEARCH_TOOLS_QUERY,
         "variables": {
             "input": {
                 "clientId": scope_id,
@@ -276,7 +275,7 @@ def _fetch_registry_list(config: FastnConfig) -> dict:
     # 1. Workspace connectors
     workspace_id = config.resolve_project_id()
     if workspace_id:
-        ws_connectors = _fetch_connectors_by_scope(
+        ws_connectors = _fetch_tools_by_scope(
             config, workspace_id, SOURCE_WORKSPACE
         )
         connectors.update(ws_connectors)
@@ -284,7 +283,7 @@ def _fetch_registry_list(config: FastnConfig) -> dict:
     # 2. Organization connectors
     org_id = _extract_org_id(config)
     if org_id:
-        org_connectors = _fetch_connectors_by_scope(
+        org_connectors = _fetch_tools_by_scope(
             config, org_id, SOURCE_ORG
         )
         # Only add org connectors that aren't already in workspace
@@ -293,7 +292,7 @@ def _fetch_registry_list(config: FastnConfig) -> dict:
                 connectors[key] = data
 
     # 3. Community connectors
-    community_connectors = _fetch_connectors_by_scope(
+    community_connectors = _fetch_tools_by_scope(
         config, COMMUNITY_CONNECTOR_ID, SOURCE_COMMUNITY, is_community=True
     )
     # Only add community connectors that aren't already present
@@ -304,17 +303,17 @@ def _fetch_registry_list(config: FastnConfig) -> dict:
     return {"version": "1.0.0", "connectors": connectors}
 
 
-def _fetch_connector_tools(
+def _fetch_tool_actions(
     config: FastnConfig, connector_id: str, source: str = SOURCE_COMMUNITY,
 ) -> list:
-    """Fetch all tools/actions for a connector via callCoreProjectFlow."""
-    headers = _graphql_headers(config)
+    """Fetch all tools for a connector via callCoreProjectFlow."""
+    headers = config.get_headers()
     workspace_id = config.resolve_project_id()
 
     # orgId depends on the connector's source scope:
-    #   workspace → workspace/space ID
-    #   org       → org ID from JWT
-    #   community → "community"
+    #   workspace -> workspace/space ID
+    #   org       -> org ID from JWT
+    #   community -> "community"
     if source == SOURCE_WORKSPACE:
         org_id = workspace_id
     elif source == SOURCE_ORG:
@@ -323,7 +322,7 @@ def _fetch_connector_tools(
         org_id = COMMUNITY_CONNECTOR_ID
 
     payload = {
-        "query": CONNECTOR_TOOLS_QUERY,
+        "query": TOOL_ACTIONS_QUERY,
         "variables": {
             "input": {
                 "operationName": "getConnectorRegisteredTools_v1",
@@ -574,9 +573,9 @@ def _detect_languages(fastn_dir: Path) -> List[str]:
 
 def _resolve_friendly_names(
     action_id: str,
+    raw_action_name: str,
     raw_tool_name: str,
-    raw_connector_name: str,
-    connector_hint: Optional[str],
+    tool_hint: Optional[str],
     registry: dict,
 ) -> tuple:
     """Resolve friendly connector and tool names from the registry.
@@ -589,26 +588,26 @@ def _resolve_friendly_names(
     """
     connectors = registry.get("connectors", {})
 
-    # If we already have a good connector name from the hint or response
-    friendly_connector = raw_connector_name or connector_hint or ""
-    friendly_tool = raw_tool_name
-    resolved_connector_id = ""
-    resolved_tool_info: Optional[dict] = None
+    # If we already have a good tool name from the hint or response
+    friendly_tool = raw_tool_name or tool_hint or ""
+    friendly_action = raw_action_name
+    resolved_tool_id = ""
+    resolved_action_info: Optional[dict] = None
 
     # Search the registry by actionId to find the friendly names
     for cname, cdata in connectors.items():
-        tools = cdata.get("tools", {})
-        for tname, tinfo in tools.items():
+        actions = cdata.get("tools", {})
+        for tname, tinfo in actions.items():
             if tinfo.get("actionId") == action_id:
-                friendly_connector = cname
-                friendly_tool = tname
-                resolved_connector_id = cdata.get("id", "")
-                resolved_tool_info = tinfo
-                return friendly_connector, friendly_tool, resolved_connector_id, resolved_tool_info
+                friendly_tool = cname
+                friendly_action = tname
+                resolved_tool_id = cdata.get("id", "")
+                resolved_action_info = tinfo
+                return friendly_tool, friendly_action, resolved_tool_id, resolved_action_info
 
-    # Fallback: if connector hint was given, look up its connector_id
-    if connector_hint and connector_hint in connectors:
-        resolved_connector_id = connectors[connector_hint].get("id", "")
-        friendly_connector = connector_hint
+    # Fallback: if tool hint was given, look up its tool_id
+    if tool_hint and tool_hint in connectors:
+        resolved_tool_id = connectors[tool_hint].get("id", "")
+        friendly_tool = tool_hint
 
-    return friendly_connector, friendly_tool, resolved_connector_id, resolved_tool_info
+    return friendly_tool, friendly_action, resolved_tool_id, resolved_action_info

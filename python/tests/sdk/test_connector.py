@@ -20,7 +20,7 @@ class TestDynamicConnector:
     def test_tool_call(self) -> None:
         called_with = {}
 
-        def mock_execute(action_id, params, connector_id="", tool_info=None,
+        def mock_execute(action_id, params, connector_id="", action_info=None,
                          connection_id=None, tenant_id=None):
             called_with["action_id"] = action_id
             called_with["params"] = params
@@ -64,7 +64,7 @@ class TestDynamicConnector:
         """send_message should match 'sendmessage' in the registry."""
         called_with = {}
 
-        def mock_execute(action_id, params, connector_id="", tool_info=None,
+        def mock_execute(action_id, params, connector_id="", action_info=None,
                          connection_id=None, tenant_id=None):
             called_with["action_id"] = action_id
             called_with["params"] = params
@@ -112,7 +112,7 @@ class TestDynamicConnector:
     def test_tool_call_with_bound_connection_id(self) -> None:
         called_with = {}
 
-        def mock_execute(action_id, params, connector_id="", tool_info=None,
+        def mock_execute(action_id, params, connector_id="", action_info=None,
                          connection_id=None, tenant_id=None):
             called_with["connection_id"] = connection_id
             return {"ok": True}
@@ -130,7 +130,7 @@ class TestDynamicConnector:
     def test_tool_call_per_call_connection_id_override(self) -> None:
         called_with = {}
 
-        def mock_execute(action_id, params, connector_id="", tool_info=None,
+        def mock_execute(action_id, params, connector_id="", action_info=None,
                          connection_id=None, tenant_id=None):
             called_with["connection_id"] = connection_id
             called_with["params"] = params
@@ -164,7 +164,7 @@ class TestAsyncDynamicConnector:
     async def test_async_tool_call(self) -> None:
         called_with = {}
 
-        async def mock_execute(action_id, params, connector_id="", tool_info=None,
+        async def mock_execute(action_id, params, connector_id="", action_info=None,
                                connection_id=None, tenant_id=None):
             called_with["action_id"] = action_id
             called_with["params"] = params
@@ -186,7 +186,7 @@ class TestAsyncDynamicConnector:
     async def test_async_tool_call_with_connection_id(self) -> None:
         called_with = {}
 
-        async def mock_execute(action_id, params, connector_id="", tool_info=None,
+        async def mock_execute(action_id, params, connector_id="", action_info=None,
                                connection_id=None, tenant_id=None):
             called_with["connection_id"] = connection_id
             return {"ok": True}
@@ -203,7 +203,7 @@ class TestAsyncDynamicConnector:
 
     @pytest.mark.asyncio
     async def test_async_tool_not_found(self) -> None:
-        async def mock_execute(action_id, params, connector_id="", tool_info=None,
+        async def mock_execute(action_id, params, connector_id="", action_info=None,
                                connection_id=None, tenant_id=None):
             return {}
 

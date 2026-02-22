@@ -93,32 +93,32 @@ class TestParseExtraArgs:
 
 class TestCoerceValue:
     def test_integer(self) -> None:
-        assert _coerce_value("42", "integer") == 42
+        assert _coerce_value("42") == 42
 
     def test_float(self) -> None:
-        assert _coerce_value("3.14", "number") == 3.14
+        assert _coerce_value("3.14") == 3.14
 
     def test_boolean_true(self) -> None:
-        assert _coerce_value("true", "boolean") is True
+        assert _coerce_value("true") is True
 
     def test_boolean_false(self) -> None:
-        assert _coerce_value("false", "boolean") is False
+        assert _coerce_value("false") is False
 
     def test_json_array(self) -> None:
-        assert _coerce_value('["a", "b"]', "array") == ["a", "b"]
+        assert _coerce_value('["a", "b"]') == ["a", "b"]
 
     def test_json_object(self) -> None:
-        assert _coerce_value('{"k": "v"}', "object") == {"k": "v"}
+        assert _coerce_value('{"k": "v"}') == {"k": "v"}
 
     def test_plain_string(self) -> None:
-        assert _coerce_value("hello world", "string") == "hello world"
+        assert _coerce_value("hello world") == "hello world"
 
     def test_empty_string(self) -> None:
-        assert _coerce_value("", "string") == ""
+        assert _coerce_value("") == ""
 
     def test_string_that_looks_numeric(self) -> None:
-        # JSON parsing will convert "5" to int 5 regardless of field_type
-        assert _coerce_value("5", "string") == 5
+        # JSON parsing will convert "5" to int 5
+        assert _coerce_value("5") == 5
 
     def test_invalid_json_stays_string(self) -> None:
-        assert _coerce_value("not json {", "object") == "not json {"
+        assert _coerce_value("not json {") == "not json {"

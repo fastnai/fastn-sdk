@@ -8,6 +8,8 @@ from typing import Any
 import click
 import httpx
 
+from fastn._http import _redact_headers
+
 
 def _to_snake_case(name: str) -> str:
     """Convert a camelCase or PascalCase name to snake_case.
@@ -79,29 +81,12 @@ def _ensure_fresh_token(config) -> None:
         )
 
 
-def _graphql_headers(config) -> dict:
-    """Build headers for the GraphQL API."""
-    return config.get_headers()
-
-
 def _is_verbose() -> bool:
     """Check if verbose mode is enabled via the CLI context."""
     ctx = click.get_current_context(silent=True)
     if ctx and ctx.obj:
         return ctx.obj.get("verbose", False)
     return False
-
-
-def _redact_headers(headers: dict) -> dict:
-    """Redact sensitive header values for verbose output."""
-    redacted = {}
-    for k, v in headers.items():
-        kl = k.lower()
-        if kl in ("authorization", "x-fastn-api-key") and len(str(v)) > 20:
-            redacted[k] = str(v)[:20] + "..."
-        else:
-            redacted[k] = v
-    return redacted
 
 
 def _verbose_post(url: str, headers: dict, payload: dict, timeout: float = 30.0) -> httpx.Response:
@@ -129,18 +114,18 @@ FASTN_APP_BASE = "https://app.ucl.dev"
 
 
 def _workspace_url(workspace_id: str) -> str:
-    """Build the Fastn UI URL for a workspace's tool management page."""
+    """Build the Fastn UI URL for a workspace's connector management page."""
     if workspace_id:
         return f"{FASTN_APP_BASE}/projects/{workspace_id}/ucl/{workspace_id}"
     return FASTN_APP_BASE
 
 
-def _handle_execute_error(resp: httpx.Response, tool_label: str = "",
+def _handle_execute_error(resp: httpx.Response, connector_label: str = "",
                           workspace_id: str = "") -> None:
     """Check for execution errors and raise with helpful messages.
 
     Detects common error patterns from the executeTool API and provides
-    actionable guidance, especially for tools that aren't enabled yet.
+    actionable guidance, especially for connectors that aren't enabled yet.
     """
     if resp.status_code == 401:
         raise click.ClickException(
@@ -166,7 +151,7 @@ def _handle_execute_error(resp: httpx.Response, tool_label: str = "",
 
         err_lower = (error_msg or resp.text).lower()
 
-        # Detect "tool not enabled" / "connector not connected" errors
+        # Detect "connector not enabled" / "connector not connected" errors
         not_enabled_keywords = [
             "not enabled", "not connected", "not configured",
             "not authorized", "no connection", "connection not found",
@@ -174,10 +159,10 @@ def _handle_execute_error(resp: httpx.Response, tool_label: str = "",
             "not active", "disabled",
         ]
         if any(kw in err_lower for kw in not_enabled_keywords):
-            hint = f" '{tool_label}'" if tool_label else ""
+            hint = f" '{connector_label}'" if connector_label else ""
             app_url = _workspace_url(workspace_id)
             raise click.ClickException(
-                f"Tool{hint} is not enabled in your workspace.\n"
+                f"Connector{hint} is not enabled in your workspace.\n"
                 f"  Enable it at: {app_url}\n"
                 f"  Then run `fastn sync` to refresh your local registry."
             )
@@ -222,7 +207,7 @@ def _parse_extra_args(args: list) -> dict:
     return params
 
 
-def _coerce_value(raw: str, field_type: str) -> Any:
+def _coerce_value(raw: str) -> Any:
     """Convert a raw string input to the appropriate Python type."""
     if not raw:
         return raw
@@ -385,7 +370,7 @@ def _prompt_for_params(fields: dict, required_fields: set) -> dict:
             while True:
                 value = click.prompt(label)
                 if value:
-                    params[name] = _coerce_value(value, ftype)
+                    params[name] = _coerce_value(value)
                     break
                 click.echo("    This field is required.")
 
@@ -402,7 +387,7 @@ def _prompt_for_params(fields: dict, required_fields: set) -> dict:
 
             value = click.prompt(label, default="", show_default=False)
             if value:
-                params[name] = _coerce_value(value, ftype)
+                params[name] = _coerce_value(value)
 
     return params
 

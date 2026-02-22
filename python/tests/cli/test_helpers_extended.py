@@ -541,24 +541,24 @@ class TestEnsureFreshToken:
 
 class TestCoerceValueExtended:
     def test_null_string(self):
-        assert _coerce_value("null", "string") is None
+        assert _coerce_value("null") is None
 
     def test_nested_json(self):
-        result = _coerce_value('{"a": {"b": 1}}', "object")
+        result = _coerce_value('{"a": {"b": 1}}')
         assert result == {"a": {"b": 1}}
 
     def test_json_array_of_objects(self):
-        result = _coerce_value('[{"id": 1}, {"id": 2}]', "array")
+        result = _coerce_value('[{"id": 1}, {"id": 2}]')
         assert len(result) == 2
         assert result[0]["id"] == 1
 
     def test_numeric_string_stays_string(self):
         """Numeric strings should be parsed as numbers by json.loads."""
-        result = _coerce_value("42", "string")
+        result = _coerce_value("42")
         assert result == 42  # json.loads parses it
 
     def test_empty_string(self):
-        assert _coerce_value("", "string") == ""
+        assert _coerce_value("") == ""
 
 
 # ===================================================================

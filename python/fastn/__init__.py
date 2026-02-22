@@ -1,7 +1,7 @@
-"""Fastn SDK — The fastest way to add enterprise integrations to any AI agent or app.
+"""Fastn SDK — The integration infrastructure for AI agents.
 
-Provides two clients (sync and async) that give attribute-based access to
-250+ integrations like Slack, Jira, GitHub, Salesforce, and more.
+Connectors provide tools. Flows compose tools. Agents run flows and tools with reasoning.
+250+ connectors: Slack, Jira, GitHub, Salesforce, HubSpot, Postgres, and more.
 
 Setup:
     pip install fastn-sdk
@@ -28,7 +28,7 @@ LLM agent integration:
     tools = fastn.get_tools_for("Send a message on Slack", format="openai")
 
     # Feed tools to your LLM, get back a tool call, then execute:
-    result = fastn.execute(action_id="send_message", params={"channel": "general", "text": "Hi"})
+    result = fastn.execute(tool="send_message", params={"channel": "general", "text": "Hi"})
 
 CLI agent mode:
     # AI-powered tool discovery and execution from the command line
@@ -77,12 +77,14 @@ from fastn.exceptions import (
     ConnectionNotFoundError,
     ConnectorNotFoundError,
     FastnError,
+    FlowNotFoundError,
     OAuthError,
     RegistryError,
+    RunNotFoundError,
     ToolNotFoundError,
 )
 
-__version__ = "0.2.3"
+__version__ = "0.3.0"
 
 __all__ = [
     "APIError",
@@ -93,8 +95,10 @@ __all__ = [
     "ConnectorNotFoundError",
     "FastnClient",
     "FastnError",
+    "FlowNotFoundError",
     "OAuthError",
     "RegistryError",
+    "RunNotFoundError",
     "ToolNotFoundError",
     "__version__",
 ]

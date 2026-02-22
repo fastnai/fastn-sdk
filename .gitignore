@@ -36,3 +36,4 @@ env/
 *.swo
 *~
 .DS_Store
+.fastn/config.json

@@ -1,18 +1,18 @@
-"""Dynamic tool proxy for Fastn SDK.
+"""Dynamic connector proxy for Fastn SDK.
 
-Provides attribute-based access to actions within a tool,
+Provides attribute-based access to tools within a connector,
 translating method calls into executeTool API calls.
 
-This module is not used directly. Instead, access tools through the client:
+This module is not used directly. Instead, access connectors through the client:
     fastn = FastnClient(api_key="...", project_id="...")
     fastn.slack.send_message(channel="general", text="Hello!")
     #     ^^^^^ DynamicConnector
-    #          ^^^^^^^^^^^^^^ action method resolved via __getattr__
+    #          ^^^^^^^^^^^^^^ tool method resolved via __getattr__
 
 How it works:
     1. ``fastn.slack`` triggers ``FastnClient.__getattr__("slack")``
-    2. The client looks up "slack" in the local registry, gets action definitions
-    3. A ``DynamicConnector`` is created with those actions
+    2. The client looks up "slack" in the local registry, gets tool definitions
+    3. A ``DynamicConnector`` is created with those tools
     4. ``connector.send_message(channel=..., text=...)`` triggers
        ``DynamicConnector.__getattr__("send_message")`` which returns a
        closure that calls ``_execute_tool()`` with the correct actionId
@@ -39,7 +39,7 @@ Classes:
 from __future__ import annotations
 
 import warnings
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 from fastn.exceptions import ToolNotFoundError
 
@@ -104,20 +104,27 @@ def _apply_migrations(
     return kwargs
 
 
-class DynamicConnector:
-    """Proxy object that resolves tool method calls at runtime.
+# Type for the result of _resolve_tool_call
+_ToolResolution = Tuple[
+    str,                    # action_id
+    Dict[str, Any],         # tool_info or dep_info
+    Dict[str, Any],         # tool_migrations
+    Optional[str],          # connection_id
+    str,                    # connector_id
+    str,                    # connector_name
+    bool,                   # is_deprecated
+    str,                    # deprecation_message (empty if not deprecated)
+]
 
-    Supports optional connection_id:
-        # Single connection (auto-resolved by backend)
-        fastn.slack.send_message(channel="general", text="Hi")
 
-        # Multiple connections — specify which one
-        fastn.slack.send_message(connection_id="conn_123", channel="general", text="Hi")
+class _BaseDynamicConnector:
+    """Shared base for sync and async connector proxies.
 
-        # Or use fastn.connect() to bind once
-        slack = fastn.connect("conn_123")
-        slack.send_message(channel="general", text="Hi")
+    Contains all logic except the final closure construction in __getattr__,
+    which differs only in sync vs async.
     """
+
+    _class_label = "DynamicConnector"
 
     def __init__(
         self,
@@ -135,32 +142,19 @@ class DynamicConnector:
         self._connection_id = connection_id
         self._migrations = migrations or {}
 
-    def __getattr__(self, tool_name: str) -> Callable[..., Any]:
-        """Resolve an action name to a callable that executes the tool.
+    def _resolve_tool_call(self, tool_name: str) -> _ToolResolution:
+        """Resolve a tool name to its execution metadata.
 
-        This enables the ``fastn.slack.send_message(channel="general", text="Hi")``
-        calling convention.  The returned callable accepts keyword arguments
-        that are forwarded to the Fastn executeTool API.
+        Handles exact match, underscore-collapsed fallback, and deprecated
+        tool migration lookup.
 
-        Name matching:
-            1. Exact match against registry action names
-            2. Underscore-collapsed fallback (``send_message`` → ``sendmessage``)
-            3. Deprecated tool migration lookup (emits ``DeprecationWarning``)
-
-        Special kwargs extracted before sending to the API:
-            - ``connection_id``: override the bound connection
-            - ``tenant_id``: execute on behalf of a specific tenant
-
-        Args:
-            tool_name: Action name (e.g. ``"send_message"``).
-
-        Returns:
-            A closure that calls :meth:`_execute_fn` with the correct
-            ``actionId`` and any schema migrations applied.
+        Returns a tuple of (action_id, tool_info, tool_migrations,
+        connection_id, connector_id, connector_name, is_deprecated,
+        deprecation_message).
 
         Raises:
-            ToolNotFoundError: If the action is not in the registry.
-            AttributeError: If *tool_name* starts with ``_``.
+            AttributeError: If tool_name starts with ``_``.
+            ToolNotFoundError: If the tool is not found in the registry.
         """
         if tool_name.startswith("_"):
             raise AttributeError(tool_name)
@@ -177,61 +171,42 @@ class DynamicConnector:
             deprecated_tools = self._migrations.get("deprecated_tools", {})
             if tool_name in deprecated_tools:
                 dep_info = deprecated_tools[tool_name]
-                action_id = dep_info.get("actionId", "")
-                connection_id = self._connection_id
-                connector_id = self._connector_id
                 message = dep_info.get(
                     "message",
                     f"'{self._connector_name}.{tool_name}()' has been removed.",
                 )
-
-                def deprecated_tool_method(**kwargs: Any) -> Any:
-                    warnings.warn(message, DeprecationWarning, stacklevel=2)
-                    call_connection_id = (
-                        kwargs.pop("connection_id", None) or connection_id
-                    )
-                    call_tenant_id = kwargs.pop("tenant_id", None)
-                    return self._execute_fn(
-                        action_id, kwargs, connector_id, dep_info,
-                        call_connection_id, call_tenant_id,
-                    )
-
-                deprecated_tool_method.__name__ = tool_name
-                deprecated_tool_method.__qualname__ = (
-                    f"{self._connector_name}.{tool_name}"
+                return (
+                    dep_info.get("actionId", ""),
+                    dep_info,
+                    {},
+                    self._connection_id,
+                    self._connector_id,
+                    self._connector_name,
+                    True,
+                    message,
                 )
-                return deprecated_tool_method
 
             raise ToolNotFoundError(
                 self._connector_name, tool_name, has_tools=bool(self._tools),
             )
 
-        action_id = tool_info["actionId"]
-        connection_id = self._connection_id
-        connector_id = self._connector_id
-        connector_name = self._connector_name
+        # "actionId" is the server-side identifier for a tool
         tool_migrations = self._migrations.get("tools", {}).get(tool_name, {})
-
-        def tool_method(**kwargs: Any) -> Any:
-            # Apply migrations if any exist for this tool
-            if tool_migrations:
-                _apply_migrations(connector_name, tool_name, kwargs, tool_migrations)
-
-            call_connection_id = kwargs.pop("connection_id", None) or connection_id
-            call_tenant_id = kwargs.pop("tenant_id", None)
-            return self._execute_fn(
-                action_id, kwargs, connector_id, tool_info,
-                call_connection_id, call_tenant_id,
-            )
-
-        tool_method.__name__ = tool_name
-        tool_method.__qualname__ = f"{self._connector_name}.{tool_name}"
-        return tool_method
+        return (
+            tool_info["actionId"],
+            tool_info,
+            tool_migrations,
+            self._connection_id,
+            self._connector_id,
+            self._connector_name,
+            False,
+            "",
+        )
 
     def __repr__(self) -> str:
         conn = f", connection='{self._connection_id}'" if self._connection_id else ""
         return (
-            f"<DynamicConnector '{self._connector_name}' "
+            f"<{self._class_label} '{self._connector_name}' "
             f"({len(self._tools)} tools){conn}>"
         )
 
@@ -242,105 +217,77 @@ class DynamicConnector:
         return sorted(set(names))
 
 
-class AsyncDynamicConnector:
-    """Async version of DynamicConnector."""
+class DynamicConnector(_BaseDynamicConnector):
+    """Sync proxy object that resolves tool method calls at runtime."""
 
-    def __init__(
-        self,
-        connector_name: str,
-        tools: Dict[str, Dict[str, str]],
-        execute_fn: Callable[..., Any],
-        connector_id: str = "",
-        connection_id: Optional[str] = None,
-        migrations: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        self._connector_name = connector_name
-        self._tools = tools
-        self._execute_fn = execute_fn
-        self._connector_id = connector_id
-        self._connection_id = connection_id
-        self._migrations = migrations or {}
+    _class_label = "DynamicConnector"
 
     def __getattr__(self, tool_name: str) -> Callable[..., Any]:
-        """Async version of :meth:`DynamicConnector.__getattr__`.
+        """Resolve a tool name to a sync callable."""
+        (action_id, tool_info, tool_migrations, connection_id,
+         connector_id, connector_name, is_deprecated, dep_message) = \
+            self._resolve_tool_call(tool_name)
 
-        Returns an ``async def`` closure so callers use ``await``::
-
-            result = await fastn.slack.send_message(channel="general", text="Hi")
-        """
-        if tool_name.startswith("_"):
-            raise AttributeError(tool_name)
-
-        tool_info = self._tools.get(tool_name)
-
-        # Fallback: try matching without underscores (send_message -> sendmessage)
-        if tool_info is None and "_" in tool_name:
-            collapsed = tool_name.replace("_", "")
-            tool_info = self._tools.get(collapsed)
-
-        # Check if this is a deprecated (removed) tool with a migration
-        if tool_info is None:
-            deprecated_tools = self._migrations.get("deprecated_tools", {})
-            if tool_name in deprecated_tools:
-                dep_info = deprecated_tools[tool_name]
-                action_id = dep_info.get("actionId", "")
-                connection_id = self._connection_id
-                connector_id = self._connector_id
-                message = dep_info.get(
-                    "message",
-                    f"'{self._connector_name}.{tool_name}()' has been removed.",
+        if is_deprecated:
+            def deprecated_tool_method(**kwargs: Any) -> Any:
+                warnings.warn(dep_message, DeprecationWarning, stacklevel=2)
+                call_connection_id = kwargs.pop("connection_id", None) or connection_id
+                call_tenant_id = kwargs.pop("tenant_id", None)
+                return self._execute_fn(
+                    action_id, kwargs, connector_id, tool_info,
+                    call_connection_id, call_tenant_id,
                 )
+            deprecated_tool_method.__name__ = tool_name
+            deprecated_tool_method.__qualname__ = f"{connector_name}.{tool_name}"
+            return deprecated_tool_method
 
-                async def deprecated_tool_method(**kwargs: Any) -> Any:
-                    warnings.warn(message, DeprecationWarning, stacklevel=2)
-                    call_connection_id = (
-                        kwargs.pop("connection_id", None) or connection_id
-                    )
-                    call_tenant_id = kwargs.pop("tenant_id", None)
-                    return await self._execute_fn(
-                        action_id, kwargs, connector_id, dep_info,
-                        call_connection_id, call_tenant_id,
-                    )
-
-                deprecated_tool_method.__name__ = tool_name
-                deprecated_tool_method.__qualname__ = (
-                    f"{self._connector_name}.{tool_name}"
-                )
-                return deprecated_tool_method
-
-            raise ToolNotFoundError(
-                self._connector_name, tool_name, has_tools=bool(self._tools),
+        def tool_method(**kwargs: Any) -> Any:
+            if tool_migrations:
+                _apply_migrations(connector_name, tool_name, kwargs, tool_migrations)
+            call_connection_id = kwargs.pop("connection_id", None) or connection_id
+            call_tenant_id = kwargs.pop("tenant_id", None)
+            return self._execute_fn(
+                action_id, kwargs, connector_id, tool_info,
+                call_connection_id, call_tenant_id,
             )
+        tool_method.__name__ = tool_name
+        tool_method.__qualname__ = f"{connector_name}.{tool_name}"
+        return tool_method
 
-        action_id = tool_info["actionId"]
-        connection_id = self._connection_id
-        connector_id = self._connector_id
-        connector_name = self._connector_name
-        tool_migrations = self._migrations.get("tools", {}).get(tool_name, {})
+
+class AsyncDynamicConnector(_BaseDynamicConnector):
+    """Async proxy object that resolves tool method calls at runtime."""
+
+    _class_label = "AsyncDynamicConnector"
+
+    def __getattr__(self, tool_name: str) -> Callable[..., Any]:
+        """Resolve a tool name to an async callable."""
+        (action_id, tool_info, tool_migrations, connection_id,
+         connector_id, connector_name, is_deprecated, dep_message) = \
+            self._resolve_tool_call(tool_name)
+
+        if is_deprecated:
+            async def deprecated_tool_method(**kwargs: Any) -> Any:
+                warnings.warn(dep_message, DeprecationWarning, stacklevel=2)
+                call_connection_id = kwargs.pop("connection_id", None) or connection_id
+                call_tenant_id = kwargs.pop("tenant_id", None)
+                return await self._execute_fn(
+                    action_id, kwargs, connector_id, tool_info,
+                    call_connection_id, call_tenant_id,
+                )
+            deprecated_tool_method.__name__ = tool_name
+            deprecated_tool_method.__qualname__ = f"{connector_name}.{tool_name}"
+            return deprecated_tool_method
 
         async def tool_method(**kwargs: Any) -> Any:
             if tool_migrations:
                 _apply_migrations(connector_name, tool_name, kwargs, tool_migrations)
-
             call_connection_id = kwargs.pop("connection_id", None) or connection_id
             call_tenant_id = kwargs.pop("tenant_id", None)
             return await self._execute_fn(
                 action_id, kwargs, connector_id, tool_info,
                 call_connection_id, call_tenant_id,
             )
-
         tool_method.__name__ = tool_name
-        tool_method.__qualname__ = f"{self._connector_name}.{tool_name}"
+        tool_method.__qualname__ = f"{connector_name}.{tool_name}"
         return tool_method
-
-    def __repr__(self) -> str:
-        conn = f", connection='{self._connection_id}'" if self._connection_id else ""
-        return (
-            f"<AsyncDynamicConnector '{self._connector_name}' "
-            f"({len(self._tools)} tools){conn}>"
-        )
-
-    def __dir__(self) -> list:
-        names = list(self._tools.keys())
-        names.extend(self._migrations.get("deprecated_tools", {}).keys())
-        return sorted(set(names))

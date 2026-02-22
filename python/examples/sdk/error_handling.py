@@ -6,7 +6,7 @@ Demonstrates the exception hierarchy and common error scenarios:
     ├── ConfigError            — missing config fields
     ├── APIError               — HTTP errors from the Fastn API
     ├── ConnectorNotFoundError — connector not in registry
-    ├── ToolNotFoundError      — action not found in connector
+    ├── ToolNotFoundError      — tool not found in connector
     ├── ConnectionNotFoundError— connection_id not valid
     ├── OAuthError             — device login failures
     └── RegistryError          — registry sync issues
@@ -33,48 +33,50 @@ PROJECT_ID = "your-project-id"
 
 
 def main() -> None:
-    # ── 1. ConfigError — missing credentials ─────────────────────────
+    # -- 1. ConfigError — missing credentials ------------------------------
     print("=== ConfigError ===")
     try:
         bad_client = FastnClient(api_key="", project_id="")
     except ConfigError as e:
         print(f"  Caught ConfigError: {e}")
 
-    # ── 2. Normal client setup ───────────────────────────────────────
+    # -- 2. Normal client setup --------------------------------------------
     fastn = FastnClient(api_key=API_KEY, project_id=PROJECT_ID)
 
-    # ── 3. ConnectorNotFoundError — unknown connector ────────────────
+    # -- 3. ConnectorNotFoundError — unknown connector ---------------------
     print("\n=== ConnectorNotFoundError ===")
     try:
         _ = fastn.nonexistent_connector
     except ConnectorNotFoundError as e:
         print(f"  Caught ConnectorNotFoundError: {e}")
+        print(f"  Connector name: {e.connector_name}")
 
-    # ── 4. ToolNotFoundError — unknown action ────────────────────────
+    # -- 4. ToolNotFoundError — unknown tool -------------------------------
     print("\n=== ToolNotFoundError ===")
     try:
-        fastn.slack.nonexistent_action(param="value")
+        fastn.slack.nonexistent_tool(param="value")
     except ToolNotFoundError as e:
         print(f"  Caught ToolNotFoundError: {e}")
+        print(f"  Tool name: {e.tool_name}")
 
-    # ── 5. APIError — server error ───────────────────────────────────
+    # -- 5. APIError — server error ----------------------------------------
     print("\n=== APIError ===")
     try:
-        # This will fail if the tool isn't connected
+        # This will fail if the connector isn't connected
         fastn.slack.send_message(channel="invalid", text="test")
     except APIError as e:
         print(f"  Caught APIError (status {e.status_code}): {e}")
     except AuthError as e:
         print(f"  Caught AuthError: {e}")
 
-    # ── 6. Catch-all with FastnError ─────────────────────────────────
+    # -- 6. Catch-all with FastnError --------------------------------------
     print("\n=== FastnError (catch-all) ===")
     try:
-        fastn.execute(action_id="act_invalid", params={})
+        fastn.execute(tool="act_invalid", params={})
     except FastnError as e:
         print(f"  Caught FastnError ({type(e).__name__}): {e}")
 
-    # ── 7. Retry pattern ─────────────────────────────────────────────
+    # -- 7. Retry pattern --------------------------------------------------
     print("\n=== Retry pattern ===")
     import time
 

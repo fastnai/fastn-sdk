@@ -65,15 +65,15 @@ echo ""
 echo "=== fastn sync ==="
 # fastn sync
 # Output:
-#   Syncing tool registry...
-#   ✓ Registry synced: 45 tools available.
-#   ✓ Refreshed stubs for 2 installed tool(s).
+#   Syncing connector registry...
+#   ✓ Registry synced: 45 connectors available.
+#   ✓ Refreshed stubs for 2 installed connector(s).
 
 echo ""
 echo "=== fastn list ==="
 fastn list
 # Output:
-#   Available tools (45):
+#   Available connectors (45):
 #
 #   My Workspace (3):
 #     ✅ flows
@@ -90,7 +90,7 @@ echo ""
 echo "=== fastn list --installed ==="
 fastn list --installed
 # Output:
-#   Installed tools (2):
+#   Installed connectors (2):
 #   ✅ slack
 #   ✅ github
 
@@ -121,10 +121,10 @@ fastn list slack -v
 # echo "=== fastn list --active ==="
 # fastn list --active
 # Output:
-#   Active tools (12 actions across 4 connectors):
+#   Active connectors (12 tools across 4 connectors):
 #
-#   ✅ Slack (5 actions)
-#   ✅ GitHub (4 actions)
+#   ✅ Slack (5 tools)
+#   ✅ GitHub (4 tools)
 #     Notion (0 tools — not connected)
 
 # ============================================================================
@@ -155,13 +155,13 @@ echo ""
 echo "=== fastn run slack ==="
 fastn run slack
 # Output:
-#   Slack — available actions:
+#   Slack — available tools:
 #
 #     send_message              Send a message to a channel
 #     list_channels             List all channels
 #     ...
 #
-#   Run: fastn run slack <action> [--key value ...]
+#   Run: fastn run slack <tool> [--key value ...]
 
 # echo ""
 # echo "=== fastn run (inline params) ==="

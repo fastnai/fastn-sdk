@@ -53,7 +53,7 @@ def _make_fastn_dir(tmpdir: str, *, config: dict = None, registry: dict = None,
 
 
 def _make_registry_with_tools() -> dict:
-    """Create a registry with Slack connector and tools."""
+    """Create a registry with Slack tool and actions."""
     return {
         "version": "1.0.0",
         "connectors": {
@@ -268,7 +268,7 @@ class TestSchemaCommand:
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
-    def test_schema_connector_not_found(self, runner, tmp_env):
+    def test_schema_tool_not_found_in_registry(self, runner, tmp_env):
         _make_fastn_dir(tmp_env)
         result = runner.invoke(cli, ["schema", "nonexistent"])
         assert result.exit_code != 0
@@ -326,7 +326,7 @@ class TestListCommand:
         _make_fastn_dir(tmp_env, registry=registry)
         result = runner.invoke(cli, ["list"])
         assert result.exit_code == 0
-        assert "Available tools" in result.output
+        assert "Available connectors" in result.output
         assert "slack" in result.output
         assert "github" in result.output
 
@@ -338,7 +338,7 @@ class TestListCommand:
         assert "My Workspace" in result.output
         assert "My Organization" in result.output
 
-    def test_list_specific_connector(self, runner, tmp_env):
+    def test_list_specific_tool(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
         result = runner.invoke(cli, ["list", "slack"])
@@ -347,7 +347,7 @@ class TestListCommand:
         assert "send_message" in result.output or "sendMessage" in result.output
         assert "list_channels" in result.output or "listChannels" in result.output
 
-    def test_list_connector_not_found(self, runner, tmp_env):
+    def test_list_tool_not_found(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
         result = runner.invoke(cli, ["list", "nonexistent"])
@@ -378,7 +378,7 @@ class TestListCommand:
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
         result = runner.invoke(cli, ["list", "--installed"])
         assert result.exit_code == 0
-        assert "No tools installed" in result.output
+        assert "No connectors installed" in result.output
 
     def test_list_empty_registry_not_authenticated(self, runner, tmp_env):
         _make_fastn_dir(tmp_env, config={
@@ -398,7 +398,7 @@ class TestListCommand:
         _make_fastn_dir(tmp_env, registry=registry, manifest=manifest)
         result = runner.invoke(cli, ["list"])
         assert result.exit_code == 0
-        # Checkmark appears next to installed connectors
+        # Checkmark appears next to installed tools
         assert "\u2705" in result.output
 
 
@@ -432,12 +432,12 @@ class TestRemoveCommand:
 # ===================================================================
 
 class TestRunCommand:
-    def test_run_list_actions(self, runner, tmp_env):
-        """fastn run slack -> list available actions."""
+    def test_run_list_tools(self, runner, tmp_env):
+        """fastn run slack -> list available tools."""
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
         result = runner.invoke(cli, ["run", "slack"])
         assert result.exit_code == 0
-        assert "available actions" in result.output.lower()
+        assert "available tools" in result.output.lower()
         assert "send_message" in result.output or "sendMessage" in result.output
 
     def test_run_not_authenticated(self, runner, tmp_env):
@@ -455,7 +455,7 @@ class TestRunCommand:
         assert result.exit_code != 0
         assert "Registry is empty" in result.output
 
-    def test_run_connector_not_found(self, runner, tmp_env):
+    def test_run_tool_not_found(self, runner, tmp_env):
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
         result = runner.invoke(cli, ["run", "nonexistent"])
         assert result.exit_code != 0
@@ -655,7 +655,7 @@ class TestSyncCommand:
         result = runner.invoke(cli, ["sync"])
         assert result.exit_code == 0
         assert "Registry synced" in result.output
-        assert "2 tools available" in result.output
+        assert "2 connectors available" in result.output
 
 
 # ===================================================================
@@ -665,15 +665,15 @@ class TestSyncCommand:
 class TestAddCommand:
     @patch("fastn.cli.registry_commands._detect_languages", return_value=["python"])
     @patch("fastn.cli.registry_commands._regenerate_stubs")
-    @patch("fastn.cli.registry_commands._fetch_connector_tools")
+    @patch("fastn.cli.registry_commands._fetch_tool_actions")
     @patch("fastn.cli._helpers._ensure_fresh_token")
-    def test_add_success(self, mock_fresh, mock_fetch_tools, mock_stubs, mock_detect, runner, tmp_env):
+    def test_add_success(self, mock_fresh, mock_fetch_actions, mock_stubs, mock_detect, runner, tmp_env):
         registry = _make_registry_with_tools()
         # Remove tools so add fetches them
         registry["connectors"]["slack"]["tools"] = {}
         _make_fastn_dir(tmp_env, registry=registry)
 
-        mock_fetch_tools.return_value = [
+        mock_fetch_actions.return_value = [
             {
                 "node": {
                     "id": "act_slack_send_message",
@@ -691,7 +691,7 @@ class TestAddCommand:
         assert "slack added" in result.output
         assert "Type stubs generated" in result.output
 
-    def test_add_connector_not_found(self, runner, tmp_env):
+    def test_add_tool_not_found(self, runner, tmp_env):
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
         result = runner.invoke(cli, ["add", "nonexistent"])
         assert result.exit_code == 0  # add doesn't fail hard, just warns
@@ -699,7 +699,7 @@ class TestAddCommand:
 
     @patch("fastn.cli.registry_commands._detect_languages", return_value=["python"])
     @patch("fastn.cli.registry_commands._regenerate_stubs")
-    @patch("fastn.cli.registry_commands._fetch_connector_tools")
+    @patch("fastn.cli.registry_commands._fetch_tool_actions")
     @patch("fastn.cli._helpers._ensure_fresh_token")
     def test_add_multiple(self, mock_fresh, mock_fetch, mock_stubs, mock_detect, runner, tmp_env):
         registry = _make_registry_with_tools()
@@ -815,7 +815,7 @@ class TestAgentCommand:
 
         result = runner.invoke(cli, ["agent", "send hello"])
         assert result.exit_code != 0
-        assert "Tool discovery failed" in result.output
+        assert "Connector discovery failed" in result.output
 
 
 # ===================================================================
