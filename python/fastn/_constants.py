@@ -59,6 +59,22 @@ query ListUCLAgents($input: ListUCLAgentsInput!) {
 }
 """
 
+SEARCH_CONNECTORS_QUERY = """
+query searchDataSourceGroups($input: SearchDataModelInput!) {
+  searchDataSourceGroups(input: $input) {
+    pageInfo { totalCount }
+    edges {
+      node {
+        id
+        clientId
+        name
+        connectorType
+      }
+    }
+  }
+}
+"""
+
 _UPDATE_RESOLVER_STEP_MUTATION = """
 mutation updateResolverStep($input: CreateResolverStepInput!) {
   updateResolverStep(input: $input) {

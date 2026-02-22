@@ -53,7 +53,7 @@ from fastn._constants import (
 )
 from fastn._formatters import _FORMAT_CONVERTERS
 from fastn._http import _redact_headers
-from fastn._catalog import _ConnectorCatalog
+from fastn._catalog import _ConnectorCatalog, _ConnectorCatalogAsync
 from fastn._flows import _FlowsSync, _FlowsAsync
 from fastn._auth_ns import _AuthSync, _AuthAsync
 from fastn._projects import _ProjectsSync, _ProjectsAsync
@@ -598,7 +598,7 @@ class AsyncFastnClient:
             timeout=self._config.timeout,
             headers=self._headers,
         )
-        self.connectors = _ConnectorCatalog(self._registry)
+        self.connectors = _ConnectorCatalogAsync(self, self._registry)
         self.flows = _FlowsAsync(self)
         self.auth = _AuthAsync(self)
         self.projects = _ProjectsAsync(self)

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+from fastn._constants import SEARCH_CONNECTORS_QUERY
+from fastn._http import _gql_call_async
 from fastn.exceptions import ConnectorNotFoundError, ToolNotFoundError
 
 
@@ -86,3 +88,79 @@ class _ConnectorCatalog:
             "inputSchema": tool_info.get("inputSchema", {}),
             "outputSchema": tool_info.get("outputSchema", {}),
         }
+
+
+class _ConnectorCatalogAsync(_ConnectorCatalog):
+    """Connector catalog (async): list connectors via the Fastn API.
+
+    Accessed as ``fastn.connectors.*`` on ``AsyncFastnClient``.
+    Inherits registry-based ``get``, ``get_tools``, and ``get_tool`` from
+    ``_ConnectorCatalog``, but overrides ``list()`` to fetch connectors
+    from the GraphQL API instead of the local registry file.
+    """
+
+    def __init__(self, client: Any, registry: Dict[str, Any]) -> None:
+        super().__init__(registry)
+        self._client = client
+
+    async def _fetch_scope(
+        self, scope_id: str, is_community: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Fetch connectors for a single scope (workspace or community)."""
+        variables = {
+            "input": {
+                "clientId": scope_id,
+                "first": 500,
+                "connectorId": scope_id,
+                "query": '{"input":{"limit":500,"offset":0,"sort":"asc","query":"","filter":{}}}',
+                "isCommunity": is_community,
+                "offset": 0,
+            }
+        }
+        data = await _gql_call_async(
+            self._client, SEARCH_CONNECTORS_QUERY, variables,
+            extra_headers={"x-fastn-space-id": scope_id},
+        )
+        search_result = data.get("searchDataSourceGroups") or {}
+        edges = search_result.get("edges") or []
+        results: List[Dict[str, Any]] = []
+        for edge in edges:
+            node = edge.get("node", {})
+            name = node.get("name", "")
+            results.append({
+                "name": name.lower().replace(" ", "_").replace("-", "_"),
+                "display_name": name,
+                "id": node.get("id", ""),
+            })
+        return results
+
+    async def list(self) -> List[Dict[str, Any]]:
+        """List all connectors: workspace + community catalog (async).
+
+        Fetches from two sources (matching the CLI ``fastn sync`` pattern):
+        1. Workspace — connectors configured in the user's project
+        2. Community — the full 200+ public connector catalog
+
+        Workspace connectors take priority over community duplicates.
+        """
+        self._client._ensure_fresh_token()
+        project_id = self._client._config.resolve_project_id()
+
+        # 1. Workspace connectors
+        workspace = await self._fetch_scope(project_id)
+
+        # 2. Community connectors
+        try:
+            community = await self._fetch_scope("community", is_community=True)
+        except Exception:
+            community = []
+
+        # Merge: workspace takes priority
+        seen = {c["name"] for c in workspace}
+        merged = list(workspace)
+        for c in community:
+            if c["name"] not in seen:
+                merged.append(c)
+                seen.add(c["name"])
+
+        return merged
