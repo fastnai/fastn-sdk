@@ -56,7 +56,7 @@ Fastn sits between your AI agent and 250+ SaaS APIs as a unified context layer:
 
 - **Dynamic Tool Filtering** — `get_tools_for(prompt)` semantically matches against the full registry and returns only the top N tools (default: 5). This reduces tool context from ~125K tokens to ~2,500 tokens — roughly 98% less context for the LLM.
 - **Context Optimization** — API schemas wrap parameters under structural keys (`body`, `param`) that LLMs don't need. The SDK unwraps schemas before sending to the LLM and re-wraps parameters before API execution. Automatic and transparent.
-- **Centralized Auth Vault** — OAuth tokens and API keys live in the Fastn platform. The SDK calls the gateway; the gateway injects credentials per tenant. Tokens auto-refresh with a 30-second expiry buffer.
+- **Fully Managed Auth** — OAuth tokens and API keys are securely vaulted on the Fastn platform. The SDK calls the gateway; the gateway injects credentials per tenant. Tokens auto-refresh with a 30-second expiry buffer.
 
 ```
 Agent → get_tools_for(prompt) → SDK → Platform (semantic match) → top N tools (flat schemas)
