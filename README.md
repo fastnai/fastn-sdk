@@ -1,8 +1,8 @@
 # Fastn SDK
 
-The integration infrastructure for AI agents. Connect 250+ enterprise APIs with managed auth, intelligent routing, and production-grade orchestration.
+**Give your AI agents and apps instant, secure access to 250+ enterprise systems.**
 
-One SDK. One CLI. Every integration. Full IDE autocomplete. First-class LLM agent support.
+Production-ready SDK with fully managed OAuth 2.1, SOC 2 certified platform, governed access, and sub-second execution. One SDK for OpenAI, Anthropic, Gemini, and Bedrock function calling.
 
 ## Why Fastn?
 
@@ -10,7 +10,8 @@ One SDK. One CLI. Every integration. Full IDE autocomplete. First-class LLM agen
 |---------|---------------|
 | Agents receive all tool schemas, burning tokens and increasing hallucination | `get_tools_for(prompt, limit=5)` semantically matches and returns only the most relevant tools |
 | API schemas are deeply nested, wasting context on structural wrappers | SDK auto-unwraps schemas for LLMs and re-wraps for execution — flat params in, correct API structure out |
-| Each SaaS API has its own OAuth flow, token refresh, and credential storage | One auth vault: `fastn.auth.connect()` handles the full lifecycle with auto-refresh and tenant isolation |
+| Each SaaS API has its own OAuth flow, token refresh, and credential storage | Fully managed OAuth 2.1 vault — acquisition, auto-refresh, tenant isolation. No token management code. |
+| Security and compliance are afterthoughts in most agent tooling | SOC 2 certified platform, role-based access control, audit trails, PII filtering |
 | LLM agents need tool schemas in provider-specific formats | `get_tools_for("Send a Slack message", format="openai")` returns ready-to-use schemas for OpenAI, Anthropic, Gemini, Bedrock |
 | Building automation workflows requires stitching APIs together | `fastn.flows.create("When a PR is opened, post to Slack")` handles orchestration |
 | No type safety when calling integrations dynamically | Generated `.pyi` stubs give full IDE autocomplete with parameter names and types |
@@ -55,8 +56,8 @@ Connectors provide tools. Flows compose tools. Agents run flows and tools with r
 Fastn sits between your AI agent and 250+ SaaS APIs as a unified context layer:
 
 - **Dynamic Tool Filtering** — `get_tools_for(prompt)` semantically matches against the full registry and returns only the top N tools (default: 5). This reduces tool context from ~125K tokens to ~2,500 tokens — roughly 98% less context for the LLM.
-- **Context Optimization** — API schemas wrap parameters under structural keys (`body`, `param`) that LLMs don't need. The SDK unwraps schemas before sending to the LLM and re-wraps parameters before API execution. Automatic and transparent.
-- **Fully Managed Auth** — OAuth tokens and API keys are securely vaulted on the Fastn platform. The SDK calls the gateway; the gateway injects credentials per tenant. Tokens auto-refresh with a 30-second expiry buffer.
+- **Context Optimization** — composes tools and skills, filters schema inputs/outputs, and strips PII to minimize tokens and reduce hallucination. The SDK also flattens nested API wrappers for the LLM and re-wraps them for execution. Automatic and transparent.
+- **Fully Managed Auth** — OAuth 2.1 tokens and API keys are securely vaulted on the SOC 2 certified Fastn platform. The SDK calls the gateway; the gateway injects credentials per tenant. Tokens auto-refresh with a 30-second expiry buffer.
 
 ```
 Agent → get_tools_for(prompt) → SDK → Platform (semantic match) → top N tools (flat schemas)
@@ -149,9 +150,9 @@ Every API call goes through the Fastn gateway. The SDK handles client-side conce
 
 | Category | Capabilities |
 |----------|-------------|
-| **Performance & Context** | Dynamic tool filtering (~98% context reduction), schema optimization (auto-unwrap/re-wrap), centralized gateway, connection pooling, automatic retries |
-| **Security & Auth Vault** | OAuth vault with auto-refresh (30s expiry buffer), credential isolation, tenant isolation, custom auth providers, config file protection (`0o600`), MCP compatible |
-| **Governance & Observability** | Access control per project/tenant, audit trail, usage analytics, verbose mode, structured error tracking |
+| **Performance & Context** | Dynamic tool filtering (~98% context reduction), context optimization (tool/skill composition, schema I/O filtering, PII filtering), centralized gateway, connection pooling, automatic retries |
+| **Security & Auth Vault** | SOC 2 certified, OAuth 2.1 vault with auto-refresh, credential isolation, tenant isolation, PII filtering, custom auth providers, MCP compatible |
+| **Governance & Observability** | Role-based access control, audit trails, enterprise compliance controls, usage analytics, verbose mode, structured error tracking |
 
 ## Documentation
 

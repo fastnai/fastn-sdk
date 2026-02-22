@@ -1,8 +1,8 @@
 # Fastn SDK for Python
 
-Connect AI agents to 250+ APIs with managed auth, tool calling, and multi-tenant orchestration.
+**Give your AI agents and apps secure, governed access to 250+ enterprise systems.**
 
-One SDK for OpenAI, Anthropic, Gemini, and Bedrock function calling. Fastn handles tool discovery, schema transformation, OAuth, and credential management so your agent code stays simple.
+Production-ready Python SDK for OpenAI, Anthropic, Gemini, and Bedrock function calling. Fully managed OAuth 2.1, SOC 2 certified platform, role-based access control, audit trails, and sub-second execution — so your agent code stays simple and your security team stays happy.
 
 [![PyPI version](https://img.shields.io/pypi/v/fastn-sdk.svg)](https://pypi.org/project/fastn-sdk/)
 [![Python](https://img.shields.io/pypi/pyversions/fastn-sdk.svg)](https://pypi.org/project/fastn-sdk/)
@@ -14,7 +14,8 @@ One SDK for OpenAI, Anthropic, Gemini, and Bedrock function calling. Fastn handl
 |---------|---------------|
 | Agents receive all tool schemas, burning tokens and increasing hallucination | `get_tools_for(prompt, limit=5)` returns only the most relevant tools — 250+ connectors, but only 5 reach the LLM |
 | API schemas are deeply nested, wasting context on structure | SDK auto-unwraps schemas for LLMs and re-wraps for execution — flat params in, correct API structure out |
-| Each SaaS API has its own OAuth flow, token refresh, and credential storage | One OAuth vault handles the full lifecycle — acquisition, auto-refresh, isolation per tenant |
+| Each SaaS API has its own OAuth flow, token refresh, and credential storage | Fully managed OAuth 2.1 vault — acquisition, auto-refresh, tenant isolation. No token management code. |
+| Security and compliance are afterthoughts in most agent tooling | SOC 2 certified platform, role-based access control, audit trails, PII filtering |
 | LLM agents need tool schemas in provider-specific formats | `get_tools_for("Send a Slack message", format="openai")` returns ready-to-use schemas for OpenAI, Anthropic, Gemini, Bedrock |
 | Managing connections per customer in multi-tenant apps is complex | First-class `tenant_id` and `connection_id` support at every level |
 | Building automation workflows requires stitching APIs together | `fastn.flows.create("When a PR is opened, post to Slack")` handles orchestration |
@@ -67,10 +68,11 @@ Fastn sits between your AI agent and 250+ SaaS APIs. The SDK handles client-side
 | Capability | What It Does | Where It Runs |
 |-----------|-------------|---------------|
 | **Dynamic tool filtering** | Returns only tools that match the current prompt or intent | Platform |
+| **Context optimization** | Composes tools/skills, filters schema I/O, strips PII — minimizes tokens and hallucination | Platform + SDK |
 | **Schema transformer** | Flattens nested API schemas for LLMs, re-wraps for execution | SDK |
 | **Intent routing** | Determines which tool to use based on agent request | Platform + SDK |
-| **OAuth vault** | Manages token refresh and credential storage per tenant | Platform |
-| **RBAC and policy rules** | Controls what each agent or tenant can access | Platform |
+| **Managed OAuth 2.1** | Full token lifecycle — acquisition, refresh, revocation, tenant isolation | Platform |
+| **Governed access** | RBAC, audit trails, and enterprise compliance controls (SOC 2 certified) | Platform |
 | **Batch optimizer** | Groups similar calls to reduce cost and time | Platform |
 | **Prompt safety** | Blocks unsafe or injected tool commands | Platform |
 | **Observability layer** | Tracks cost, latency, and errors per tool call | Platform + SDK CLI |
@@ -87,16 +89,21 @@ tools = fastn.get_tools_for("Send a Slack message", format="openai", limit=5)
 tools = fastn.get_tools_for("slack tools", connector="slack", format="openai")
 ```
 
-### Schema Transformation
+### Context Optimization
 
-API schemas wrap parameters under structural keys (`body`, `param`, `query`) that the API needs but the LLM doesn't. The SDK transforms schemas in both directions automatically:
+Fastn minimizes what reaches the LLM — fewer tokens, less hallucination, better compliance:
+
+- **Tool and skill composition** — the platform composes tools and skills into efficient chains, so agents receive focused context instead of raw API surface area
+- **Schema I/O filtering** — strips unnecessary fields from tool input and output schemas before they reach the LLM, reducing token cost
+- **PII filtering** — removes personally identifiable information from context for security and compliance
+- **Schema transformation** — the SDK flattens nested API wrappers (`body`, `param`) for the LLM and re-wraps them for execution:
 
 ```
 What the API expects:   {"body": {"channel": "#general", "text": "hello"}}
 What the LLM sees:      {"channel": "#general", "text": "hello"}
 ```
 
-Your agent works with flat parameters. The SDK handles the translation.
+Combined with [Dynamic Tool Filtering](#dynamic-tool-filtering), this reduces agent context from ~125K tokens to a focused, compliant payload.
 
 ### Architecture
 
@@ -369,7 +376,7 @@ fastn.flows.delete(flow_id="flow_abc123")
 
 ## Authentication
 
-Fastn supports three authentication types at different levels. The SDK triggers connectors and flows — the platform auto-manages token refresh and credential injection.
+Fastn supports three authentication types at different levels. The SDK triggers connectors and flows — the SOC 2 certified platform auto-manages OAuth 2.1 token refresh and credential injection.
 
 | Auth Type | Who Authenticates | To What | How | Expiry |
 |-----------|------------------|---------|-----|--------|
