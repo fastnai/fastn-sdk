@@ -59,6 +59,37 @@ query ListUCLAgents($input: ListUCLAgentsInput!) {
 }
 """
 
+LIST_FLOWS_QUERY = """
+query apis($input: SearchDataModelInput!) {
+  apis(input: $input) {
+    pageInfo {
+      totalCount
+      __typename
+    }
+    edges {
+      node {
+        id
+        name
+        description
+        status
+        version
+        updatedAt
+        deployedAt
+        metaData {
+          flowType
+          architecture
+          isAsync
+          __typename
+        }
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+}
+"""
+
 SEARCH_CONNECTORS_QUERY = """
 query searchDataSourceGroups($input: SearchDataModelInput!) {
   searchDataSourceGroups(input: $input) {

@@ -8,8 +8,8 @@
 #
 # Prerequisites:
 #   pip install fastn
-#   fastn init          # or: fastn login
-#   fastn sync
+#   fastn login
+#   fastn connector sync
 # ============================================================================
 
 set -euo pipefail
@@ -45,37 +45,31 @@ fastn whoami
 
 # fastn login
 # → Opens browser for OAuth device login
-# → Prompts to select a workspace
+# → Prompts to select a project
 # → Saves tokens to .fastn/config.json
 
 # fastn logout
 # → Clears auth tokens from .fastn/config.json
 
-# fastn init
-# → Interactive setup wizard
-# → Option 1: Browser login (recommended)
-# → Option 2: Manual API key entry
-# → Saves config + adds to .gitignore
-
 # ============================================================================
-# REGISTRY MANAGEMENT
+# CONNECTORS — fastn connector <subcommand>
 # ============================================================================
 
 echo ""
-echo "=== fastn sync ==="
-# fastn sync
+echo "=== fastn connector sync ==="
+# fastn connector sync
 # Output:
 #   Syncing connector registry...
 #   ✓ Registry synced: 45 connectors available.
 #   ✓ Refreshed stubs for 2 installed connector(s).
 
 echo ""
-echo "=== fastn list ==="
-fastn list
+echo "=== fastn connector ls ==="
+fastn connector ls
 # Output:
 #   Available connectors (45):
 #
-#   My Workspace (3):
+#   My Project (3):
 #     ✅ flows
 #       test
 #
@@ -87,16 +81,16 @@ fastn list
 #       ...
 
 echo ""
-echo "=== fastn list --installed ==="
-fastn list --installed
+echo "=== fastn connector ls --installed ==="
+fastn connector ls --installed
 # Output:
 #   Installed connectors (2):
 #   ✅ slack
 #   ✅ github
 
 echo ""
-echo "=== fastn list slack ==="
-fastn list slack
+echo "=== fastn connector ls slack ==="
+fastn connector ls slack
 # Output:
 #   Slack (25 tools):
 #
@@ -105,8 +99,8 @@ fastn list slack
 #     ...
 
 echo ""
-echo "=== fastn list slack -v ==="
-fastn list slack -v
+echo "=== fastn connector ls slack -v ==="
+fastn connector ls slack -v
 # Output (verbose — shows schemas):
 #   send_message
 #     Usage: fastn.slack.send_message()
@@ -118,8 +112,8 @@ fastn list slack -v
 #       ok: boolean
 
 # echo ""
-# echo "=== fastn list --active ==="
-# fastn list --active
+# echo "=== fastn connector ls --active ==="
+# fastn connector ls --active
 # Output:
 #   Active connectors (12 tools across 4 connectors):
 #
@@ -132,28 +126,28 @@ fastn list slack -v
 # ============================================================================
 
 # echo ""
-# echo "=== fastn add ==="
-# fastn add slack
+# echo "=== fastn connector add ==="
+# fastn connector add slack
 # Output:
 #   Adding slack...
 #     Fetching tools for slack...
 #     ✓ slack added (25 tools).
 #   ✓ Type stubs generated.
 
-# fastn add slack github jira    # Add multiple at once
+# fastn connector add slack github jira    # Add multiple at once
 
 # echo ""
-# echo "=== fastn remove ==="
-# fastn remove slack
+# echo "=== fastn connector remove ==="
+# fastn connector remove slack
 # Output: ✓ Removed slack.
 
 # ============================================================================
-# TOOL EXECUTION (fastn run)
+# TOOL EXECUTION (fastn connector run)
 # ============================================================================
 
 echo ""
-echo "=== fastn run slack ==="
-fastn run slack
+echo "=== fastn connector run slack ==="
+fastn connector run slack
 # Output:
 #   Slack — available tools:
 #
@@ -161,11 +155,11 @@ fastn run slack
 #     list_channels             List all channels
 #     ...
 #
-#   Run: fastn run slack <tool> [--key value ...]
+#   Run: fastn connector run slack <tool> [--key value ...]
 
 # echo ""
-# echo "=== fastn run (inline params) ==="
-# fastn run slack send_message --channel general --text "Hello from CLI!"
+# echo "=== fastn connector run (inline params) ==="
+# fastn connector run slack send_message --channel general --text "Hello from CLI!"
 # Output:
 #   Running slack.send_message...
 #   {
@@ -174,32 +168,32 @@ fastn run slack
 #   }
 
 # echo ""
-# echo "=== fastn run (interactive) ==="
-# fastn run slack send_message
+# echo "=== fastn connector run (interactive) ==="
+# fastn connector run slack send_message
 # → Prompts for each parameter:
 #   channel (Channel name) [string]: general
 #   text (Message text) [string]: Hello!
 
 # echo ""
-# echo "=== fastn run (with tenant) ==="
-# fastn run slack send_message --tenant acme --channel general --text "Hi"
-# fastn run slack send_message acme-tenant-id --channel general --text "Hi"
+# echo "=== fastn connector run (with tenant) ==="
+# fastn connector run slack send_message --tenant acme --channel general --text "Hi"
+# fastn connector run slack send_message acme-tenant-id --channel general --text "Hi"
 
 # echo ""
-# echo "=== fastn run (with connection) ==="
-# fastn run slack send_message --connection-id conn_123 --channel general --text "Hi"
+# echo "=== fastn connector run (with connection) ==="
+# fastn connector run slack send_message --connection-id conn_123 --channel general --text "Hi"
 
 # echo ""
-# echo "=== fastn run (JSON params) ==="
-# fastn run slack send_message --channel general --text "Hello" --blocks '[{"type":"section"}]'
+# echo "=== fastn connector run (JSON params) ==="
+# fastn connector run slack send_message --channel general --text "Hello" --blocks '[{"type":"section"}]'
 
 # ============================================================================
 # SCHEMA INSPECTION
 # ============================================================================
 
 echo ""
-echo "=== fastn schema ==="
-fastn schema slack send_message
+echo "=== fastn connector schema ==="
+fastn connector schema slack send_message
 # Output (JSON):
 #   {
 #     "name": "send_message",
@@ -210,8 +204,8 @@ fastn schema slack send_message
 #   }
 
 echo ""
-echo "=== fastn schema (all tools) ==="
-fastn schema slack
+echo "=== fastn connector schema (all tools) ==="
+fastn connector schema slack
 # Output: JSON array of all tool schemas
 
 # ============================================================================
@@ -264,7 +258,7 @@ fastn schema slack
 
 # echo ""
 # echo "=== verbose mode ==="
-# fastn -v run slack send_message --channel general --text "Hi"
+# fastn -v connector run slack send_message --channel general --text "Hi"
 # Output includes:
 #   [API] POST https://live.fastn.ai/api/ucl/executeTool
 #   [API] Headers: { ... }

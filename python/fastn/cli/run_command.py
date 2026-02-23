@@ -6,7 +6,7 @@ from typing import Optional
 import click
 
 from fastn import __version__
-from fastn.cli import cli, EXECUTE_URL, SOURCE_COMMUNITY
+from fastn.cli import cli, connector, EXECUTE_URL, SOURCE_COMMUNITY
 from fastn.cli._helpers import (
     _ensure_fresh_token,
     _extract_input_fields,
@@ -20,7 +20,7 @@ from fastn.cli._registry import _fetch_tool_actions, _parse_tool_node
 from fastn.config import find_fastn_dir, load_config, load_manifest, load_registry, save_registry
 
 
-@cli.command(
+@connector.command(
     context_settings=dict(
         ignore_unknown_options=True,
         allow_extra_args=True,
@@ -37,18 +37,17 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
 
     \b
     Usage:
-      fastn run <connector>                              Show available tools
-      fastn run <connector> <tool> [--key value]          Execute with inline params
-      fastn run <connector> <tool> <tenant_id>            Execute for a specific tenant
-      fastn run <connector> <tool>                        Execute with interactive prompts
+      fastn connector run <connector>                              Show available tools
+      fastn connector run <connector> <tool> [--key value]          Execute with inline params
+      fastn connector run <connector> <tool> <tenant_id>            Execute for a specific tenant
+      fastn connector run <connector> <tool>                        Execute with interactive prompts
 
     \b
     Examples:
-      fastn run slack                                Show available Slack tools
-      fastn run slack send_message --channel general --text "Hello!"
-      fastn run slack send_message 3ab9d640-...      Execute as specific tenant
-      fastn run slack send_message             Prompts for each field
-      fastn run flows my_flow --input '{"key": "value"}'
+      fastn connector run slack                                Show available Slack tools
+      fastn connector run slack send_message --channel general --text "Hello!"
+      fastn connector run slack send_message 3ab9d640-...      Execute as specific tenant
+      fastn connector run slack send_message             Prompts for each field
     """
     config = load_config()
     if not config.auth_token and not config.api_key:
@@ -62,12 +61,12 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
 
     if not connectors:
         raise click.ClickException(
-            "Registry is empty. Run `fastn sync` first."
+            "Registry is empty. Run `fastn connector sync` first."
         )
 
     if connector_name not in connectors:
         raise click.ClickException(
-            f"Connector '{connector_name}' not found. Run `fastn list` to see available connectors."
+            f"Connector '{connector_name}' not found. Run `fastn connector ls` to see available connectors."
         )
 
     connector_data = connectors[connector_name]
@@ -75,7 +74,7 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
 
     if not connector_id:
         raise click.ClickException(
-            f"No ID for '{connector_name}'. Run `fastn sync`."
+            f"No ID for '{connector_name}'. Run `fastn connector sync`."
         )
 
     # Ensure tools are loaded
@@ -108,7 +107,7 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
             else:
                 click.echo(f"    {display_key}")
         click.echo()
-        click.echo(f"  Run: fastn run {connector_name} <tool> [--key value ...]")
+        click.echo(f"  Run: fastn connector run {connector_name} <tool> [--key value ...]")
         click.echo()
         return
 
@@ -129,7 +128,7 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
     action_id = tool_info.get("actionId", "")
     if not action_id:
         raise click.ClickException(
-            f"No actionId for '{tool_name}'. Run `fastn sync` and `fastn add {connector_name}`."
+            f"No actionId for '{tool_name}'. Run `fastn connector sync` and `fastn connector add {connector_name}`."
         )
 
     # Extract input fields from schema for interactive prompting
@@ -186,7 +185,7 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
     click.echo(json.dumps(result, indent=2))
 
 
-@cli.command()
+@connector.command()
 @click.argument("connector_name")
 @click.argument("tool_name", required=False, default=None)
 def schema(connector_name: str, tool_name: Optional[str]) -> None:
@@ -194,8 +193,8 @@ def schema(connector_name: str, tool_name: Optional[str]) -> None:
 
     \b
     Usage:
-      fastn schema slack                  Show schemas for all Slack tools
-      fastn schema slack send_message     Show schema for a specific tool
+      fastn connector schema slack                  Show schemas for all Slack tools
+      fastn connector schema slack send_message     Show schema for a specific tool
     """
     fastn_dir = find_fastn_dir()
     registry = load_registry(fastn_dir)
@@ -203,7 +202,7 @@ def schema(connector_name: str, tool_name: Optional[str]) -> None:
 
     if connector_name not in connectors:
         raise click.ClickException(
-            f"Connector '{connector_name}' not found. Run `fastn add {connector_name}` first."
+            f"Connector '{connector_name}' not found. Run `fastn connector add {connector_name}` first."
         )
 
     connector_data = connectors[connector_name]
@@ -211,7 +210,7 @@ def schema(connector_name: str, tool_name: Optional[str]) -> None:
 
     if not tools:
         raise click.ClickException(
-            f"No tools cached for '{connector_name}'. Run `fastn add {connector_name}` first."
+            f"No tools cached for '{connector_name}'. Run `fastn connector add {connector_name}` first."
         )
 
     if tool_name:

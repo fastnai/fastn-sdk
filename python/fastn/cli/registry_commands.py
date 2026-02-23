@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 import click
 
 from fastn.cli import (
-    cli,
+    connector,
     API_BASE_URL,
     COMMUNITY_CONNECTOR_ID,
     SOURCE_COMMUNITY,
@@ -44,7 +44,7 @@ from fastn.config import (
 )
 
 
-@cli.command()
+@connector.command()
 def sync() -> None:
     """Download/update the connector registry and refresh installed stubs."""
     config = load_config()
@@ -88,10 +88,10 @@ def sync() -> None:
             click.echo(f"\u2713 Refreshed stubs for {len(installed)} installed connector(s).")
 
     click.echo()
-    click.echo("Run `fastn add <name>` to enable autocomplete for specific connectors.")
+    click.echo("Run `fastn connector add <name>` to enable autocomplete for specific connectors.")
 
 
-@cli.command()
+@connector.command()
 @click.argument("connector_names", nargs=-1, required=True)
 def add(connector_names: tuple) -> None:
     """Download full type stubs for specific connectors."""
@@ -124,14 +124,14 @@ def add(connector_names: tuple) -> None:
 
         if connector_name not in reg_connectors:
             click.echo(f"  \u2717 Connector '{connector_name}' not found in registry.")
-            click.echo(f"    Run `fastn sync` to refresh, then try again.")
+            click.echo(f"    Run `fastn connector sync` to refresh, then try again.")
             continue
 
         connector_data = reg_connectors[connector_name]
         connector_id = connector_data.get("id", "")
 
         if not connector_id:
-            click.echo(f"  \u2717 No ID for '{connector_name}'. Run `fastn sync`.")
+            click.echo(f"  \u2717 No ID for '{connector_name}'. Run `fastn connector sync`.")
             continue
 
         # Fetch tools for this connector
@@ -165,7 +165,7 @@ def add(connector_names: tuple) -> None:
         click.echo("✓ Type stubs generated.")
 
 
-@cli.command()
+@connector.command()
 @click.argument("connector_name")
 def remove(connector_name: str) -> None:
     """Remove connector stubs."""
@@ -203,7 +203,7 @@ def _show_connector_detail(
 
     if connector_name not in connectors:
         raise click.ClickException(
-            f"Connector '{connector_name}' not found. Run `fastn list` to see available connectors."
+            f"Connector '{connector_name}' not found. Run `fastn connector ls` to see available connectors."
         )
 
     connector_data = connectors[connector_name]
@@ -211,7 +211,7 @@ def _show_connector_detail(
 
     if not connector_id:
         raise click.ClickException(
-            f"No ID for '{connector_name}'. Run `fastn sync`."
+            f"No ID for '{connector_name}'. Run `fastn connector sync`."
         )
 
     # Check if tools are already cached in registry
@@ -276,7 +276,7 @@ def _show_active_connectors(
     installed_names: set,
     verbose: bool,
 ) -> None:
-    """Show only active/enabled connectors (workspace + org)."""
+    """Show only active/enabled connectors (project + org)."""
     config = load_config()
     if not config.auth_token and not config.api_key:
         raise click.ClickException("Not authenticated. Run `fastn login` first.")
@@ -355,7 +355,7 @@ def _show_active_connectors(
     }
     unresolved_ids = active_action_ids - set(action_to_connector.keys())
 
-    # For connectors that haven't been `fastn add`-ed yet (tools dict is
+    # For connectors that haven't been `fastn connector add`-ed yet (tools dict is
     # empty), fetch their tool list so we can map actionIds.
     # Phase 1: workspace/org connectors (always fetched)
     # Phase 2: community connectors (only if unresolved IDs remain)
@@ -480,7 +480,7 @@ def _show_active_connectors(
     click.echo()
     app_url = _workspace_url(workspace_id)
     click.echo(f"  {total_connectors} connectors active. Manage at: {app_url}")
-    click.echo(f"  Run `fastn add <name>` to enable autocomplete.")
+    click.echo(f"  Run `fastn connector add <name>` to enable autocomplete.")
     click.echo()
 
 
@@ -490,7 +490,7 @@ def _show_installed_connectors(
 ) -> None:
     """Show only locally installed connectors."""
     if not installed_names:
-        click.echo("No connectors installed. Run `fastn add <name>` to install.")
+        click.echo("No connectors installed. Run `fastn connector add <name>` to install.")
         return
 
     items = [(k, v) for k, v in connectors.items() if k in installed_names]
@@ -501,7 +501,7 @@ def _show_installed_connectors(
     for name, data in items:
         click.echo(f"  \u2705 {name}")
     click.echo()
-    click.echo(f"  {len(items)} installed. Run `fastn add <name>` to enable autocomplete.")
+    click.echo(f"  {len(items)} installed. Run `fastn connector add <name>` to enable autocomplete.")
     click.echo()
 
 
@@ -512,7 +512,7 @@ def _show_all_connectors(
     """Default listing: show all available connectors grouped by source."""
     # Group connectors by source
     source_order = [
-        (SOURCE_WORKSPACE, "My Workspace"),
+        (SOURCE_WORKSPACE, "My Project"),
         (SOURCE_ORG, "My Organization"),
         (SOURCE_COMMUNITY, "Marketplace"),
     ]
@@ -546,25 +546,25 @@ def _show_all_connectors(
 
     click.echo()
     installed_count = len(installed_names)
-    click.echo(f"  {installed_count} installed. Run `fastn add <name>` to enable autocomplete.")
+    click.echo(f"  {installed_count} installed. Run `fastn connector add <name>` to enable autocomplete.")
     click.echo()
 
 
-@cli.command(name="list")
+@connector.command(name="ls")
 @click.argument("connector_name", required=False, default=None)
-@click.option("--active", is_flag=True, help="Show only active/enabled connectors (workspace + org)")
-@click.option("--installed", is_flag=True, help="Show only locally installed connectors (fastn add)")
+@click.option("--active", is_flag=True, help="Show only active/enabled connectors (project + org)")
+@click.option("--installed", is_flag=True, help="Show only locally installed connectors (fastn connector add)")
 @click.option("-v", "--verbose", is_flag=True, help="Show input/output schemas for each tool")
 def list_connectors(connector_name: Optional[str], active: bool, installed: bool, verbose: bool) -> None:
     """List connectors, or show details for a specific one.
 
     \b
     Usage:
-      fastn list              Show all available connectors
-      fastn list --active     Show only active/enabled connectors
-      fastn list --installed  Show only locally installed connectors
-      fastn list slack        Show tools for the 'slack' connector
-      fastn list slack -v     Show tools with input/output schemas
+      fastn connector ls              Show all available connectors
+      fastn connector ls --active     Show only active/enabled connectors
+      fastn connector ls --installed  Show only locally installed connectors
+      fastn connector ls slack        Show tools for the 'slack' connector
+      fastn connector ls slack -v     Show tools with input/output schemas
     """
     fastn_dir = find_fastn_dir()
     registry = load_registry(fastn_dir)

@@ -962,7 +962,7 @@ class TestFlowsNamespace:
             assert result["status"] == "completed"
 
     def test_flows_list(self, httpx_mock: HTTPXMock) -> None:
-        """flows.list() returns list of flows via GraphQL."""
+        """flows.list() returns list of flows via the apis GraphQL query."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir)
             client = FastnClient(config_path=config_path)
@@ -972,13 +972,12 @@ class TestFlowsNamespace:
                 method="POST",
                 json={
                     "data": {
-                        "callCoreProjectFlow": {
-                            "data": [
-                                {"id": "flow_1", "name": "Flow One", "description": "First flow"},
-                                {"id": "flow_2", "name": "Flow Two", "description": "Second flow"},
+                        "apis": {
+                            "pageInfo": {"totalCount": 2},
+                            "edges": [
+                                {"node": {"id": "flow_1", "name": "Flow One", "description": "First flow", "status": "active", "version": "1", "updatedAt": "2024-01-01", "deployedAt": "2024-01-01", "metaData": {"flowType": "integration", "architecture": "sequential", "isAsync": False}}},
+                                {"node": {"id": "flow_2", "name": "Flow Two", "description": "Second flow", "status": "active", "version": "2", "updatedAt": "2024-01-02", "deployedAt": "2024-01-02", "metaData": None}},
                             ],
-                            "statusCode": 200,
-                            "message": None,
                         }
                     }
                 },
@@ -987,6 +986,9 @@ class TestFlowsNamespace:
             result = client.flows.list()
             assert len(result) == 2
             assert result[0]["flow_id"] == "flow_1"
+            assert result[0]["name"] == "Flow One"
+            assert result[0]["status"] == "active"
+            assert result[0]["version"] == "1"
             assert result[1]["flow_id"] == "flow_2"
 
     def test_flows_list_with_status_filter(self, httpx_mock: HTTPXMock) -> None:
@@ -1000,13 +1002,12 @@ class TestFlowsNamespace:
                 method="POST",
                 json={
                     "data": {
-                        "callCoreProjectFlow": {
-                            "data": [
-                                {"id": "flow_1", "name": "Flow One", "description": "Active", "status": "active"},
-                                {"id": "flow_2", "name": "Flow Two", "description": "Paused", "status": "paused"},
+                        "apis": {
+                            "pageInfo": {"totalCount": 2},
+                            "edges": [
+                                {"node": {"id": "flow_1", "name": "Flow One", "description": "Active", "status": "active", "version": "1", "updatedAt": "", "deployedAt": ""}},
+                                {"node": {"id": "flow_2", "name": "Flow Two", "description": "Paused", "status": "paused", "version": "1", "updatedAt": "", "deployedAt": ""}},
                             ],
-                            "statusCode": 200,
-                            "message": None,
                         }
                     }
                 },
@@ -1053,22 +1054,74 @@ class TestFlowsNamespace:
                 client.flows.create(prompt="test")
 
     def test_flows_not_found_error(self, httpx_mock: HTTPXMock) -> None:
-        """flows API returns FLOW_NOT_FOUND → raises FlowNotFoundError."""
+        """flows.delete() raises FlowNotFoundError when ID and name resolution both fail."""
         from fastn.exceptions import FlowNotFoundError
 
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir)
             client = FastnClient(config_path=config_path)
 
+            # Delete returns 404 → triggers name resolution
             httpx_mock.add_response(
                 url="https://live.fastn.ai/api/flows/delete",
                 method="POST",
                 status_code=404,
                 json={"error": "FLOW_NOT_FOUND"},
             )
+            # Resolution lists flows → no match found → FlowNotFoundError
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/graphql",
+                method="POST",
+                json={"data": {"apis": {"pageInfo": {"totalCount": 0}, "edges": []}}},
+            )
 
             with pytest.raises(FlowNotFoundError):
                 client.flows.delete(flow_id="nonexistent")
+
+    def test_flows_delete_resolves_versioned_name(self, httpx_mock: HTTPXMock) -> None:
+        """flows.delete() resolves a versioned name to the base flow_id."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_test_env(tmpdir)
+            client = FastnClient(config_path=config_path)
+
+            # First delete with versioned name → 404
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/flows/delete",
+                method="POST",
+                status_code=404,
+                json={"error": "FLOW_NOT_FOUND"},
+            )
+            # Resolution lists flows → finds match
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/graphql",
+                method="POST",
+                json={
+                    "data": {
+                        "apis": {
+                            "pageInfo": {"totalCount": 1},
+                            "edges": [
+                                {"node": {"id": "testflow", "name": "testflow_v1", "description": "", "status": "active", "version": "1", "updatedAt": "", "deployedAt": ""}},
+                            ],
+                        }
+                    }
+                },
+            )
+            # Second delete with resolved base ID → success
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/flows/delete",
+                method="POST",
+                json={"body": {"deleted": True}},
+            )
+
+            result = client.flows.delete(flow_id="testflow_v1")
+            assert result["deleted"] is True
+
+            # Verify: 3 requests made (delete, graphql list, delete)
+            requests = httpx_mock.get_requests()
+            assert len(requests) == 3
+            # Last delete used the resolved base ID
+            last_body = json.loads(requests[2].content)
+            assert last_body["flow_id"] == "testflow"
 
     def test_flows_run_not_found_error(self, httpx_mock: HTTPXMock) -> None:
         """flows API returns RUN_NOT_FOUND → raises RunNotFoundError."""
@@ -1270,7 +1323,7 @@ class TestAsyncFlowsNamespace:
 
     @pytest.mark.asyncio
     async def test_async_flows_list(self, httpx_mock: HTTPXMock) -> None:
-        """Async flows.list() returns list of flows via GraphQL."""
+        """Async flows.list() returns list of flows via the apis GraphQL query."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir)
             client = AsyncFastnClient(config_path=config_path)
@@ -1280,13 +1333,12 @@ class TestAsyncFlowsNamespace:
                 method="POST",
                 json={
                     "data": {
-                        "callCoreProjectFlow": {
-                            "data": [
-                                {"id": "flow_1", "name": "Flow One", "description": "First"},
-                                {"id": "flow_2", "name": "Flow Two", "description": "Second"},
+                        "apis": {
+                            "pageInfo": {"totalCount": 2},
+                            "edges": [
+                                {"node": {"id": "flow_1", "name": "Flow One", "description": "First", "status": "active", "version": "1", "updatedAt": "", "deployedAt": ""}},
+                                {"node": {"id": "flow_2", "name": "Flow Two", "description": "Second", "status": "active", "version": "1", "updatedAt": "", "deployedAt": ""}},
                             ],
-                            "statusCode": 200,
-                            "message": None,
                         }
                     }
                 },
@@ -1295,6 +1347,45 @@ class TestAsyncFlowsNamespace:
             result = await client.flows.list()
             assert len(result) == 2
             assert result[0]["flow_id"] == "flow_1"
+
+    @pytest.mark.asyncio
+    async def test_async_flows_delete_resolves_versioned_name(self, httpx_mock: HTTPXMock) -> None:
+        """Async flows.delete() resolves a versioned name to the base flow_id."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_test_env(tmpdir)
+            client = AsyncFastnClient(config_path=config_path)
+
+            # First delete → 404
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/flows/delete",
+                method="POST",
+                status_code=404,
+                json={"error": "FLOW_NOT_FOUND"},
+            )
+            # Resolution lists flows → finds match
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/graphql",
+                method="POST",
+                json={
+                    "data": {
+                        "apis": {
+                            "pageInfo": {"totalCount": 1},
+                            "edges": [
+                                {"node": {"id": "testflow", "name": "testflow_v1", "description": "", "status": "active", "version": "1", "updatedAt": "", "deployedAt": ""}},
+                            ],
+                        }
+                    }
+                },
+            )
+            # Second delete → success
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/flows/delete",
+                method="POST",
+                json={"body": {"deleted": True}},
+            )
+
+            result = await client.flows.delete(flow_id="testflow_v1")
+            assert result["deleted"] is True
 
     @pytest.mark.asyncio
     async def test_async_flows_run(self, httpx_mock: HTTPXMock) -> None:

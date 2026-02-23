@@ -137,7 +137,7 @@ class _ConnectorCatalogAsync(_ConnectorCatalog):
     async def list(self) -> List[Dict[str, Any]]:
         """List all connectors: workspace + community catalog (async).
 
-        Fetches from two sources (matching the CLI ``fastn sync`` pattern):
+        Fetches from two sources (matching the CLI ``fastn connector sync`` pattern):
         1. Workspace — connectors configured in the user's project
         2. Community — the full 200+ public connector catalog
 

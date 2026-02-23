@@ -116,15 +116,15 @@ def _select_workspace(config: FastnConfig) -> Optional[str]:
     try:
         workspaces = _fetch_workspaces(config)
     except Exception as e:
-        click.echo(f"  \u26a0 Could not fetch workspaces: {e}")
+        click.echo(f"  \u26a0 Could not fetch projects: {e}")
         return None
 
     if not workspaces:
-        click.echo("  No workspaces found.")
+        click.echo("  No projects found.")
         return None
 
     click.echo()
-    click.echo("  Select a workspace:")
+    click.echo("  Select a project:")
     click.echo()
 
     # Display numbered list
@@ -159,7 +159,7 @@ def _select_workspace(config: FastnConfig) -> Optional[str]:
         ]
 
         if not matches:
-            click.echo(f"  No workspaces matching '{choice}'.")
+            click.echo(f"  No projects matching '{choice}'.")
             continue
 
         if len(matches) == 1:
@@ -243,11 +243,11 @@ def _fetch_tools_by_scope(
         connector_type = node.get("connectorType", "connector")
         key = name.lower().replace(" ", "_").replace("-", "_")
 
-        # The workspace flows connector is returned as "my_connectors"
-        # by the API — rename it to "flows" for display.
+        # The workspace tools connector is returned as "my_connectors"
+        # by the API — rename it to "my_tools" for display.
         if key == "my_connectors":
-            key = "flows"
-            name = "Flows"
+            key = "my_tools"
+            name = "My Tools"
 
         connectors[key] = {
             "id": connector_id,

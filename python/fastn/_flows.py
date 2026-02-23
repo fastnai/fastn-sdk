@@ -2,81 +2,106 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, List, Optional
 
-from fastn._constants import CALL_CORE_PROJECT_FLOW_QUERY, FLOWS_API_URL
+from fastn._constants import FLOWS_API_URL, LIST_FLOWS_QUERY
 from fastn._http import _api_call_sync, _api_call_async, _gql_call_sync, _gql_call_async
+from fastn.exceptions import FlowNotFoundError
 
 
 def _build_flows_query_variables(client: Any) -> Dict[str, Any]:
-    """Build the GraphQL variables for fetching flows."""
+    """Build the GraphQL variables for the ``apis`` query."""
     workspace_id = client._config.resolve_project_id()
-    connector_id = workspace_id
     return {
         "input": {
-            "operationName": "getConnectorRegisteredTools_v1",
-            "input": {
-                "connectorId": connector_id,
-                "orgId": workspace_id,
-                "workspaceId": workspace_id,
-                "gatewayId": workspace_id,
-            },
+            "clientId": workspace_id,
+            "first": 500,
+            "after": None,
+            "query": '{"input":{"limit":500,"offset":0,"sort":"desc","query":"","filter":{}}}',
         }
     }
 
 
 def _parse_flows_response(data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Parse the callCoreProjectFlow response into a list of flow dicts."""
-    result = data.get("callCoreProjectFlow") or {}
-    items = result.get("data") or []
+    """Parse the ``apis`` GraphQL response into a list of flow dicts."""
+    result = data.get("apis") or {}
+    edges = result.get("edges") or []
 
-    if isinstance(items, str):
-        try:
-            items = json.loads(items)
-        except (json.JSONDecodeError, TypeError):
-            items = []
-
-    _FLOW_KEYS = {"id", "name", "description", "inputSchema", "outputSchema"}
-    flows = []
-    for item in items:
-        if not isinstance(item, dict):
+    flows: List[Dict[str, Any]] = []
+    for edge in edges:
+        if not isinstance(edge, dict):
             continue
+        node = edge.get("node") or {}
+        if not isinstance(node, dict):
+            continue
+
         flow: Dict[str, Any] = {
-            "flow_id": item.get("id", ""),
-            "name": item.get("name", ""),
-            "description": item.get("description", ""),
-            "inputSchema": item.get("inputSchema", {}),
-            "outputSchema": item.get("outputSchema", {}),
+            "flow_id": node.get("id", ""),
+            "name": node.get("name", ""),
+            "description": node.get("description", ""),
+            "status": node.get("status", ""),
+            "version": node.get("version", ""),
+            "updatedAt": node.get("updatedAt", ""),
+            "deployedAt": node.get("deployedAt", ""),
         }
-        # Pass through any extra fields (e.g. status) from the API
-        for key, val in item.items():
-            if key not in _FLOW_KEYS:
-                flow[key] = val
+
+        meta = node.get("metaData") or {}
+        if meta:
+            flow["flowType"] = meta.get("flowType", "")
+            flow["architecture"] = meta.get("architecture", "")
+            flow["isAsync"] = meta.get("isAsync", False)
+
         flows.append(flow)
 
     return flows
 
 
 def _fetch_flows_sync(client: Any) -> List[Dict[str, Any]]:
-    """Fetch all flows from the workspace using the GraphQL API (sync)."""
+    """Fetch all flows from the workspace using the ``apis`` GraphQL query (sync)."""
     variables = _build_flows_query_variables(client)
-    data = _gql_call_sync(client, CALL_CORE_PROJECT_FLOW_QUERY, variables)
+    data = _gql_call_sync(client, LIST_FLOWS_QUERY, variables)
     return _parse_flows_response(data)
 
 
 async def _fetch_flows_async(client: Any) -> List[Dict[str, Any]]:
-    """Fetch all flows from the workspace using the GraphQL API (async)."""
+    """Fetch all flows from the workspace using the ``apis`` GraphQL query (async)."""
     variables = _build_flows_query_variables(client)
-    data = await _gql_call_async(client, CALL_CORE_PROJECT_FLOW_QUERY, variables)
+    data = await _gql_call_async(client, LIST_FLOWS_QUERY, variables)
     return _parse_flows_response(data)
+
+
+# ---------------------------------------------------------------------------
+# Name → ID resolution helpers
+# ---------------------------------------------------------------------------
+
+def _resolve_flow_id_sync(client: Any, name_or_id: str) -> str:
+    """Resolve a flow name to its base flow_id by listing flows.
+
+    Raises FlowNotFoundError if no match is found.
+    """
+    flows = _fetch_flows_sync(client)
+    for flow in flows:
+        if flow.get("name") == name_or_id:
+            return flow["flow_id"]
+    raise FlowNotFoundError(name_or_id)
+
+
+async def _resolve_flow_id_async(client: Any, name_or_id: str) -> str:
+    """Resolve a flow name to its base flow_id by listing flows (async).
+
+    Raises FlowNotFoundError if no match is found.
+    """
+    flows = await _fetch_flows_async(client)
+    for flow in flows:
+        if flow.get("name") == name_or_id:
+            return flow["flow_id"]
+    raise FlowNotFoundError(name_or_id)
 
 
 class _FlowsSync:
     """Flow management namespace (sync): ``fastn.flows.*``
 
-    Provides operations for Fastn integration flows. Flows are managed
-    through the GraphQL API (callCoreProjectFlow proxy).
+    Provides operations for Fastn integration flows.
 
     Usage::
 
@@ -125,18 +150,30 @@ class _FlowsSync:
     def delete(self, flow_id: str) -> Dict[str, Any]:
         """Delete a flow.
 
+        Accepts either the base flow ID (e.g. ``"testflow"``) or a versioned
+        name (e.g. ``"testflow_v1"``).  If the given identifier is not found
+        directly, the method lists all flows and resolves the name to the
+        correct base flow ID before retrying.
+
         Args:
-            flow_id: The ID of the flow to delete.
+            flow_id: The base flow ID or versioned flow name.
 
         Returns:
             Confirmation dict.
 
         Raises:
-            FlowNotFoundError: If the flow_id does not exist.
+            FlowNotFoundError: If the flow cannot be found by ID or name.
         """
-        return _api_call_sync(
-            self._client, "POST", f"{FLOWS_API_URL}/delete", {"flow_id": flow_id}
-        )
+        try:
+            return _api_call_sync(
+                self._client, "POST", f"{FLOWS_API_URL}/delete", {"flow_id": flow_id}
+            )
+        except FlowNotFoundError:
+            # The given string may be a versioned name — resolve to base ID.
+            resolved_id = _resolve_flow_id_sync(self._client, flow_id)
+            return _api_call_sync(
+                self._client, "POST", f"{FLOWS_API_URL}/delete", {"flow_id": resolved_id}
+            )
 
     def run(
         self,
@@ -180,8 +217,7 @@ class _FlowsSync:
     def list(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
         """List flows in the project.
 
-        Fetches flows from the workspace via the GraphQL API using the
-        same mechanism as ``fastn list flows``.
+        Fetches flows from the workspace via the ``apis`` GraphQL query.
 
         Args:
             status: Optional filter — ``"active"``, ``"paused"``, ``"draft"``,
@@ -189,11 +225,11 @@ class _FlowsSync:
 
         Returns:
             A list of flow summary dicts with ``flow_id``, ``name``,
-            ``description``, ``inputSchema``, and ``outputSchema``.
+            ``description``, ``status``, ``version``, ``updatedAt``,
+            and ``deployedAt``.
         """
         flows = _fetch_flows_sync(self._client)
 
-        # Client-side status filter (if the API ever provides status info)
         if status:
             flows = [f for f in flows if f.get("status") == status]
 
@@ -260,10 +296,20 @@ class _FlowsAsync:
         )
 
     async def delete(self, flow_id: str) -> Dict[str, Any]:
-        """Delete a flow (async)."""
-        return await _api_call_async(
-            self._client, "POST", f"{FLOWS_API_URL}/delete", {"flow_id": flow_id}
-        )
+        """Delete a flow (async).
+
+        Accepts either the base flow ID or a versioned name.  Resolves
+        automatically if the initial ID is not found.
+        """
+        try:
+            return await _api_call_async(
+                self._client, "POST", f"{FLOWS_API_URL}/delete", {"flow_id": flow_id}
+            )
+        except FlowNotFoundError:
+            resolved_id = await _resolve_flow_id_async(self._client, flow_id)
+            return await _api_call_async(
+                self._client, "POST", f"{FLOWS_API_URL}/delete", {"flow_id": resolved_id}
+            )
 
     async def run(
         self,
@@ -287,12 +333,10 @@ class _FlowsAsync:
     async def list(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
         """List flows in the project (async).
 
-        Fetches flows from the workspace via the GraphQL API using the
-        same mechanism as ``fastn list flows``.
+        Fetches flows from the workspace via the ``apis`` GraphQL query.
         """
         flows = await _fetch_flows_async(self._client)
 
-        # Client-side status filter (if the API ever provides status info)
         if status:
             flows = [f for f in flows if f.get("status") == status]
 

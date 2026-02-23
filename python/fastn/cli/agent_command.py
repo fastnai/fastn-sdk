@@ -1173,7 +1173,7 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
           max_turns: int, skip_confirm: bool, run_eval: bool,
           max_errors: int, max_tools: int,
           tenant: Optional[str]) -> None:
-    """AI-powered tool execution \u2014 describe what you want in natural language.
+    """Give a goal in plain English \u2014 the agent thinks, picks the right skills and tools, and executes.
 
     \b
     Usage:
@@ -1184,9 +1184,9 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
       fastn agent "Say hey to general" --eval
 
     \b
-    The agent discovers available connectors and tools, sends them to your
-    configured LLM using native function calling, and executes tool calls
-    in a loop until the task is complete. Supports multi-step tasks automatically.
+    The agent discovers available skills and tools, sends them to your
+    configured LLM, and executes in a loop until the task is complete.
+    It reasons about which skills to load, handles errors, and adapts.
     Use --connector to scope discovery to a specific connector.
     Each tool call requires confirmation by default. Pass -y to skip.
     Pass --eval to evaluate whether the agent did the right thing.
@@ -1254,7 +1254,7 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
     click.echo(f"  \u256d\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500")
     click.echo(f"  \u2502  {prompt_str}")
     if tenant:
-        click.echo(f"  \u2502  Tenant: {config.tenant_id}  Workspace: {workspace_id}")
+        click.echo(f"  \u2502  Tenant: {config.tenant_id}  Project: {workspace_id}")
     if connector:
         click.echo(f"  \u2502  Connector: {connector}")
     if tool_filter:

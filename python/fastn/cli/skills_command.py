@@ -1,4 +1,4 @@
-"""CLI command: fastn skills — list agent skills in the current project."""
+"""CLI command: fastn skill — list skills agents can load."""
 
 from __future__ import annotations
 
@@ -11,8 +11,8 @@ from fastn._constants import LIST_SKILLS_QUERY
 
 
 @cli.command()
-def skills():
-    """List agent skills in the current project."""
+def skill():
+    """List skills in this project — tools and knowledge that agents load to handle tasks."""
     config = load_config()
     if not config.auth_token and not config.api_key:
         raise click.ClickException("Not authenticated. Run `fastn login` first.")
@@ -21,7 +21,7 @@ def skills():
 
     project_id = config.resolve_project_id()
     if not project_id:
-        raise click.ClickException("No project configured. Run `fastn init` first.")
+        raise click.ClickException("No project configured. Run `fastn login` first.")
 
     headers = config.get_headers()
     variables = {"input": {"projectId": project_id}}

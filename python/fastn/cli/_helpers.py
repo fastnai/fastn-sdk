@@ -162,9 +162,9 @@ def _handle_execute_error(resp: httpx.Response, connector_label: str = "",
             hint = f" '{connector_label}'" if connector_label else ""
             app_url = _workspace_url(workspace_id)
             raise click.ClickException(
-                f"Connector{hint} is not enabled in your workspace.\n"
+                f"Connector{hint} is not enabled in your project.\n"
                 f"  Enable it at: {app_url}\n"
-                f"  Then run `fastn sync` to refresh your local registry."
+                f"  Then run `fastn connector sync` to refresh your local registry."
             )
 
         raise click.ClickException(

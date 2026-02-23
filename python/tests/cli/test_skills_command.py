@@ -1,4 +1,4 @@
-"""Tests for the fastn skills CLI command."""
+"""Tests for the fastn skill CLI command."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ class TestSkillsCommand:
         )
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["skills"])
+        result = runner.invoke(cli, ["skill"])
 
         assert result.exit_code == 0
         assert "Email Summarizer" in result.output
@@ -120,7 +120,7 @@ class TestSkillsCommand:
         )
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["skills"])
+        result = runner.invoke(cli, ["skill"])
 
         assert result.exit_code == 0
         assert "No skills found" in result.output
@@ -134,7 +134,7 @@ class TestSkillsCommand:
         mock_load.return_value = config
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["skills"])
+        result = runner.invoke(cli, ["skill"])
 
         assert result.exit_code != 0
         assert "Not authenticated" in result.output
@@ -152,7 +152,7 @@ class TestSkillsCommand:
         mock_load.return_value = config
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["skills"])
+        result = runner.invoke(cli, ["skill"])
 
         assert result.exit_code != 0
         assert "No project configured" in result.output
@@ -173,7 +173,7 @@ class TestSkillsCommand:
         mock_post.return_value = _mock_response(status_code=401, text="Unauthorized")
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["skills"])
+        result = runner.invoke(cli, ["skill"])
 
         assert result.exit_code != 0
         assert "Authentication failed" in result.output
@@ -196,7 +196,7 @@ class TestSkillsCommand:
         )
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["skills"])
+        result = runner.invoke(cli, ["skill"])
 
         assert result.exit_code != 0
         assert "API error" in result.output
@@ -219,7 +219,7 @@ class TestSkillsCommand:
         )
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["skills"])
+        result = runner.invoke(cli, ["skill"])
 
         assert result.exit_code != 0
         assert "GraphQL error" in result.output
@@ -242,7 +242,7 @@ class TestSkillsCommand:
         )
 
         runner = CliRunner()
-        runner.invoke(cli, ["skills"])
+        runner.invoke(cli, ["skill"])
 
         # Check _verbose_post was called with the right payload
         call_args = mock_post.call_args

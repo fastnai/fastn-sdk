@@ -7,7 +7,7 @@ Configuration priority (highest wins):
     1. Constructor params:  FastnClient(api_key="...", project_id="...")
     2. Environment vars:    FASTN_API_KEY, FASTN_PROJECT_ID, FASTN_AUTH_TOKEN,
                             FASTN_TENANT_ID, FASTN_STAGE
-    3. Config file:         .fastn/config.json (created by ``fastn init``)
+    3. Config file:         .fastn/config.json (created by ``fastn login``)
 
 Config file format (.fastn/config.json):
     {
@@ -120,7 +120,7 @@ class FastnConfig:
         if missing:
             raise ConfigError(
                 f"Missing required config fields: {', '.join(missing)}. "
-                f"Run `fastn init` or set environment variables "
+                f"Run `fastn login` or set environment variables "
                 f"(FASTN_API_KEY, FASTN_PROJECT_ID, etc.)."
             )
 

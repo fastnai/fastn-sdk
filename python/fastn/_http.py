@@ -137,10 +137,13 @@ def _gql_call_sync(
     client: Any,
     query: str,
     variables: Dict[str, Any],
+    extra_headers: Dict[str, str] | None = None,
 ) -> Any:
     """Shared GraphQL call with error handling (sync)."""
     client._ensure_fresh_token()
     headers = dict(client._headers)
+    if extra_headers:
+        headers.update(extra_headers)
     gql_payload = {"query": query, "variables": variables}
     _log_request(client, "POST", GRAPHQL_URL, gql_payload)
 

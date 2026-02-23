@@ -8,7 +8,7 @@ Exception hierarchy:
     FastnError                      Base class. Has .message and .details attrs.
     +-- AuthError                   Invalid/expired credentials (API key or JWT).
     |   +-- OAuthError              OAuth device flow failure. Has .error_code attr.
-    +-- ConfigError                 Missing api_key/project_id. Run ``fastn init``.
+    +-- ConfigError                 Missing api_key/project_id. Run ``fastn login``.
     +-- ConnectorNotFoundError      Connector not in registry. Has .connector_name.
     +-- ToolNotFoundError           Tool not found in connector. Has .connector_name, .tool_name.
     +-- ConnectionNotFoundError     Multiple connections, none specified.
@@ -23,7 +23,7 @@ Usage:
     except AuthError:
         print("Check credentials")
     except ConnectorNotFoundError as e:
-        print(f"Run: fastn sync && fastn add {e.connector_name}")
+        print(f"Run: fastn connector sync && fastn connector add {e.connector_name}")
     except APIError as e:
         print(f"HTTP {e.status_code}: {e}")
 """
@@ -60,8 +60,8 @@ class ConnectorNotFoundError(FastnError):
     def __init__(self, connector_name: str) -> None:
         super().__init__(
             f"Connector '{connector_name}' not found in local registry. "
-            f"Run `fastn sync` to update the registry, "
-            f"then `fastn add {connector_name}` to install it."
+            f"Run `fastn connector sync` to update the registry, "
+            f"then `fastn connector add {connector_name}` to install it."
         )
         self.connector_name = connector_name
 
@@ -75,12 +75,12 @@ class ToolNotFoundError(FastnError):
         if has_tools:
             msg = (
                 f"Tool '{tool_name}' not found in connector '{connector_name}'. "
-                f"Run `fastn sync` to update the registry, or check the tool name."
+                f"Run `fastn connector sync` to update the registry, or check the tool name."
             )
         else:
             msg = (
                 f"Connector '{connector_name}' has no tools installed. "
-                f"Run `fastn add {connector_name}` to fetch its tools."
+                f"Run `fastn connector add {connector_name}` to fetch its tools."
             )
         super().__init__(msg)
         self.connector_name = connector_name

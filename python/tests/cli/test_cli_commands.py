@@ -242,7 +242,7 @@ class TestSchemaCommand:
     def test_schema_all_tools(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["schema", "slack"])
+        result = runner.invoke(cli, ["connector", "schema","slack"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, list)
@@ -253,7 +253,7 @@ class TestSchemaCommand:
     def test_schema_specific_tool(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["schema", "slack", "send_message"])
+        result = runner.invoke(cli, ["connector", "schema","slack", "send_message"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["name"] == "send_message"
@@ -264,13 +264,13 @@ class TestSchemaCommand:
     def test_schema_tool_not_found(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["schema", "slack", "nonexistent"])
+        result = runner.invoke(cli, ["connector", "schema","slack", "nonexistent"])
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
     def test_schema_tool_not_found_in_registry(self, runner, tmp_env):
         _make_fastn_dir(tmp_env)
-        result = runner.invoke(cli, ["schema", "nonexistent"])
+        result = runner.invoke(cli, ["connector", "schema","nonexistent"])
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
@@ -286,7 +286,7 @@ class TestSchemaCommand:
             },
         }
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["schema", "github"])
+        result = runner.invoke(cli, ["connector", "schema","github"])
         assert result.exit_code != 0
         assert "No tools cached" in result.output
 
@@ -310,7 +310,7 @@ class TestSchemaCommand:
             },
         }
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["schema", "slack", "send_message"])
+        result = runner.invoke(cli, ["connector", "schema","slack", "send_message"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["actionId"] == "act_slack_sendmessage"
@@ -324,7 +324,7 @@ class TestListCommand:
     def test_list_all_tools(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["list"])
+        result = runner.invoke(cli, ["connector", "ls"])
         assert result.exit_code == 0
         assert "Available connectors" in result.output
         assert "slack" in result.output
@@ -333,15 +333,15 @@ class TestListCommand:
     def test_list_groups_by_source(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["list"])
+        result = runner.invoke(cli, ["connector", "ls"])
         assert result.exit_code == 0
-        assert "My Workspace" in result.output
+        assert "My Project" in result.output
         assert "My Organization" in result.output
 
     def test_list_specific_tool(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["list", "slack"])
+        result = runner.invoke(cli, ["connector", "ls","slack"])
         assert result.exit_code == 0
         assert "Slack" in result.output
         assert "send_message" in result.output or "sendMessage" in result.output
@@ -350,14 +350,14 @@ class TestListCommand:
     def test_list_tool_not_found(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["list", "nonexistent"])
+        result = runner.invoke(cli, ["connector", "ls","nonexistent"])
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
     def test_list_verbose(self, runner, tmp_env):
         registry = _make_registry_with_tools()
         _make_fastn_dir(tmp_env, registry=registry)
-        result = runner.invoke(cli, ["list", "slack", "-v"])
+        result = runner.invoke(cli, ["connector", "ls","slack", "-v"])
         assert result.exit_code == 0
         assert "Input:" in result.output or "Usage:" in result.output
 
@@ -369,14 +369,14 @@ class TestListCommand:
             "last_synced": "2026-02-19T00:00:00+00:00",
         }
         _make_fastn_dir(tmp_env, registry=registry, manifest=manifest)
-        result = runner.invoke(cli, ["list", "--installed"])
+        result = runner.invoke(cli, ["connector", "ls","--installed"])
         assert result.exit_code == 0
         assert "slack" in result.output
         assert "Installed" in result.output
 
     def test_list_installed_none(self, runner, tmp_env):
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
-        result = runner.invoke(cli, ["list", "--installed"])
+        result = runner.invoke(cli, ["connector", "ls","--installed"])
         assert result.exit_code == 0
         assert "No connectors installed" in result.output
 
@@ -385,7 +385,7 @@ class TestListCommand:
             "api_key": "",
             "project_id": "",
         })
-        result = runner.invoke(cli, ["list"])
+        result = runner.invoke(cli, ["connector", "ls"])
         assert result.exit_code != 0
         assert "Not authenticated" in result.output
 
@@ -396,7 +396,7 @@ class TestListCommand:
             "registry_version": "1.0.0",
         }
         _make_fastn_dir(tmp_env, registry=registry, manifest=manifest)
-        result = runner.invoke(cli, ["list"])
+        result = runner.invoke(cli, ["connector", "ls"])
         assert result.exit_code == 0
         # Checkmark appears next to installed tools
         assert "\u2705" in result.output
@@ -416,13 +416,13 @@ class TestRemoveCommand:
             "registry_version": "1.0.0",
         }
         _make_fastn_dir(tmp_env, registry=registry, manifest=manifest)
-        result = runner.invoke(cli, ["remove", "slack"])
+        result = runner.invoke(cli, ["connector", "remove","slack"])
         assert result.exit_code == 0
         assert "Removed slack" in result.output
 
     def test_remove_not_installed(self, runner, tmp_env):
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
-        result = runner.invoke(cli, ["remove", "slack"])
+        result = runner.invoke(cli, ["connector", "remove","slack"])
         assert result.exit_code == 0
         assert "not installed" in result.output
 
@@ -433,9 +433,9 @@ class TestRemoveCommand:
 
 class TestRunCommand:
     def test_run_list_tools(self, runner, tmp_env):
-        """fastn run slack -> list available tools."""
+        """fastn connector run slack -> list available tools."""
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
-        result = runner.invoke(cli, ["run", "slack"])
+        result = runner.invoke(cli, ["connector", "run","slack"])
         assert result.exit_code == 0
         assert "available tools" in result.output.lower()
         assert "send_message" in result.output or "sendMessage" in result.output
@@ -445,25 +445,25 @@ class TestRunCommand:
             "api_key": "",
             "project_id": "",
         })
-        result = runner.invoke(cli, ["run", "slack", "send_message"])
+        result = runner.invoke(cli, ["connector", "run","slack", "send_message"])
         assert result.exit_code != 0
         assert "Not authenticated" in result.output
 
     def test_run_empty_registry(self, runner, tmp_env):
         _make_fastn_dir(tmp_env)
-        result = runner.invoke(cli, ["run", "slack"])
+        result = runner.invoke(cli, ["connector", "run","slack"])
         assert result.exit_code != 0
         assert "Registry is empty" in result.output
 
     def test_run_tool_not_found(self, runner, tmp_env):
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
-        result = runner.invoke(cli, ["run", "nonexistent"])
+        result = runner.invoke(cli, ["connector", "run","nonexistent"])
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
     def test_run_action_not_found(self, runner, tmp_env):
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
-        result = runner.invoke(cli, ["run", "slack", "nonexistent_action"])
+        result = runner.invoke(cli, ["connector", "run","slack", "nonexistent_action"])
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
 
@@ -488,7 +488,7 @@ class TestRunCommand:
         # Pass extra params as ctx.args — Click's positional tenant_id
         # will consume the first --flag, so remaining args get parsed
         result = runner.invoke(cli, [
-            "run", "slack", "send_message",
+            "connector", "run", "slack", "send_message",
             "--channel", "general", "--text", "Hello!"
         ])
         assert result.exit_code == 0
@@ -514,7 +514,7 @@ class TestRunCommand:
         mock_post.return_value = mock_resp
 
         result = runner.invoke(cli, [
-            "run", "slack", "send_message",
+            "connector", "run", "slack", "send_message",
             "--connection-id", "conn_abc",
             "--channel", "general", "--text", "Hi"
         ])
@@ -543,7 +543,7 @@ class TestRunCommand:
 
         # Use list_channels which has no required params, so no prompt
         result = runner.invoke(cli, [
-            "run", "slack", "list_channels",
+            "connector", "run", "slack", "list_channels",
             "--tenant", "acme",
         ])
         assert result.exit_code == 0
@@ -565,7 +565,7 @@ class TestRunCommand:
         mock_post.return_value = mock_resp
 
         result = runner.invoke(cli, [
-            "run", "slack", "send_message", "tenant-123",
+            "connector", "run", "slack", "send_message", "tenant-123",
             "--channel", "general", "--text", "Hi"
         ])
         assert result.exit_code == 0
@@ -586,7 +586,7 @@ class TestRunCommand:
         mock_post.return_value = mock_resp
 
         result = runner.invoke(cli, [
-            "run", "slack", "send_message",
+            "connector", "run", "slack", "send_message",
             "--channel", "general", "--text", "Hi"
         ])
         assert result.exit_code != 0
@@ -604,7 +604,7 @@ class TestRunCommand:
         mock_post.return_value = mock_resp
 
         result = runner.invoke(cli, [
-            "run", "slack", "send_message",
+            "connector", "run", "slack", "send_message",
             "--channel", "general", "--text", "Hi"
         ])
         assert result.exit_code != 0
@@ -623,7 +623,7 @@ class TestRunCommand:
             mock_resp.text = '{"body": {"ok": true}}'
             mock_post.return_value = mock_resp
 
-            result = runner.invoke(cli, ["run", "slack", "send_message"],
+            result = runner.invoke(cli, ["connector", "run","slack", "send_message"],
                                   input="general\nHello\n")
             # Should prompt for required fields
             assert "channel" in result.output.lower() or result.exit_code == 0
@@ -639,7 +639,7 @@ class TestSyncCommand:
             "api_key": "",
             "project_id": "",
         })
-        result = runner.invoke(cli, ["sync"])
+        result = runner.invoke(cli, ["connector", "sync"])
         assert result.exit_code != 0
         assert "Not authenticated" in result.output
 
@@ -652,7 +652,7 @@ class TestSyncCommand:
         mock_fetch.return_value = _make_registry_with_tools()
         mock_stubs.return_value = False
 
-        result = runner.invoke(cli, ["sync"])
+        result = runner.invoke(cli, ["connector", "sync"])
         assert result.exit_code == 0
         assert "Registry synced" in result.output
         assert "2 connectors available" in result.output
@@ -686,14 +686,14 @@ class TestAddCommand:
         ]
         mock_stubs.return_value = True
 
-        result = runner.invoke(cli, ["add", "slack"])
+        result = runner.invoke(cli, ["connector", "add","slack"])
         assert result.exit_code == 0
         assert "slack added" in result.output
         assert "Type stubs generated" in result.output
 
     def test_add_tool_not_found(self, runner, tmp_env):
         _make_fastn_dir(tmp_env, registry=_make_registry_with_tools())
-        result = runner.invoke(cli, ["add", "nonexistent"])
+        result = runner.invoke(cli, ["connector", "add","nonexistent"])
         assert result.exit_code == 0  # add doesn't fail hard, just warns
         assert "not found" in result.output.lower()
 
@@ -720,7 +720,7 @@ class TestAddCommand:
         ]
         mock_stubs.return_value = True
 
-        result = runner.invoke(cli, ["add", "slack", "github"])
+        result = runner.invoke(cli, ["connector", "add","slack", "github"])
         assert result.exit_code == 0
         assert "slack added" in result.output
         assert "github added" in result.output
@@ -819,35 +819,6 @@ class TestAgentCommand:
 
 
 # ===================================================================
-# INIT command
-# ===================================================================
-
-class TestInitCommand:
-    def test_init_manual_api_key(self, runner, tmp_env):
-        """Init with manual API key entry (no browser login)."""
-        result = runner.invoke(cli, ["init"],
-                              input="n\ntest-api-key\ntest-project-id\n")
-        assert result.exit_code == 0
-        assert "Config saved" in result.output
-
-        # Verify config was written
-        config_data = json.loads(
-            (Path(tmp_env) / ".fastn" / "config.json").read_text()
-        )
-        assert config_data["api_key"] == "test-api-key"
-        assert config_data["project_id"] == "test-project-id"
-
-    def test_init_creates_gitignore(self, runner, tmp_env):
-        result = runner.invoke(cli, ["init"],
-                              input="n\nkey\nproj\n")
-        assert result.exit_code == 0
-        assert "gitignore" in result.output.lower()
-        gitignore = Path(tmp_env) / ".gitignore"
-        assert gitignore.exists()
-        assert ".fastn/config.json" in gitignore.read_text()
-
-
-# ===================================================================
 # LOGIN command
 # ===================================================================
 
@@ -877,7 +848,7 @@ class TestVerboseFlag:
         mock_post.return_value = mock_resp
 
         result = runner.invoke(cli, [
-            "-v", "run", "slack", "send_message",
+            "-v", "connector", "run", "slack", "send_message",
             "--channel", "general", "--text", "Hi"
         ])
         assert result.exit_code == 0

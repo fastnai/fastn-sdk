@@ -5,9 +5,9 @@ Connectors provide tools. Flows compose tools. Agents run flows and tools with r
 
 Setup:
     pip install fastn-sdk
-    fastn init          # or: fastn login
-    fastn sync
-    fastn add slack
+    fastn login
+    fastn connector sync
+    fastn connector add slack
 
 Quick start:
     from fastn import FastnClient
@@ -48,8 +48,8 @@ Multi-connection / multi-tenant:
     fastn = FastnClient(tenant_id="acme")
 
 CLI tool execution:
-    fastn run slack send_message --channel general --text "Hello!"
-    fastn run slack send_message acme-tenant-id    # with tenant
+    fastn connector run slack send_message --channel general --text "Hello!"
+    fastn connector run slack send_message acme-tenant-id    # with tenant
 
 Environments (LIVE / STAGING / DEV):
     fastn = FastnClient(api_key="...", project_id="...", stage="DEV")

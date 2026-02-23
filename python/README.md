@@ -35,10 +35,10 @@ Installs the SDK and CLI. Requires Python 3.8+.
 fastn login
 
 # 2. Download the connector registry
-fastn sync
+fastn connector sync
 
 # 3. Add connectors you need (enables IDE autocomplete)
-fastn add slack jira github
+fastn connector add slack jira github
 ```
 
 ```python
@@ -143,7 +143,7 @@ Combined with [Dynamic Tool Filtering](#dynamic-tool-filtering), this reduces ag
 | **Tenant** | A customer, organization, or team in a multi-tenant app. | `tenant_id: "acme-corp"` |
 | **Skill** | A reusable agent configuration stored in a project. | `fastn.skills.list()` |
 | **Agent** | A goal-driven executor that calls tools/flows with reasoning. | `fastn agent "Send hello to Slack"` |
-| **Project** | A workspace that groups connectors, flows, and tenants. | `project_id: "proj_xyz"` |
+| **Project** | A container that groups connectors, flows, and tenants. | `project_id: "proj_xyz"` |
 | **Stage** | An environment for isolating dev/staging/production data. | `"LIVE"`, `"STAGING"`, `"DEV"` |
 
 ## SDKs
@@ -160,7 +160,7 @@ Credentials are loaded from three sources (highest priority first):
 
 1. **Constructor parameters**: `FastnClient(api_key="...", project_id="...")`
 2. **Environment variables**: `FASTN_API_KEY`, `FASTN_PROJECT_ID`
-3. **Config file**: `.fastn/config.json` (created by `fastn init` or `fastn login`)
+3. **Config file**: `.fastn/config.json` (created by `fastn login`)
 
 ```python
 # Explicit credentials (no config file needed)
@@ -170,7 +170,7 @@ fastn = FastnClient(api_key="your-api-key", project_id="your-project-id")
 | Variable | Description |
 |----------|-------------|
 | `FASTN_API_KEY` | API key |
-| `FASTN_PROJECT_ID` | Project / workspace ID |
+| `FASTN_PROJECT_ID` | Project ID |
 | `FASTN_AUTH_TOKEN` | JWT from `fastn login` |
 | `FASTN_TENANT_ID` | Default tenant ID |
 | `FASTN_STAGE` | Environment: `LIVE`, `STAGING`, or `DEV` |
@@ -557,7 +557,7 @@ fastn = FastnClient(tenant_id="acme")
 # export FASTN_TENANT_ID=acme
 
 # CLI flag
-# fastn run slack send_message --tenant acme --channel general --text "Hello!"
+# fastn connector run slack send_message --tenant acme --channel general --text "Hello!"
 ```
 
 **Priority:** per-call `tenant_id` > CLI `--tenant` flag > constructor param > `FASTN_TENANT_ID` env var > config file
@@ -584,7 +584,7 @@ result = fastn.run("Send hello to #general on Slack")
 
 ## Projects
 
-List available workspaces for the authenticated user:
+List available projects for the authenticated user:
 
 ```python
 projects = fastn.projects.list()
@@ -596,20 +596,21 @@ for p in projects:
 
 | Command | Description |
 |---------|-------------|
-| `fastn init` | Interactive setup — prompts for API key and project ID |
-| `fastn login` | Authenticate via browser (OAuth device flow) |
-| `fastn logout` | Clear stored authentication tokens |
-| `fastn whoami` | Show current authenticated user |
-| `fastn sync` | Download/update the connector registry |
-| `fastn add <name> [...]` | Add connector stubs for IDE autocomplete |
-| `fastn remove <name>` | Remove connector stubs |
-| `fastn list` | Show all available connectors |
-| `fastn list --active` | Show only active/enabled connectors |
-| `fastn list -v` | Show connectors with tool details |
-| `fastn run <connector> <tool>` | Execute a connector tool |
-| `fastn agent "<prompt>"` | AI-powered tool execution via natural language |
-| `fastn skills` | List agent skills in the current project |
-| `fastn schema <connector> <tool>` | Print a tool's input/output schema |
+| `fastn login` | Authenticate with Fastn and select a project |
+| `fastn logout` | Log out and clear saved credentials |
+| `fastn whoami` | Show the current logged-in user |
+| `fastn connector ls` | List all available connectors |
+| `fastn connector ls <name>` | Show tools for a specific connector |
+| `fastn connector add <name> [...]` | Download type stubs for IDE autocomplete |
+| `fastn connector remove <name>` | Remove connector stubs |
+| `fastn connector sync` | Download/update the connector registry |
+| `fastn connector run <name> <tool>` | Execute a connector tool |
+| `fastn connector schema <name> <tool>` | Print a tool's input/output schema |
+| `fastn flow ls` | List all flows |
+| `fastn flow create` | Create a flow from a plain-English prompt |
+| `fastn flow run <flow_id>` | Trigger a flow run |
+| `fastn skill` | List available agent skills |
+| `fastn agent "<prompt>"` | Describe a task in plain English — AI calls the right tools |
 | `fastn version` | Show SDK and registry versions |
 
 ### `fastn agent`
@@ -634,22 +635,22 @@ fastn agent --eval "Create a Jira ticket for the login bug"
 | `--connection-id` | -- | Connection ID for multi-connection connectors |
 | `--tenant` | -- | Tenant ID override |
 
-### `fastn run`
+### `fastn connector run`
 
 Execute connector tools directly from the command line:
 
 ```bash
 # List available tools
-fastn run slack
+fastn connector run slack
 
 # Interactive mode (prompts for each parameter)
-fastn run slack send_message
+fastn connector run slack send_message
 
 # Inline parameters
-fastn run slack send_message --channel general --text "Hello!"
+fastn connector run slack send_message --channel general --text "Hello!"
 
 # With tenant override
-fastn run slack send_message --tenant acme --channel general --text "Hello!"
+fastn connector run slack send_message --tenant acme --channel general --text "Hello!"
 ```
 
 ## API Reference
@@ -718,7 +719,7 @@ FastnClient(
 
 | Method | Description |
 |--------|-------------|
-| `fastn.projects.list()` | List available workspaces |
+| `fastn.projects.list()` | List available projects |
 
 ### `AsyncFastnClient`
 
@@ -748,13 +749,13 @@ try:
 except AuthError:
     print("Invalid credentials — check your API key")
 except ConnectorNotFoundError as e:
-    print(f"Run: fastn sync && fastn add {e.connector_name}")
+    print(f"Run: fastn connector sync && fastn connector add {e.connector_name}")
 except ToolNotFoundError as e:
     print(f"Tool '{e.tool_name}' not found in '{e.connector_name}'")
 except APIError as e:
     print(f"HTTP {e.status_code}: {e}")
 except ConfigError:
-    print("Run: fastn init")
+    print("Run: fastn login")
 ```
 
 | Exception | When | Key Attributes |
@@ -773,7 +774,7 @@ except ConfigError:
 
 ## IDE Autocomplete
 
-After `fastn sync` and `fastn add <name>`, your IDE shows full autocomplete:
+After `fastn connector sync` and `fastn connector add <name>`, your IDE shows full autocomplete:
 
 - **PyCharm / IntelliJ**: Works automatically with `.pyi` stubs
 - **VS Code (Pylance)**: Add `".fastn/python"` to `python.analysis.extraPaths`
@@ -831,7 +832,7 @@ tests/
     ├── test_agent_command.py       # fastn agent command
     ├── test_agent_helpers.py       # Agent helper functions
     ├── test_helpers_extended.py    # Extended helper tests (token, schema, parsing)
-    ├── test_skills_command.py      # fastn skills command
+    ├── test_skills_command.py      # fastn skill command
     ├── test_detect_api_error.py    # API error detection across providers
     └── test_detect_languages.py    # SDK language detection for stub generation
 ```

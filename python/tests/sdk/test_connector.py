@@ -57,7 +57,7 @@ class TestDynamicConnector:
             execute_fn=lambda *a, **kw: None,
         )
 
-        with pytest.raises(ToolNotFoundError, match="fastn add slack"):
+        with pytest.raises(ToolNotFoundError, match="fastn connector add slack"):
             connector.send_message(channel="general")
 
     def test_underscore_fallback(self) -> None:

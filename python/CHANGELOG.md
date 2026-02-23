@@ -144,23 +144,23 @@ tools = client.get_tools_for("message", connector="slack", format="openai")
   - Confirmation gates for tool calls (default on, `-y` to skip)
   - LLM diagnosis on persistent failures with debug context dump
   - Schema unwrapping for LLM consumption, re-wrapping for API execution
-- `fastn run` command for direct tool execution from CLI
+- `fastn connector run` command for direct tool execution from CLI
   - Interactive parameter prompting when no args provided
   - Inline parameters via `--key value`
-  - Tenant ID as positional argument: `fastn run slack send_message <tenant_id>`
-- `--tenant` option on `fastn run` and `fastn agent` for multi-tenant testing
-- `fastn list --active` to show only enabled tools in workspace and org
+  - Tenant ID as positional argument: `fastn connector run slack send_message <tenant_id>`
+- `--tenant` option on `fastn connector run` and `fastn agent` for multi-tenant testing
+- `fastn connector ls --active` to show only enabled tools in project and org
 - Generic error detection (`_detect_api_error`) for diverse API response formats
   - Handles Slack, GitHub, Stripe, GraphQL, generic REST, HTTP status codes in body
   - Preserves original error messages for LLM diagnosis
 - Interactive LLM provider setup (OpenAI, Anthropic, Gemini) on first `fastn agent` run
-- Workspace selection during `fastn login` and `fastn init`
+- Project selection during `fastn login`
 - CLI split into `cli/` package for maintainability
 
 ### Changed
 
-- Registry sync fetches from three scopes: workspace, organization, community
-- `fastn list` groups connectors by source category
+- Registry sync fetches from three scopes: project, organization, community
+- `fastn connector ls` groups connectors by source category
 - Tenant header corrected to `x-fastn-space-tenantid`
 - Tool schemas unwrapped for LLM (flat params) and re-wrapped for API execution
 
