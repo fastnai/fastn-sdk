@@ -848,50 +848,55 @@ class TestFlowsNamespace:
             assert hasattr(client.flows, "create")
             assert hasattr(client.flows, "delete")
             assert hasattr(client.flows, "run")
+            assert hasattr(client.flows, "get")
+            assert hasattr(client.flows, "schema")
             assert hasattr(client.flows, "get_run")
             assert hasattr(client.flows, "list")
             assert hasattr(client.flows, "update")
 
-    def test_flows_create(self, httpx_mock: HTTPXMock) -> None:
-        """flows.create() sends prompt to the flows API."""
+    def test_flows_generate(self, httpx_mock: HTTPXMock) -> None:
+        """flows.generate() sends prompt to the flow builder agent."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir)
             client = FastnClient(config_path=config_path)
 
             httpx_mock.add_response(
-                url="https://live.fastn.ai/api/flows/create",
+                url="https://live.fastn.ai/api/v1/flowBuilderAgent",
                 method="POST",
                 json={"body": {"flow_id": "flow_abc123"}},
             )
 
-            result = client.flows.create(prompt="When a Jira ticket is created, post to Slack")
+            result = client.flows.generate(prompt="When a Jira ticket is created, post to Slack")
             assert result["flow_id"] == "flow_abc123"
 
             request = httpx_mock.get_request()
             body = json.loads(request.content)
-            assert body["prompt"] == "When a Jira ticket is created, post to Slack"
+            assert body["input"]["chatInput"] == "When a Jira ticket is created, post to Slack"
+            assert "sessionID" in body["input"]
+            assert request.headers.get("x-fastn-custom-auth") == "true"
 
-    def test_flows_create_with_answers(self, httpx_mock: HTTPXMock) -> None:
-        """flows.create() sends answers on follow-up call."""
+    def test_flows_generate_with_session_id(self, httpx_mock: HTTPXMock) -> None:
+        """flows.generate() reuses session_id for follow-up calls."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir)
             client = FastnClient(config_path=config_path)
 
             httpx_mock.add_response(
-                url="https://live.fastn.ai/api/flows/create",
+                url="https://live.fastn.ai/api/v1/flowBuilderAgent",
                 method="POST",
                 json={"body": {"flow_id": "flow_abc123"}},
             )
 
-            result = client.flows.create(
-                prompt="Sync data to Salesforce",
-                answers={"channel": "#general", "frequency": "daily"},
+            result = client.flows.generate(
+                prompt="Use the #general channel",
+                session_id="existing-session-123",
             )
             assert result["flow_id"] == "flow_abc123"
 
             request = httpx_mock.get_request()
             body = json.loads(request.content)
-            assert body["answers"]["channel"] == "#general"
+            assert body["input"]["sessionID"] == "existing-session-123"
+            assert body["input"]["chatInput"] == "Use the #general channel"
 
     def test_flows_delete(self, httpx_mock: HTTPXMock) -> None:
         """flows.delete() sends flow_id to the delete endpoint."""
@@ -913,38 +918,44 @@ class TestFlowsNamespace:
             assert body["flow_id"] == "flow_abc123"
 
     def test_flows_run(self, httpx_mock: HTTPXMock) -> None:
-        """flows.run() triggers a flow run and returns run_id."""
+        """flows.run() calls the v1 API with flow_name."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir)
             client = FastnClient(config_path=config_path)
 
             httpx_mock.add_response(
-                url="https://live.fastn.ai/api/flows/run",
+                url="https://live.fastn.ai/api/v1/testflow",
                 method="POST",
-                json={"body": {"run_id": "run_xyz", "status": "running"}},
+                json={"result": "ok"},
             )
 
-            result = client.flows.run(flow_id="flow_abc123")
-            assert result["run_id"] == "run_xyz"
-            assert result["status"] == "running"
-
-    def test_flows_run_with_user_id(self, httpx_mock: HTTPXMock) -> None:
-        """flows.run() passes user_id for multi-tenant flows."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            config_path = _create_test_env(tmpdir)
-            client = FastnClient(config_path=config_path)
-
-            httpx_mock.add_response(
-                url="https://live.fastn.ai/api/flows/run",
-                method="POST",
-                json={"body": {"run_id": "run_xyz", "status": "running"}},
-            )
-
-            client.flows.run(flow_id="flow_abc123", user_id="user_42")
+            result = client.flows.run("testflow")
+            assert result["result"] == "ok"
 
             request = httpx_mock.get_request()
             body = json.loads(request.content)
-            assert body["user_id"] == "user_42"
+            assert body == {"input": {}}
+            assert request.headers.get("x-fastn-custom-auth") == "true"
+
+    def test_flows_run_with_input_and_stage(self, httpx_mock: HTTPXMock) -> None:
+        """flows.run() passes input_data and stage header."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = _create_test_env(tmpdir)
+            client = FastnClient(config_path=config_path)
+
+            httpx_mock.add_response(
+                url="https://live.fastn.ai/api/v1/myflow",
+                method="POST",
+                json={"result": "ok"},
+            )
+
+            client.flows.run("myflow", input_data={"name": "test"}, stage="DRAFT")
+
+            request = httpx_mock.get_request()
+            body = json.loads(request.content)
+            assert body == {"input": {"name": "test"}}
+            assert request.headers.get("stage") == "DRAFT"
+            assert request.headers.get("x-fastn-custom-auth") == "true"
 
     def test_flows_get_run(self, httpx_mock: HTTPXMock) -> None:
         """flows.get_run() returns run status."""
@@ -1045,13 +1056,13 @@ class TestFlowsNamespace:
             client = FastnClient(config_path=config_path)
 
             httpx_mock.add_response(
-                url="https://live.fastn.ai/api/flows/create",
+                url="https://live.fastn.ai/api/v1/flowBuilderAgent",
                 method="POST",
                 status_code=401,
             )
 
             with pytest.raises(AuthError):
-                client.flows.create(prompt="test")
+                client.flows.generate(prompt="test")
 
     def test_flows_not_found_error(self, httpx_mock: HTTPXMock) -> None:
         """flows.delete() raises FlowNotFoundError when ID and name resolution both fail."""
@@ -1306,19 +1317,19 @@ class TestAuthConfigureCustom:
 
 class TestAsyncFlowsNamespace:
     @pytest.mark.asyncio
-    async def test_async_flows_create(self, httpx_mock: HTTPXMock) -> None:
-        """Async flows.create() sends prompt to the flows API."""
+    async def test_async_flows_generate(self, httpx_mock: HTTPXMock) -> None:
+        """Async flows.generate() sends prompt to the flow builder agent."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir)
             client = AsyncFastnClient(config_path=config_path)
 
             httpx_mock.add_response(
-                url="https://live.fastn.ai/api/flows/create",
+                url="https://live.fastn.ai/api/v1/flowBuilderAgent",
                 method="POST",
                 json={"body": {"flow_id": "flow_async_123"}},
             )
 
-            result = await client.flows.create(prompt="Sync Jira to Slack")
+            result = await client.flows.generate(prompt="Sync Jira to Slack")
             assert result["flow_id"] == "flow_async_123"
 
     @pytest.mark.asyncio
@@ -1389,19 +1400,19 @@ class TestAsyncFlowsNamespace:
 
     @pytest.mark.asyncio
     async def test_async_flows_run(self, httpx_mock: HTTPXMock) -> None:
-        """Async flows.run() triggers a flow."""
+        """Async flows.run() calls the v1 API."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_path = _create_test_env(tmpdir)
             client = AsyncFastnClient(config_path=config_path)
 
             httpx_mock.add_response(
-                url="https://live.fastn.ai/api/flows/run",
+                url="https://live.fastn.ai/api/v1/testflow",
                 method="POST",
-                json={"body": {"run_id": "run_async", "status": "running"}},
+                json={"result": "ok"},
             )
 
-            result = await client.flows.run(flow_id="flow_abc")
-            assert result["run_id"] == "run_async"
+            result = await client.flows.run("testflow")
+            assert result["result"] == "ok"
 
     @pytest.mark.asyncio
     async def test_async_auth_connect(self, httpx_mock: HTTPXMock) -> None:

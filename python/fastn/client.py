@@ -58,6 +58,7 @@ from fastn._flows import _FlowsSync, _FlowsAsync
 from fastn._auth_ns import _AuthSync, _AuthAsync
 from fastn._projects import _ProjectsSync, _ProjectsAsync
 from fastn._skills import _SkillsSync, _SkillsAsync
+from fastn._kit import _KitSync, _KitAsync
 
 # Re-exports for backward compatibility (CLI imports these from fastn.client)
 from fastn._formatters import _unwrap_input_schema  # noqa: F401
@@ -293,6 +294,7 @@ class FastnClient:
         self.auth = _AuthSync(self)
         self.projects = _ProjectsSync(self)
         self.skills = _SkillsSync(self)
+        self.kit = _KitSync(self)
 
     def connect(self, connection_id: str) -> DynamicConnector:
         """Bind a connection_id and return a connector proxy."""
@@ -309,7 +311,7 @@ class FastnClient:
         if name.startswith("_") or name in (
             "connectors", "connect", "run", "close", "execute",
             "get_tools", "get_tool", "get_tools_for",
-            "flows", "auth", "projects", "skills",
+            "flows", "auth", "projects", "skills", "kit",
         ):
             raise AttributeError(name)
 
@@ -603,6 +605,7 @@ class AsyncFastnClient:
         self.auth = _AuthAsync(self)
         self.projects = _ProjectsAsync(self)
         self.skills = _SkillsAsync(self)
+        self.kit = _KitAsync(self)
 
     def _log(self, *args: Any) -> None:
         """Print debug info when verbose mode is enabled."""
@@ -624,7 +627,7 @@ class AsyncFastnClient:
         if name.startswith("_") or name in (
             "connectors", "connect", "run", "close", "execute",
             "get_tools", "get_tool", "get_tools_for",
-            "flows", "auth", "projects", "skills",
+            "flows", "auth", "projects", "skills", "kit",
         ):
             raise AttributeError(name)
 

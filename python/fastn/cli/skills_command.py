@@ -5,7 +5,7 @@ from __future__ import annotations
 import click
 
 from fastn.cli import cli, GRAPHQL_URL
-from fastn.cli._helpers import _ensure_fresh_token, _verbose_post
+from fastn.cli._helpers import _ensure_fresh_token, _handle_401, _verbose_post
 from fastn.config import load_config
 from fastn._constants import LIST_SKILLS_QUERY
 
@@ -30,9 +30,7 @@ def skill():
     resp = _verbose_post(GRAPHQL_URL, headers=headers, payload=payload)
 
     if resp.status_code == 401:
-        raise click.ClickException(
-            "Authentication failed. Run `fastn login` to re-authenticate."
-        )
+        _handle_401(resp)
     if resp.status_code >= 400:
         raise click.ClickException(f"API error ({resp.status_code}): {resp.text[:200]}")
 

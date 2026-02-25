@@ -98,10 +98,13 @@ def _api_call_sync(
     method: str,
     url: str,
     payload: Optional[Dict[str, Any]] = None,
+    extra_headers: Optional[Dict[str, str]] = None,
 ) -> Any:
     """Shared HTTP call with error handling (sync)."""
     client._ensure_fresh_token()
     headers = dict(client._headers)
+    if extra_headers:
+        headers.update(extra_headers)
     _log_request(client, method, url, payload)
 
     if method == "POST":
@@ -118,10 +121,13 @@ async def _api_call_async(
     method: str,
     url: str,
     payload: Optional[Dict[str, Any]] = None,
+    extra_headers: Optional[Dict[str, str]] = None,
 ) -> Any:
     """Shared HTTP call with error handling (async)."""
     client._ensure_fresh_token()
     headers = dict(client._headers)
+    if extra_headers:
+        headers.update(extra_headers)
     _log_request(client, method, url, payload)
 
     if method == "POST":

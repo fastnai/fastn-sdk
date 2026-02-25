@@ -56,6 +56,37 @@ def _extract_org_id(config):
     return ""
 
 
+def _handle_401(resp: httpx.Response, config=None) -> None:
+    """Raise a clear error for 401 responses.
+
+    If we can determine the token is still valid locally, the 401 is likely
+    a resource-access issue — show the API's own error message.  Otherwise
+    assume an auth problem and suggest re-login.
+    """
+    # Try to figure out whether the token is actually expired.
+    token_expired = True  # pessimistic default
+    if config is not None:
+        try:
+            from fastn.oauth import is_token_expired
+            token_expired = is_token_expired(config.token_expiry)
+        except Exception:
+            pass
+
+    if not token_expired:
+        # Token is still valid → the 401 is a resource/access issue.
+        try:
+            detail = resp.json().get("error", "")
+        except (ValueError, RuntimeError):
+            detail = ""
+        msg = detail or "Access denied"
+        raise click.ClickException(f"{msg}")
+
+    # Token appears expired or we can't tell — assume auth issue.
+    raise click.ClickException(
+        "Authentication failed. Run `fastn login` to re-authenticate."
+    )
+
+
 def _ensure_fresh_token(config) -> None:
     """Auto-refresh the access token if it has expired.
 
@@ -128,9 +159,7 @@ def _handle_execute_error(resp: httpx.Response, connector_label: str = "",
     actionable guidance, especially for connectors that aren't enabled yet.
     """
     if resp.status_code == 401:
-        raise click.ClickException(
-            "Authentication failed. Check your credentials or run `fastn login`."
-        )
+        _handle_401(resp)
 
     if resp.status_code >= 400:
         # Try to parse the error body for specific error types
