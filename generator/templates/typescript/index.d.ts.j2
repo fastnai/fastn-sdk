@@ -2,7 +2,7 @@
  * Fastn SDK — auto-generated type declarations.
  *
  * This file provides IDE autocomplete for all connectors.
- * Do not edit manually. Regenerate with `fastn sync`.
+ * Do not edit manually. Regenerate with `fastn connector sync`.
  */
 
 {% for connector in connectors %}
@@ -35,7 +35,7 @@ export declare class FastnClient {
     constructor(config?: FastnConfig);
 
     {% for connector in connectors %}
-    /** {{ connector.display_name }} ({{ connector.category }}){% if connector.name not in installed %} — run `fastn add {{ connector.name }}` for full autocomplete{% endif %} */
+    /** {{ connector.display_name }} ({{ connector.category }}){% if connector.name not in installed %} — run `fastn connector add {{ connector.name }}` for full autocomplete{% endif %} */
     readonly {{ connector.name }}: {{ connector.class_name }};
     {% endfor %}
 

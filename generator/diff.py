@@ -6,7 +6,7 @@ migration records that the SDK runtime uses to keep old code working
 with deprecation warnings.
 
 Migration flow:
-    1. `fastn sync` / `fastn add` detects breaking changes via diff_registries()
+    1. `fastn connector sync` / `fastn connector add` detects breaking changes via diff_registries()
     2. User confirms the update
     3. build_migrations() generates migration records from the diff
     4. Records are saved to .fastn/migrations.json

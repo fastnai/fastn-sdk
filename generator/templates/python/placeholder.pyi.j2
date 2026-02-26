@@ -1,6 +1,6 @@
 """Fastn placeholder stubs for connectors not yet installed.
 
-Run `fastn add <connector>` to get full autocomplete.
+Run `fastn connector add <connector>` to get full autocomplete.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any
 class {{ connector.class_name }}:
     """{{ connector.display_name }} ({{ connector.category }}).
 
-    Run `fastn add {{ connector.name }}` to enable full autocomplete for this connector.
+    Run `fastn connector add {{ connector.name }}` to enable full autocomplete for this connector.
     """
 
     def __getattr__(self, name: str) -> Any: ...

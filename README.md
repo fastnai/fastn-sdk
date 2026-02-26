@@ -20,23 +20,29 @@ Production-ready SDK with fully managed OAuth 2.1, SOC 2 certified platform, gov
 
 | Language | Package | Status |
 |----------|---------|--------|
-| **Python** | [`fastn-sdk`](https://pypi.org/project/fastn-sdk/) | Stable (v0.3.0) |
+| **Python** | [`fastn-ai`](https://pypi.org/project/fastn-ai/) | Stable (v0.3.1) |
 | **Node.js** | `@fastn/sdk` | Planned |
 
 ## Quick Start (Python)
 
 ```bash
-pip install fastn-sdk
-fastn login
-fastn sync
-fastn add slack
+pip install fastn-ai
 ```
 
 ```python
 from fastn import FastnClient
 
-fastn = FastnClient()
+fastn = FastnClient(api_key="...", project_id="...")
 fastn.slack.send_message(channel="general", text="Hello from Fastn!")
+```
+
+IDE autocomplete works immediately — 250+ connector stubs ship in the package.
+
+For CLI usage:
+
+```bash
+fastn login
+fastn connector sync   # optional — refreshes connector registry and type stubs
 ```
 
 ## Terminology
@@ -165,7 +171,7 @@ Every API call goes through the Fastn gateway. The SDK handles client-side conce
 
 ```
 fastn-sdk/
-├── python/                  # Python SDK + CLI (PyPI: fastn-sdk)
+├── python/                  # Python SDK + CLI (PyPI: fastn-ai)
 │   ├── fastn/               # SDK source
 │   │   ├── client.py        # FastnClient, AsyncFastnClient
 │   │   ├── connector.py     # Dynamic connector proxy (DynamicConnector, AsyncDynamicConnector)
@@ -190,7 +196,7 @@ fastn-sdk/
 cd python
 pip install -e ".[dev]"
 
-# Run all tests (418 tests, ~6s)
+# Run all tests (576 tests, ~7s)
 make test
 
 # Run only SDK tests

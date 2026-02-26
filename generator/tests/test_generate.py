@@ -213,7 +213,7 @@ class TestStubGenerator:
         non_installed = [c for c in parsed["connectors"] if c["name"] != "slack"]
         result = gen.generate_placeholder(non_installed)
         assert "class JiraConnector" in result
-        assert "fastn add jira" in result
+        assert "fastn connector add jira" in result
 
     def test_generate_all_python(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

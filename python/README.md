@@ -4,8 +4,8 @@
 
 Production-ready Python SDK for OpenAI, Anthropic, Gemini, and Bedrock function calling. Fully managed OAuth 2.1, SOC 2 certified platform, role-based access control, audit trails, and sub-second execution — so your agent code stays simple and your security team stays happy.
 
-[![PyPI version](https://img.shields.io/pypi/v/fastn-sdk.svg)](https://pypi.org/project/fastn-sdk/)
-[![Python](https://img.shields.io/pypi/pyversions/fastn-sdk.svg)](https://pypi.org/project/fastn-sdk/)
+[![PyPI version](https://img.shields.io/pypi/v/fastn-ai.svg)](https://pypi.org/project/fastn-ai/)
+[![Python](https://img.shields.io/pypi/pyversions/fastn-ai.svg)](https://pypi.org/project/fastn-ai/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## Why Fastn?
@@ -23,23 +23,13 @@ Production-ready Python SDK for OpenAI, Anthropic, Gemini, and Bedrock function 
 ## Installation
 
 ```bash
-pip install fastn-sdk
+pip install fastn-ai
 ```
 
-Installs the SDK and CLI. Requires Python 3.8+.
+Installs the SDK, CLI, and type stubs for 250+ connectors. Requires Python 3.8+.
+IDE autocomplete works immediately — no extra setup needed.
 
 ## Quick Start
-
-```bash
-# 1. Authenticate
-fastn login
-
-# 2. Download the connector registry
-fastn connector sync
-
-# 3. Add connectors you need (enables IDE autocomplete)
-fastn connector add slack jira github
-```
 
 ```python
 from fastn import FastnClient
@@ -150,7 +140,7 @@ Combined with [Dynamic Tool Filtering](#dynamic-tool-filtering), this reduces ag
 
 | Package | What It Does | Language | Status |
 |---------|-------------|----------|--------|
-| [`fastn-sdk`](https://pypi.org/project/fastn-sdk/) | Backend SDK — triggers connectors and flows, discovers tools, executes tool calls | Python | Available |
+| [`fastn-ai`](https://pypi.org/project/fastn-ai/) | Backend SDK — triggers connectors and flows, discovers tools, executes tool calls | Python | Available |
 | `@fastn/sdk` | Backend SDK — same capabilities as the Python SDK | TypeScript | Coming soon |
 | [`fastn-connect`](https://github.com/fastnai/fastn-connect) | Frontend widget — captures OAuth credentials and connector config for the platform | JavaScript | Available |
 
@@ -601,9 +591,9 @@ for p in projects:
 | `fastn whoami` | Show the current logged-in user |
 | `fastn connector ls` | List all available connectors |
 | `fastn connector ls <name>` | Show tools for a specific connector |
-| `fastn connector add <name> [...]` | Download type stubs for IDE autocomplete |
+| `fastn connector sync` | Refresh connector registry, fetch tool schemas, regenerate type stubs |
+| `fastn connector add <name> [...]` | Fetch full tool schemas for specific connectors |
 | `fastn connector remove <name>` | Remove connector stubs |
-| `fastn connector sync` | Download/update the connector registry |
 | `fastn connector run <name> <tool>` | Execute a connector tool |
 | `fastn connector schema <name> <tool>` | Print a tool's input/output schema |
 | `fastn flow ls` | List all flows |
@@ -749,7 +739,7 @@ try:
 except AuthError:
     print("Invalid credentials — check your API key")
 except ConnectorNotFoundError as e:
-    print(f"Run: fastn connector sync && fastn connector add {e.connector_name}")
+    print(f"Connector '{e.connector_name}' not found — run: fastn connector sync")
 except ToolNotFoundError as e:
     print(f"Tool '{e.tool_name}' not found in '{e.connector_name}'")
 except APIError as e:
@@ -774,11 +764,13 @@ except ConfigError:
 
 ## IDE Autocomplete
 
-After `fastn connector sync` and `fastn connector add <name>`, your IDE shows full autocomplete:
+Type stubs for 250+ connectors ship in the package — autocomplete works after `pip install fastn-ai`:
 
-- **PyCharm / IntelliJ**: Works automatically with `.pyi` stubs
-- **VS Code (Pylance)**: Add `".fastn/python"` to `python.analysis.extraPaths`
-- **mypy**: Set `mypy_path = .fastn/python`
+- **PyCharm / IntelliJ**: Works automatically
+- **VS Code (Pylance)**: Works automatically
+- **mypy**: Works automatically (PEP 561 `py.typed` marker included)
+
+To refresh stubs with the latest connector schemas, run `fastn connector sync`.
 
 ## Examples
 
@@ -795,7 +787,7 @@ See [`examples/`](examples/) for runnable scripts:
 # Install in dev mode
 pip install -e ".[dev]"
 
-# Run all tests (440 tests, ~6s)
+# Run all tests (576 tests, ~7s)
 make test
 
 # Run only SDK tests

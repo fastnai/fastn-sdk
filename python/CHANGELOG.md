@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] — Canonical Terminology Refactor
 
+(See below for details — this will ship in a future version.)
+
+## [0.3.1] - 2026-02-26
+
+### Added
+
+- **Bundled type stubs**: 255 connector `.pyi` stubs ship in the wheel — `pip install fastn-ai` gives full IDE autocomplete with zero extra setup
+- **Concurrent tool-schema fetching**: `fastn connector sync` fetches tool schemas for all connectors in parallel (10 workers)
+- **`__getattr__` fallback stubs**: Connectors without tool schemas get a fallback stub so `fastn.<connector>.<anything>()` still works at runtime
+- **`.gitattributes`**: Generated stubs collapse in GitHub PR diffs
+
+### Changed
+
+- `fastn connector sync` is now the single command that does everything: fetch registry, fetch tool schemas, save snapshot, generate stubs
+- `fastn connector add` now described as "fetch full tool schemas" (stubs already bundled)
+- Removed `_install_stubs_to_package()` — stubs ship in the wheel, no runtime copy needed
+- Removed `generator/fetch_and_generate.py` — merged into `fastn connector sync`
+- Updated all docs and templates to use canonical `fastn connector` commands
+
 ### Breaking Changes — Terminology
 
 The SDK now uses the canonical Fastn architecture terminology:
