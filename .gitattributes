@@ -1,0 +1,3 @@
+python/fastn/__init__.pyi linguist-generated=true
+python/fastn/connectors/*.pyi linguist-generated=true
+generator/registry_snapshot.json linguist-generated=true

@@ -1,0 +1,67 @@
+{
+  "connectors": {
+    "github": {
+      "connector_type": "GROUP",
+      "display_name": "GitHub",
+      "id": "conn_github_001",
+      "source": "org",
+      "tools": {}
+    },
+    "slack": {
+      "connector_type": "GROUP",
+      "display_name": "Slack",
+      "id": "conn_slack_001",
+      "source": "workspace",
+      "tools": {
+        "list_channels": {
+          "actionId": "act_slack_list_channels",
+          "description": "List all channels",
+          "inputSchema": {
+            "properties": {},
+            "type": "object"
+          },
+          "name": "listChannels"
+        },
+        "send_message": {
+          "actionId": "act_slack_send_message",
+          "description": "Send a message to a channel",
+          "inputSchema": {
+            "properties": {
+              "body": {
+                "properties": {
+                  "channel": {
+                    "description": "Channel name",
+                    "type": "string"
+                  },
+                  "text": {
+                    "description": "Message text",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "channel",
+                  "text"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "body"
+            ],
+            "type": "object"
+          },
+          "name": "sendMessage",
+          "outputSchema": {
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0.0"
+}

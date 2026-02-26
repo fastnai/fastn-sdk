@@ -23,9 +23,10 @@ htmlcov/
 .ruff_cache/
 .pytype/
 
-# Generated stubs (created by fastn add)
-fastn/__init__.pyi
-fastn/connectors/
+# Generated stubs (created locally by fastn connector sync)
+# Note: fastn/__init__.pyi and fastn/connectors/*.pyi are NOT ignored —
+# they ship in the published wheel for out-of-the-box autocomplete.
+.fastn/python/
 
 # Environment
 .env

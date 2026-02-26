@@ -223,12 +223,12 @@ class TestStubGenerator:
                 tmpdir,
                 language="python",
             )
-            assert any("index.pyi" in f for f in files)
+            assert any("__init__.pyi" in f for f in files)
             assert any("slack.pyi" in f for f in files)
             assert any("_placeholders.pyi" in f for f in files)
 
             # Verify content
-            index_path = Path(tmpdir) / "index.pyi"
+            index_path = Path(tmpdir) / "fastn" / "__init__.pyi"
             assert index_path.exists()
             content = index_path.read_text()
             assert "SlackConnector" in content
@@ -253,4 +253,62 @@ class TestStubGenerator:
                 tmpdir,
                 language="python",
             )
+            assert not any("_placeholders" in f for f in files)
+
+    def test_zero_tool_connector_has_getattr(self) -> None:
+        """Connectors with 0 tools generate a class with __getattr__ fallback."""
+        zero_tool_registry = {
+            "version": "1.0",
+            "connectors": {
+                "hubspot": {
+                    "display_name": "HubSpot",
+                    "category": "crm",
+                    "tools": {},
+                },
+            },
+        }
+        gen = StubGenerator(language="python")
+        parsed = parse_registry(zero_tool_registry)
+        hubspot = parsed["connectors"][0]
+        result = gen.generate_connector(hubspot)
+        assert "class HubspotConnector" in result
+        assert "__getattr__" in result
+        assert "def send" not in result  # no tool methods
+
+    def test_zero_tool_connector_index_hint(self) -> None:
+        """Zero-tool connectors show 'run fastn connector add' hint in index."""
+        zero_tool_registry = {
+            "version": "1.0",
+            "connectors": {
+                "hubspot": {
+                    "display_name": "HubSpot",
+                    "category": "crm",
+                    "tools": {},
+                },
+            },
+        }
+        gen = StubGenerator(language="python")
+        parsed = parse_registry(zero_tool_registry)
+        result = gen.generate_index(parsed["connectors"], ["hubspot"])
+        assert "fastn connector add hubspot" in result
+
+    def test_populated_connector_no_hint(self) -> None:
+        """Connectors with tools do NOT show 'run fastn connector add' hint."""
+        gen = StubGenerator(language="python")
+        parsed = parse_registry(SAMPLE_REGISTRY)
+        result = gen.generate_index(parsed["connectors"], ["slack", "jira"])
+        assert "fastn connector add slack" not in result
+        assert "fastn connector add jira" not in result
+
+    def test_all_installed_individual_files(self) -> None:
+        """When all connectors are installed, each gets its own .pyi file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            files = generate_stubs(
+                SAMPLE_REGISTRY,
+                ["slack", "jira"],
+                tmpdir,
+                language="python",
+            )
+            assert any("slack.pyi" in f for f in files)
+            assert any("jira.pyi" in f for f in files)
             assert not any("_placeholders" in f for f in files)

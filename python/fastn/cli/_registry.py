@@ -6,7 +6,6 @@ schema migration, and stub generation/installation.
 
 from __future__ import annotations
 
-import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -449,49 +448,18 @@ def _update_schema_hashes(fastn_dir: Path, registry: Dict, installed: list) -> N
     save_manifest(manifest, fastn_dir)
 
 
-def _install_stubs_to_package(fastn_dir: Path) -> None:
-    """Copy generated Python stubs into the fastn package directory.
-
-    This places ``.pyi`` files alongside the source in site-packages (or the
-    source checkout) so IDEs discover them automatically via PEP 561.
-    The ``py.typed`` marker already exists in the package.
-    """
-    import fastn as _fastn_pkg
-
-    stub_src = fastn_dir / "python" / "fastn"
-    if not stub_src.is_dir():
-        return
-
-    pkg_dir = Path(_fastn_pkg.__file__).resolve().parent
-
-    try:
-        # Copy __init__.pyi
-        init_stub = stub_src / "__init__.pyi"
-        if init_stub.exists():
-            shutil.copy2(str(init_stub), str(pkg_dir / "__init__.pyi"))
-
-        # Copy connectors/ stubs
-        src_connectors = stub_src / "connectors"
-        if src_connectors.is_dir():
-            dst_connectors = pkg_dir / "connectors"
-            dst_connectors.mkdir(parents=True, exist_ok=True)
-            for pyi_file in src_connectors.glob("*.pyi"):
-                shutil.copy2(str(pyi_file), str(dst_connectors / pyi_file.name))
-    except OSError:
-        # site-packages may be read-only (e.g. system Python) — warn but don't crash
-        click.echo(
-            "  Warning: Could not install stubs to package directory. "
-            "IDE autocomplete may require manual stubPath configuration."
-        )
-
-
 def _regenerate_stubs(
     fastn_dir: Path,
     language: str = "python",
     old_registry: Optional[Dict] = None,
     _skip: Optional[bool] = None,
 ) -> bool:
-    """Regenerate type stubs based on current registry and installed connectors.
+    """Regenerate type stubs based on current registry.
+
+    All connectors in the registry get individual stub files so users
+    get autocomplete for every connector without needing ``fastn add``.
+    Connectors whose tool schemas have been fetched (via ``fastn add``)
+    get fully typed method signatures; others get a ``__getattr__`` fallback.
 
     If old_registry is provided, performs breaking change detection
     before regenerating. The user is prompted to confirm when breaking
@@ -516,14 +484,24 @@ def _regenerate_stubs(
     if _skip:
         return False
 
+    # Treat ALL connectors as "installed" so each gets its own stub file.
+    # Connectors with fetched tool schemas get fully typed stubs;
+    # those without get a __getattr__ fallback (from the connector template).
+    all_connector_names = list(
+        (parse_registry(registry) if parse_registry else {}).get("connectors", [])
+    )
+    if all_connector_names:
+        # Use parsed (sanitized) names from the registry
+        stub_installed = [c["name"] for c in all_connector_names]
+    else:
+        stub_installed = installed
+
     generator = StubGenerator(language=language)
-    parsed = parse_registry(registry)
-    generator.generate_all(registry, installed, str(output_dir))
+    generator.generate_all(registry, stub_installed, str(output_dir))
 
     # Update schema hashes after successful generation
     if language == "python":
         _update_schema_hashes(fastn_dir, registry, installed)
-        _install_stubs_to_package(fastn_dir)
 
     return True
 

@@ -1,6 +1,6 @@
 """Fastn {{ connector.display_name }} connector — auto-generated type stubs.
 
-Do not edit manually. Regenerate with `fastn add {{ connector.name }}`.
+Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ class {{ connector.class_name }}:
     Provides {{ connector.tool_count }} tools.
     """
 
+    {% if connector.tools %}
     {% for tool in connector.tools %}
     def {{ tool.name }}(
         self,
@@ -42,3 +43,6 @@ class {{ connector.class_name }}:
         ...
 
     {% endfor %}
+    {% else %}
+    def __getattr__(self, name: str) -> Any: ...
+    {% endif %}

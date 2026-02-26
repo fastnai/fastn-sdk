@@ -44,9 +44,44 @@ from fastn.config import (
 )
 
 
+def _save_snapshot_and_generate_package_stubs(registry: dict) -> None:
+    """Save registry snapshot and generate stubs into the SDK package tree.
+
+    This writes stubs into ``python/fastn/`` so they ship in the published wheel.
+    Only runs when executed from within the SDK repo (generator/ must exist).
+    """
+    from pathlib import Path as _Path
+
+    sdk_root = _Path(__file__).resolve().parent.parent.parent.parent
+    snapshot_path = sdk_root / "generator" / "registry_snapshot.json"
+    package_dir = sdk_root / "python"
+
+    if not snapshot_path.parent.exists():
+        click.echo("  (Skipping package stub generation — not in SDK repo)")
+        return
+
+    try:
+        from generator.generate import StubGenerator, _sanitize_identifier
+    except ImportError:
+        click.echo("  (Skipping package stub generation — generator not found)")
+        return
+
+    # Save snapshot
+    snapshot_path.write_text(json.dumps(registry, indent=2, sort_keys=True))
+    click.echo(f"\u2713 Saved registry snapshot to {snapshot_path.relative_to(sdk_root)}")
+
+    # Generate stubs into package dir
+    all_names = [_sanitize_identifier(k) for k in registry.get("connectors", {}).keys()]
+    generator = StubGenerator("python")
+    files = generator.generate_all(registry, all_names, str(package_dir))
+
+    with_tools = sum(1 for c in registry.get("connectors", {}).values() if c.get("tools"))
+    click.echo(f"\u2713 Generated {len(files)} package stubs ({with_tools} with typed methods)")
+
+
 @connector.command()
 def sync() -> None:
-    """Download/update the connector registry and refresh installed stubs."""
+    """Sync all connectors, fetch tool schemas, and generate type stubs."""
     config = load_config()
     if not config.auth_token and not config.api_key:
         raise click.ClickException("Not authenticated. Run `fastn login` first.")
@@ -73,28 +108,75 @@ def sync() -> None:
     connector_count = len(registry.get("connectors", {}))
     click.echo(f"\u2713 Registry synced: {connector_count} connectors available.")
 
-    # Regenerate stubs for installed connectors (with breaking change detection)
-    installed = get_installed_connectors(fastn_dir)
-    if installed:
-        languages = _detect_languages(fastn_dir)
-        updated = False
-        for lang in languages:
-            result = _regenerate_stubs(
-                fastn_dir, lang, old_registry=old_registry,
-                _skip=not updated if updated else None,
-            )
-            updated = updated or result
-        if updated:
-            click.echo(f"\u2713 Refreshed stubs for {len(installed)} installed connector(s).")
+    # Fetch tool schemas for every connector (concurrently)
+    reg_connectors = registry.get("connectors", {})
+    to_fetch = [
+        (name, cdata)
+        for name, cdata in reg_connectors.items()
+        if not cdata.get("tools") and cdata.get("id")
+    ]
+    skipped = len(reg_connectors) - len(to_fetch)
 
-    click.echo()
-    click.echo("Run `fastn connector add <name>` to enable autocomplete for specific connectors.")
+    if to_fetch:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        click.echo(f"Fetching tool schemas for {len(to_fetch)} connectors...")
+        fetched = 0
+        failed = 0
+
+        def _fetch_one(name: str, cdata: dict) -> bool:
+            source = cdata.get("source", SOURCE_COMMUNITY)
+            try:
+                tool_nodes = _fetch_tool_actions(config, cdata["id"], source)
+                tools = {}
+                for node in tool_nodes:
+                    parsed = _parse_tool_node(node)
+                    tools[parsed["key"]] = parsed["data"]
+                cdata["tools"] = tools
+                cdata["tool_count"] = len(tools)
+                return True
+            except Exception:
+                return False
+
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            futures = {
+                pool.submit(_fetch_one, name, cdata): name
+                for name, cdata in to_fetch
+            }
+            for future in as_completed(futures):
+                if future.result():
+                    fetched += 1
+                else:
+                    failed += 1
+                done = fetched + failed
+                if done % 50 == 0:
+                    click.echo(f"  ... {done}/{len(to_fetch)} connectors")
+
+        save_registry(registry, fastn_dir)
+        click.echo(f"\u2713 Fetched tool schemas: {fetched} new, {skipped} cached, {failed} failed.")
+    else:
+        click.echo(f"\u2713 Tool schemas up to date ({skipped} cached).")
+
+    # Save snapshot and generate package stubs
+    _save_snapshot_and_generate_package_stubs(registry)
+
+    # Regenerate stubs for ALL connectors (with breaking change detection)
+    languages = _detect_languages(fastn_dir)
+    updated = False
+    for lang in languages:
+        result = _regenerate_stubs(
+            fastn_dir, lang, old_registry=old_registry,
+            _skip=not updated if updated else None,
+        )
+        updated = updated or result
+    if updated:
+        click.echo(f"\u2713 Refreshed type stubs for {connector_count} connectors.")
 
 
 @connector.command()
 @click.argument("connector_names", nargs=-1, required=True)
 def add(connector_names: tuple) -> None:
-    """Download full type stubs for specific connectors."""
+    """Fetch full tool schemas for specific connectors (enhances autocomplete)."""
     config = load_config()
     try:
         config.validate()
@@ -480,7 +562,7 @@ def _show_active_connectors(
     click.echo()
     app_url = _workspace_url(workspace_id)
     click.echo(f"  {total_connectors} connectors active. Manage at: {app_url}")
-    click.echo(f"  Run `fastn connector add <name>` to enable autocomplete.")
+    click.echo(f"  Run `fastn connector add <name>` to fetch full tool schemas.")
     click.echo()
 
 
@@ -490,7 +572,7 @@ def _show_installed_connectors(
 ) -> None:
     """Show only locally installed connectors."""
     if not installed_names:
-        click.echo("No connectors installed. Run `fastn connector add <name>` to install.")
+        click.echo("No connectors installed. Run `fastn connector add <name>` to fetch tool schemas.")
         return
 
     items = [(k, v) for k, v in connectors.items() if k in installed_names]
@@ -501,7 +583,7 @@ def _show_installed_connectors(
     for name, data in items:
         click.echo(f"  \u2705 {name}")
     click.echo()
-    click.echo(f"  {len(items)} installed. Run `fastn connector add <name>` to enable autocomplete.")
+    click.echo(f"  {len(items)} installed. Run `fastn connector add <name>` to fetch full tool schemas.")
     click.echo()
 
 
@@ -546,7 +628,7 @@ def _show_all_connectors(
 
     click.echo()
     installed_count = len(installed_names)
-    click.echo(f"  {installed_count} installed. Run `fastn connector add <name>` to enable autocomplete.")
+    click.echo(f"  {installed_count} installed. Run `fastn connector add <name>` to fetch full tool schemas.")
     click.echo()
 
 

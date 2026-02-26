@@ -4,10 +4,7 @@ Connectors provide tools. Flows compose tools. Agents run flows and tools with r
 250+ connectors: Slack, Jira, GitHub, Salesforce, HubSpot, Postgres, and more.
 
 Setup:
-    pip install fastn-sdk
-    fastn login
-    fastn connector sync
-    fastn connector add slack
+    pip install fastn-ai
 
 Quick start:
     from fastn import FastnClient

@@ -41,7 +41,7 @@ class FastnClient:
     {% for connector in connectors %}
     @property
     def {{ connector.name }}(self) -> {{ connector.class_name }}:
-        """{{ connector.display_name }} ({{ connector.category }}){% if connector.name not in installed %} — run `fastn add {{ connector.name }}` for full autocomplete{% endif %}"""
+        """{{ connector.display_name }} ({{ connector.category }}){% if connector.tool_count == 0 %} — run `fastn connector add {{ connector.name }}` to fetch tools{% endif %}"""
         ...
     {% endfor %}
 
@@ -72,7 +72,7 @@ class AsyncFastnClient:
     {% for connector in connectors %}
     @property
     def {{ connector.name }}(self) -> {{ connector.class_name }}:
-        """{{ connector.display_name }} ({{ connector.category }}){% if connector.name not in installed %} — run `fastn add {{ connector.name }}` for full autocomplete{% endif %}"""
+        """{{ connector.display_name }} ({{ connector.category }}){% if connector.tool_count == 0 %} — run `fastn connector add {{ connector.name }}` to fetch tools{% endif %}"""
         ...
     {% endfor %}
 
