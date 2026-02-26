@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fastn-ai"
-version = "0.3.0"
+version = "0.3.1"
 description = "Fastn — The fastest way to add enterprise integrations to any AI agent or app."
 readme = "README.md"
 license = "MIT"
