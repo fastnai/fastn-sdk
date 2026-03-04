@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Dict, Optional
 
-from fastn._constants import GRAPHQL_URL
+import httpx
+
+from fastn._constants import BACKOFF_FACTOR, GRAPHQL_URL
 from fastn.exceptions import APIError, AuthError, FlowNotFoundError, RunNotFoundError
 
 
@@ -175,3 +178,85 @@ async def _gql_call_async(
     response = await client._http.post(GRAPHQL_URL, json=gql_payload, headers=headers)
     client._log(f"Response {response.status_code}: {response.text[:2000]}")
     return _check_gql_response(response)
+
+
+# ---------------------------------------------------------------------------
+# POST with retry — 429 back-off and connection-error recovery
+# ---------------------------------------------------------------------------
+
+def _post_with_retry_sync(
+    client: Any,
+    url: str,
+    payload: Dict[str, Any],
+    extra_headers: Optional[Dict[str, str]] = None,
+) -> Any:
+    """POST with retry for 429 and connection errors (sync).
+
+    Uses ``_check_api_response`` for consistent error handling and
+    ``client._max_retries`` for the retry budget.
+    """
+    client._ensure_fresh_token()
+    headers = dict(client._headers)
+    if extra_headers:
+        headers.update(extra_headers)
+    _log_request(client, "POST", url, payload)
+
+    last_error: Optional[Exception] = None
+    for attempt in range(client._max_retries + 1):
+        try:
+            response = client._http.post(url, json=payload, headers=headers)
+            client._log(f"Response {response.status_code}: {response.text[:2000]}")
+            if response.status_code == 429 and attempt < client._max_retries:
+                time.sleep(BACKOFF_FACTOR * (2 ** attempt))
+                continue
+            return _check_api_response(response, payload)
+        except (httpx.ConnectError, httpx.ReadTimeout) as e:
+            last_error = e
+            if attempt < client._max_retries:
+                time.sleep(BACKOFF_FACTOR * (2 ** attempt))
+                continue
+            raise APIError(
+                f"Connection failed after {client._max_retries + 1} attempts: {e}"
+            ) from e
+
+    raise APIError(f"Request failed: {last_error}") from last_error
+
+
+async def _post_with_retry_async(
+    client: Any,
+    url: str,
+    payload: Dict[str, Any],
+    extra_headers: Optional[Dict[str, str]] = None,
+) -> Any:
+    """POST with retry for 429 and connection errors (async).
+
+    Uses ``_check_api_response`` for consistent error handling and
+    ``client._max_retries`` for the retry budget.
+    """
+    import asyncio
+
+    client._ensure_fresh_token()
+    headers = dict(client._headers)
+    if extra_headers:
+        headers.update(extra_headers)
+    _log_request(client, "POST", url, payload)
+
+    last_error: Optional[Exception] = None
+    for attempt in range(client._max_retries + 1):
+        try:
+            response = await client._http.post(url, json=payload, headers=headers)
+            client._log(f"Response {response.status_code}: {response.text[:2000]}")
+            if response.status_code == 429 and attempt < client._max_retries:
+                await asyncio.sleep(BACKOFF_FACTOR * (2 ** attempt))
+                continue
+            return _check_api_response(response, payload)
+        except (httpx.ConnectError, httpx.ReadTimeout) as e:
+            last_error = e
+            if attempt < client._max_retries:
+                await asyncio.sleep(BACKOFF_FACTOR * (2 ** attempt))
+                continue
+            raise APIError(
+                f"Connection failed after {client._max_retries + 1} attempts: {e}"
+            ) from e
+
+    raise APIError(f"Request failed: {last_error}") from last_error

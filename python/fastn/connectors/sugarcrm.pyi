@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class SugarcrmConnector:
@@ -13,7 +13,7 @@ class SugarcrmConnector:
     Provides 17 tools.
     """
 
-    def create_contact(
+    def sugarcrm_create_contact(
         self,
         account_id: Optional[str] = None,
         alt_address_city: Optional[str] = None,
@@ -48,7 +48,7 @@ class SugarcrmConnector:
         title: Optional[str] = None,
         twitter: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new contact in the contacts management connector to store additional customer or lead information.
+        """Creates a new contact record in SugarCRM to store information about a customer, partner, or lead-derived person. Use this tool when a new person must be added to the CRM contacts for the first time. Do not use this tool to update an existing contact (use sugarcrm_update_contact) or to create lead or opportunity records. This operation permanently adds a contact record to SugarCRM.
 
         Args:
             account_id: ID of the associated account.
@@ -88,7 +88,7 @@ class SugarcrmConnector:
         """
         ...
 
-    def create_lead(
+    def sugarcrm_create_lead(
         self,
         account_name: Optional[str] = None,
         alt_address_city: Optional[str] = None,
@@ -128,7 +128,7 @@ class SugarcrmConnector:
         twitter: Optional[str] = None,
         website: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new lead in the lead generation connector to document a new potential customer inquiry or interest.
+        """Creates a new lead record in SugarCRM to represent a potential customer or inquiry. Use this tool when you want to add a brand-new lead to the CRM pipeline for the first time. Do not use this tool to update an existing lead (use sugarcrm_update_lead) or to create contact or opportunity records. This operation permanently adds a lead record to SugarCRM.
 
         Args:
             account_name: Account name associated with the record.
@@ -173,7 +173,7 @@ class SugarcrmConnector:
         """
         ...
 
-    def create_opportunity(
+    def sugarcrm_create_opportunity(
         self,
         account_id: Optional[str] = None,
         amount: Optional[str] = None,
@@ -197,7 +197,7 @@ class SugarcrmConnector:
         service_start_date: Optional[str] = None,
         worst_case: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new opportunity in the sales management connector to track potential sales and revenue.
+        """Creates a new opportunity record in SugarCRM to track a potential sale or revenue-generating deal. Use this tool when a new sales opportunity must be added to the pipeline for the first time. Do not use this tool to update an existing opportunity (use sugarcrm_update_opportunity) or to create lead or contact records. This operation permanently adds an opportunity record to SugarCRM.
 
         Args:
             account_id: The ID of the account associated with the opportunity.
@@ -226,11 +226,11 @@ class SugarcrmConnector:
         """
         ...
 
-    def delete_contact(
+    def sugarcrm_delete_contact(
         self,
         contactId: str,
     ) -> Dict[str, Any]:
-        """Deletes a specified contact from the contacts management connector, permanently removing them from the list.
+        """Permanently deletes a contact record from SugarCRM by contact ID. Use this tool when a contact must be fully removed from the CRM — for example, a duplicate or invalid record. Do not use this tool to simply update contact information (use sugarcrm_update_contact instead). This operation is irreversible; the contact record cannot be recovered after deletion.
 
         Args:
             contactId: The ID of the contact. (required)
@@ -239,11 +239,11 @@ class SugarcrmConnector:
         """
         ...
 
-    def delete_lead(
+    def sugarcrm_delete_lead(
         self,
         opportunityId: str,
     ) -> Dict[str, Any]:
-        """Deletes a specified lead from the lead generation connector, removing it from the pipeline of potential customers.
+        """Permanently deletes a lead record from SugarCRM by lead ID. Use this tool when a lead must be fully removed from the CRM — for example, duplicate records or invalid inquiries. Do not use this tool to simply update or close a lead (use sugarcrm_update_lead instead). This operation is irreversible; the lead record cannot be recovered after deletion.
 
         Args:
             opportunityId:  (required)
@@ -252,11 +252,11 @@ class SugarcrmConnector:
         """
         ...
 
-    def delete_opportunity(
+    def sugarcrm_delete_opportunity(
         self,
         opportunityId: str,
     ) -> Dict[str, Any]:
-        """Deletes a specified opportunity from the sales management connector, removing it from the sales pipeline.
+        """Permanently deletes an opportunity record from SugarCRM by opportunity ID. Use this tool when an opportunity must be fully removed from the sales pipeline — for example, a cancelled or duplicate deal. Do not use this tool to simply update or close an opportunity (use sugarcrm_update_opportunity instead). This operation is irreversible; the opportunity record cannot be recovered after deletion.
 
         Args:
             opportunityId: The ID of the opportunity. (required)
@@ -265,7 +265,7 @@ class SugarcrmConnector:
         """
         ...
 
-    def get_access_token(
+    def sugarcrm_get_access_token(
         self,
         client_id: Optional[str] = None,
         client_secret: Optional[str] = None,
@@ -274,7 +274,7 @@ class SugarcrmConnector:
         platform: Optional[str] = None,
         username: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves an access token from the authentication connector, enabling subsequent API requests.
+        """Obtains an OAuth2 access token from SugarCRM using user credentials or a grant flow via the /oauth2/token endpoint. Use this tool as the first authentication step before making any other SugarCRM API calls; the returned access token must be included in subsequent requests. Do not use this tool to renew an existing session (use sugarcrm_get_refresh_token instead). This operation posts credentials to the authentication endpoint and returns a short-lived access token.
 
         Args:
             client_id: 
@@ -288,11 +288,11 @@ class SugarcrmConnector:
         """
         ...
 
-    def get_contact(
+    def sugarcrm_get_contact(
         self,
         contactId: str,
     ) -> Dict[str, Any]:
-        """Retrieves detailed information about a specific contact from the contacts management connector using a unique identifier.
+        """Retrieves full details of a single contact record from SugarCRM by its unique contact ID. Use this tool when you need to inspect or display all fields of one specific contact. Do not use this tool to retrieve multiple contacts at once (use sugarcrm_list_contacts) or to fetch lead or opportunity records. This is a read-only operation with no side effects.
 
         Args:
             contactId: The ID of the contact. (required)
@@ -301,30 +301,11 @@ class SugarcrmConnector:
         """
         ...
 
-    def get_contacts(
-        self,
-        fields: Optional[str] = None,
-        max_num: Optional[str] = None,
-        offset: Optional[str] = None,
-        order_by: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Fetches a list of contacts from the contacts management connector, displaying existing contacts in the system.
-
-        Args:
-            fields: Comma-separated list of fields to retrieve.
-            max_num: Maximum number of records to retrieve.
-            offset: Offset for pagination.
-            order_by: Field to order results by.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_lead(
+    def sugarcrm_get_lead(
         self,
         leadId: str,
     ) -> Dict[str, Any]:
-        """Retrieves detailed information about a specific lead from the lead generation connector using a unique identifier.
+        """Retrieves full details of a single lead record from SugarCRM by its unique lead ID. Use this tool when you need to inspect or display all fields of one specific lead. Do not use this tool to retrieve multiple leads at once (use sugarcrm_list_leads) or to fetch contact or opportunity records. This is a read-only operation with no side effects.
 
         Args:
             leadId: The ID of the lead to access. (required)
@@ -333,49 +314,11 @@ class SugarcrmConnector:
         """
         ...
 
-    def get_leads(
-        self,
-        fields: Optional[str] = None,
-        max_num: Optional[str] = None,
-        offset: Optional[str] = None,
-        order_by: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Fetches a list of leads from the lead generation connector, displaying all potential customer inquiries.
-
-        Args:
-            fields: Comma-separated list of fields to retrieve.
-            max_num: Maximum number of records to retrieve.
-            offset: Offset for pagination.
-            order_by: Field to order the results by.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_opportunities(
-        self,
-        fields: Optional[str] = None,
-        max_num: Optional[str] = None,
-        offset: Optional[str] = None,
-        order_by: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Fetches a list of opportunities from the sales management connector, showing all potential sales in the pipeline.
-
-        Args:
-            fields: Comma-separated list of fields to retrieve.
-            max_num: Maximum number of records to retrieve.
-            offset: Offset for pagination.
-            order_by: Field to order the results by.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_opportunity(
+    def sugarcrm_get_opportunity(
         self,
         opportunityId: str,
     ) -> Dict[str, Any]:
-        """Retrieves detailed information about a specific opportunity from the sales management connector using its unique identifier.
+        """Retrieves full details of a single opportunity record from SugarCRM by its unique opportunity ID. Use this tool when you need to inspect or display all fields of one specific opportunity. Do not use this tool to retrieve multiple opportunities at once (use sugarcrm_list_opportunities) or to fetch lead or contact records. This is a read-only operation with no side effects.
 
         Args:
             opportunityId: The ID of the opportunity. (required)
@@ -384,7 +327,7 @@ class SugarcrmConnector:
         """
         ...
 
-    def get_refresh_token(
+    def sugarcrm_get_refresh_token(
         self,
         client_id: Optional[str] = None,
         client_secret: Optional[str] = None,
@@ -392,7 +335,7 @@ class SugarcrmConnector:
         platform: Optional[str] = None,
         refresh_token: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Obtains a refresh token using the authentication connector to maintain user session without requiring re-login.
+        """Obtains a new OAuth2 refresh token from SugarCRM using the /oauth2/token endpoint. Use this tool to silently renew a user session and obtain a new access token without requiring the user to re-authenticate interactively. Do not use this tool to obtain an initial access token from credentials (use sugarcrm_get_access_token instead). Calling this tool issues a POST request to the authentication endpoint and may invalidate the previously issued refresh token.
 
         Args:
             client_id: 
@@ -405,8 +348,66 @@ class SugarcrmConnector:
         """
         ...
 
-    def update_contact(
+    def sugarcrm_list_contacts(
         self,
+        fields: Optional[str] = None,
+        max_num: Optional[str] = None,
+        offset: Optional[str] = None,
+        order_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves a list of all contact records in SugarCRM. Use this tool when you need to browse multiple contacts at once, search for a contact by name, or identify a contacts ID before calling sugarcrm_get_contact. Do not use this tool when you already know the contact ID and need full detail for a single record (use sugarcrm_get_contact instead). This is a read-only operation with no side effects.
+
+        Args:
+            fields: Comma-separated list of fields to retrieve.
+            max_num: Maximum number of records to retrieve.
+            offset: Offset for pagination.
+            order_by: Field to order results by.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def sugarcrm_list_leads(
+        self,
+        fields: Optional[str] = None,
+        max_num: Optional[str] = None,
+        offset: Optional[str] = None,
+        order_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves a list of all lead records in SugarCRM. Use this tool when you need an overview of leads in the pipeline, want to browse multiple leads at once, or need to identify a leads ID before calling sugarcrm_get_lead. Do not use this tool when you already know the lead ID and need full detail for a single record (use sugarcrm_get_lead instead). This is a read-only operation with no side effects.
+
+        Args:
+            fields: Comma-separated list of fields to retrieve.
+            max_num: Maximum number of records to retrieve.
+            offset: Offset for pagination.
+            order_by: Field to order the results by.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def sugarcrm_list_opportunities(
+        self,
+        fields: Optional[str] = None,
+        max_num: Optional[str] = None,
+        offset: Optional[str] = None,
+        order_by: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves a list of all opportunity records in SugarCRM. Use this tool when you need an overview of the sales pipeline, want to browse multiple opportunities at once, or need to identify an opportunitys ID before calling sugarcrm_get_opportunity. Do not use this tool when you already know the opportunity ID and need full detail for a single record (use sugarcrm_get_opportunity instead). This is a read-only operation with no side effects.
+
+        Args:
+            fields: Comma-separated list of fields to retrieve.
+            max_num: Maximum number of records to retrieve.
+            offset: Offset for pagination.
+            order_by: Field to order the results by.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def sugarcrm_update_contact(
+        self,
+        contactId: str,
         account_id: Optional[str] = None,
         alt_address_city: Optional[str] = None,
         alt_address_country: Optional[str] = None,
@@ -440,9 +441,10 @@ class SugarcrmConnector:
         title: Optional[str] = None,
         twitter: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates existing contact information in the contacts management connector based on provided details.
+        """Updates an existing contact record in SugarCRM by contact ID. Use this tool when you need to modify fields on a contact — such as name, email, phone number, or account association — after the contact has been created. Do not use this tool to create a new contact (use sugarcrm_create_contact) or to update lead or opportunity records. This operation overwrites the specified fields and the change is permanent unless manually reversed.
 
         Args:
+            contactId:  (required)
             account_id: ID of the associated account in SugarCRM.
             alt_address_city: City for the alternative address.
             alt_address_country: Country for the alternative address.
@@ -480,8 +482,9 @@ class SugarcrmConnector:
         """
         ...
 
-    def update_lead(
+    def sugarcrm_update_lead(
         self,
+        leadId: str,
         account_name: Optional[str] = None,
         alt_address_city: Optional[str] = None,
         alt_address_country: Optional[str] = None,
@@ -520,9 +523,10 @@ class SugarcrmConnector:
         twitter: Optional[str] = None,
         website: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates existing lead information in the lead generation connector based on new details or status changes.
+        """Updates an existing lead record in SugarCRM by lead ID. Use this tool when you need to modify one or more fields on a lead — such as name, contact details, status, or assignment — after the lead has already been created. Do not use this tool to create a new lead (use sugarcrm_create_lead) or to update contact or opportunity records. This operation overwrites the specified fields on the lead and the change is permanent unless manually reversed.
 
         Args:
+            leadId: ID of the lead. (required)
             account_name: Name of the associated account.
             alt_address_city: Alternative address city.
             alt_address_country: Alternative address country.
@@ -565,8 +569,9 @@ class SugarcrmConnector:
         """
         ...
 
-    def update_opportunity(
+    def sugarcrm_update_opportunity(
         self,
+        opportunityId: str,
         account_id: Optional[str] = None,
         amount: Optional[str] = None,
         assigned_user_id: Optional[str] = None,
@@ -589,9 +594,10 @@ class SugarcrmConnector:
         service_start_date: Optional[str] = None,
         worst_case: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates existing opportunity details in the sales management connector to reflect current status or information.
+        """Updates an existing opportunity record in SugarCRM by opportunity ID. Use this tool when you need to modify fields on an opportunity — such as deal stage, close date, amount, or assigned user — after it has been created. Do not use this tool to create a new opportunity (use sugarcrm_create_opportunity) or to update lead or contact records. This operation overwrites the specified fields and the change is permanent unless manually reversed.
 
         Args:
+            opportunityId: The ID of the opportunity. (required)
             account_id: The ID of the account associated with the opportunity.
             amount: The amount of the opportunity.
             assigned_user_id: The ID of the user assigned to the opportunity.

@@ -11,7 +11,7 @@ from fastn.cli import cli, OrderedGroup, GRAPHQL_URL
 from fastn.cli._helpers import _ensure_fresh_token, _handle_401, _verbose_post
 from fastn.config import load_config
 from fastn._constants import DEPLOY_FLOW_MUTATION, FLOW_BUILDER_SPACE_ID, FLOW_BUILDER_URL, FLOW_RUN_API_URL, FLOWS_API_URL, LIST_FLOWS_QUERY, GET_FLOW_QUERY
-from fastn._flows import _extract_input_fields, _extract_output_fields
+from fastn._flows import _extract_flow_input_fields as _extract_input_fields, _extract_output_fields
 
 
 # ---------------------------------------------------------------------------
@@ -588,7 +588,7 @@ def deploy(flow_name, stage, comment):
 def schema(flow_name):
     """Show the input/output schema of a flow in AI tool format.
 
-    Returns a JSON object with name, description, actionId, inputSchema,
+    Returns a JSON object with name, description, toolId, inputSchema,
     and outputSchema — ready for use with LLM tool calling.
 
     Uses the flow's defined inputModel/outputModel when available,
@@ -634,7 +634,7 @@ def schema(flow_name):
     tool = {
         "name": flow_data.get("name", flow_name),
         "description": flow_data.get("description", ""),
-        "actionId": flow_data.get("id", flow_name),
+        "toolId": flow_data.get("id", flow_name),
         "inputSchema": input_schema or {"type": "object", "properties": {}, "required": []},
         "outputSchema": output_schema or {"type": "object", "properties": {}, "required": []},
     }

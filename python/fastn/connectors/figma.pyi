@@ -4,8 +4,12 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+
+class _FigmaPostCommentOnFileClientMeta(TypedDict, total=False):
+    x: int
+    y: int
 
 class FigmaConnector:
     """Figma connector ().
@@ -13,12 +17,12 @@ class FigmaConnector:
     Provides 14 tools.
     """
 
-    def delete_comment(
+    def figma_delete_comment(
         self,
         commentId: str,
         fileId: str,
     ) -> Dict[str, Any]:
-        """Deletes a comment from a specific file in the document management system.
+        """Permanently deletes a specific comment from a Figma file, identified by file ID and comment ID. This action is irreversible — the comment cannot be recovered after deletion. Use this tool to remove outdated or incorrect feedback from a design file. Do not use this tool to delete all comments on a file at once; each comment must be deleted individually.
 
         Args:
             commentId: The ID of the comment to be accessed. (required)
@@ -28,8 +32,9 @@ class FigmaConnector:
         """
         ...
 
-    def get_file(
+    def figma_get_file(
         self,
+        fileId: str,
         branch_data: Optional[str] = None,
         depth: Optional[str] = None,
         geometry: Optional[str] = None,
@@ -37,9 +42,10 @@ class FigmaConnector:
         plugin_data: Optional[str] = None,
         version: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a file from the file storage system based on the provided file ID.
+        """Returns the full document structure of a specific Figma file, identified by file ID, including all pages, frames, layers, components, and styles. Use this tool when you need complete access to a files design content. For large files, consider using figma_get_file_nodes to retrieve only specific elements. Do not use this tool for metadata only; use figma_get_file_metadata for that purpose.
 
         Args:
+            fileId: The ID of the Figma file. (required)
             branch_data: Branch data for the request.
             depth: Depth of the request.
             geometry: Geometry data for the request.
@@ -51,24 +57,11 @@ class FigmaConnector:
         """
         ...
 
-    def get_file_comments(
-        self,
-        as_md: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Fetches all comments associated with a specific file in the document management system.
-
-        Args:
-            as_md: Parameter to specify markdown format.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_file_meta_data(
+    def figma_get_file_metadata(
         self,
         fileId: str,
     ) -> Dict[str, Any]:
-        """Obtains metadata for a particular file in the file storage system, providing details such as size, type, and creation date.
+        """Returns metadata for a specific Figma file, identified by file ID, including its name, last modified timestamp, thumbnail URL, and version information. Use this tool when you need file-level metadata without downloading the full document structure. Do not use this tool to retrieve the full file content or node-level data; use figma_get_file or figma_get_file_nodes for those purposes.
 
         Args:
             fileId: The ID of the Figma file. (required)
@@ -77,30 +70,19 @@ class FigmaConnector:
         """
         ...
 
-    def get_file_versions(
+    def figma_get_file_nodes(
         self,
         fileId: str,
-    ) -> Dict[str, Any]:
-        """Fetches all versions of a specific file from the file storage system, allowing you to see edit history.
-
-        Args:
-            fileId: The unique identifier of the Figma file. (required)
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_files_nodes(
-        self,
         ids: str,
         depth: Optional[str] = None,
         geometry: Optional[str] = None,
         plugin_data: Optional[str] = None,
         version: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves all nodes related to files in the workspace of the document management system, useful for understanding the file structure.
+        """Returns specific nodes from a Figma file, identified by file ID and one or more node IDs. A node represents any design element such as a frame, group, component, or text layer. Use this tool when you need the design data for specific elements within a file without fetching the entire file. Do not use this tool to retrieve all file content; use figma_get_file for that purpose.
 
         Args:
+            fileId: The ID of the Figma file to access. (required)
             ids: Specifies the IDs of the objects to be retrieved. (required)
             depth: Specifies the depth of the response data.
             geometry: Specifies the geometry to be included in the response.
@@ -111,8 +93,9 @@ class FigmaConnector:
         """
         ...
 
-    def get_image(
+    def figma_get_image(
         self,
+        imageId: str,
         contents_only: Optional[str] = None,
         format: Optional[str] = None,
         ids: Optional[str] = None,
@@ -124,9 +107,10 @@ class FigmaConnector:
         use_absolute_bounds: Optional[str] = None,
         version: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Gets an image from the file storage system using the image ID, providing the necessary data for display or further processing.
+        """Returns a rendered image (PNG, JPG, SVG, or PDF) of a specific node or frame within a Figma file, identified by file ID and node ID. Use this tool to export a visual representation of a design element for display or asset generation. Do not use this tool to retrieve raw file structure or metadata; use figma_get_file or figma_get_file_metadata for those purposes.
 
         Args:
+            imageId: The ID of the image to export. (required)
             contents_only: Specifies whether to only return the contents of the image.
             format: Specifies the desired format of the exported image (e.g., PNG, SVG).
             ids: Comma-separated list of node IDs to export.
@@ -142,20 +126,48 @@ class FigmaConnector:
         """
         ...
 
-    def get_me(
+    def figma_get_me(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves current user information from the user management system, including details like username and contact info.
+        """Returns profile information for the currently authenticated Figma user, including their user ID, name, email address, and profile image URL. Use this tool to verify the authenticated identity or obtain the current users ID for permission checks. Do not use this tool to retrieve information about other users or teams.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_project_files(
+    def figma_list_file_comments(
+        self,
+        fileId: str,
+        as_md: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Returns all comments posted on a specific Figma file, identified by file ID, including comment text, author, timestamp, and position on the canvas. Use this tool to review feedback or extract discussion history from a design file. Do not use this tool to post a new comment; use figma_post_comment_on_file for that purpose.
+
+        Args:
+            fileId: The ID of the Figma file. (required)
+            as_md: Parameter to specify markdown format.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def figma_list_file_versions(
+        self,
+        fileId: str,
+    ) -> Dict[str, Any]:
+        """Returns the full version history of a specific Figma file, identified by file ID. Each entry includes a version ID, timestamp, and description of the change. Use this tool to audit edits, compare versions, or identify a specific historical state of a file. Do not use this tool to retrieve the current file content; use figma_get_file for that purpose.
+
+        Args:
+            fileId: The unique identifier of the Figma file. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def figma_list_project_files(
         self,
         projectId: str,
     ) -> Dict[str, Any]:
-        """Fetches files associated with a specific project in the project management system.
+        """Returns a list of all Figma files within a specific project, identified by project ID. Use this tool to enumerate files in a project and obtain file IDs for further operations such as retrieving file content or comments. Do not use this tool to retrieve the content of a specific file; use figma_get_file for that purpose.
 
         Args:
             projectId: The ID of the Figma project. (required)
@@ -164,15 +176,17 @@ class FigmaConnector:
         """
         ...
 
-    def get_team_component_sets(
+    def figma_list_team_component_sets(
         self,
+        teamId: str,
         after: Optional[str] = None,
         before: Optional[str] = None,
         page_size: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches sets of components that are part of the team’s projects in the collaborative project management system.
+        """Returns a list of all published component sets belonging to a specific Figma team, identified by team ID. Component sets group related variants of a component together. Use this tool to discover available component sets in a teams design system. Do not use this tool to retrieve individual components; use figma_list_team_components for that purpose.
 
         Args:
+            teamId: The ID of the Figma team. (required)
             after: Cursor to start pagination from.
             before: Cursor to end pagination at.
             page_size: Number of results per page.
@@ -181,15 +195,17 @@ class FigmaConnector:
         """
         ...
 
-    def get_team_components(
+    def figma_list_team_components(
         self,
+        teamId: str,
         after: Optional[str] = None,
         before: Optional[str] = None,
         page_size: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves components used by a team within the collaborative project management system.
+        """Returns a list of all published components belonging to a specific Figma team, identified by team ID. Use this tool to enumerate reusable design components available across a teams projects. Do not use this tool to retrieve component sets or styles; use figma_list_team_component_sets or figma_list_team_styles for those purposes.
 
         Args:
+            teamId: The ID of the Figma team. (required)
             after: Cursor to fetch results after a specific item.
             before: Cursor to fetch results before a specific item.
             page_size: Number of results per page.
@@ -198,11 +214,11 @@ class FigmaConnector:
         """
         ...
 
-    def get_team_projects(
+    def figma_list_team_projects(
         self,
         teamId: str,
     ) -> Dict[str, Any]:
-        """Obtains a list of projects that belong to the team in the project management system.
+        """Returns a list of all projects belonging to a specific Figma team, identified by team ID. Use this tool to enumerate projects and obtain project IDs needed to retrieve files within those projects. Do not use this tool to retrieve files directly; use figma_list_project_files for that purpose.
 
         Args:
             teamId: The ID of the Figma team. (required)
@@ -211,15 +227,17 @@ class FigmaConnector:
         """
         ...
 
-    def get_team_styles(
+    def figma_list_team_styles(
         self,
+        teamId: str,
         after: Optional[str] = None,
         before: Optional[str] = None,
         page_size: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves style guides and design styles utilized by the team in the collaborative project management system.
+        """Returns a list of all published styles (color, text, effect, and grid styles) belonging to a specific Figma team, identified by team ID. Use this tool to audit or reference the design system styles available to a team. Do not use this tool to retrieve component sets or project files.
 
         Args:
+            teamId: The ID of the Figma team. (required)
             after: Cursor to start pagination from.
             before: Cursor to end pagination at.
             page_size: Number of results per page.
@@ -228,15 +246,17 @@ class FigmaConnector:
         """
         ...
 
-    def post_comment_on_file(
+    def figma_post_comment_on_file(
         self,
-        client_meta: Dict[str, Any],
+        client_meta: _FigmaPostCommentOnFileClientMeta,
+        fileId: str,
         message: str,
     ) -> Dict[str, Any]:
-        """Posts a comment on a specific file within the document management system, allowing collaboration and feedback.
+        """Posts a new comment on a specific Figma file, identified by its file ID. Use this tool to leave feedback, annotations, or review notes directly on a Figma design file. This action creates a new comment record visible to all collaborators with access to the file. Do not use this tool to reply to an existing comment thread or to retrieve existing comments.
 
         Args:
             client_meta: Metadata about the client making the request. (required)
+            fileId: The unique identifier of the Figma file. (required)
             message: A message associated with the request. (required)
         Returns:
             API response as a dictionary.

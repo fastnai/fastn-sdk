@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class WebsearchConnector:
@@ -13,7 +13,7 @@ class WebsearchConnector:
     Provides 1 tools.
     """
 
-    def web_search(
+    def websearch_search(
         self,
         country: str,
         includeContent: bool,
@@ -21,7 +21,7 @@ class WebsearchConnector:
         maxResults: int,
         query: str,
     ) -> Dict[str, Any]:
-        """Performs a comprehensive web search to gather relevant information from online sources.
+        """Performs a real-time web search and returns relevant results from online sources using the WebSearchAPI. Use this tool when you need up-to-date information from the internet that may not be available in the models training data. Do not use this tool for searches scoped to a specific internal database or knowledge base. This operation is read-only and has no side effects.
 
         Args:
             country: Country code (ISO 3166-1 alpha-2) to localize the search results (e.g., 'us', 'gb'). (required)

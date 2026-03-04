@@ -14,6 +14,7 @@ from generator.generate import (
     generate_stubs,
     parse_connector,
     parse_registry,
+    _extract_tool_params,
     _sanitize_identifier,
     _to_camel_case,
     _to_pascal_case,
@@ -29,7 +30,7 @@ SAMPLE_REGISTRY = {
             "category": "communication",
             "tools": {
                 "send_message": {
-                    "actionId": "act_slack_send_message",
+                    "toolId": "act_slack_send_message",
                     "description": "Send a message to a Slack channel",
                     "params": {
                         "text": {
@@ -45,7 +46,7 @@ SAMPLE_REGISTRY = {
                     },
                 },
                 "create_channel": {
-                    "actionId": "act_slack_create_channel",
+                    "toolId": "act_slack_create_channel",
                     "description": "Create a new Slack channel",
                     "params": {
                         "name": {
@@ -67,7 +68,7 @@ SAMPLE_REGISTRY = {
             "category": "project_management",
             "tools": {
                 "create_issue": {
-                    "actionId": "act_jira_create_issue",
+                    "toolId": "act_jira_create_issue",
                     "description": "Create a Jira issue",
                     "params": {
                         "summary": {
@@ -312,3 +313,250 @@ class TestStubGenerator:
             assert any("slack.pyi" in f for f in files)
             assert any("jira.pyi" in f for f in files)
             assert not any("_placeholders" in f for f in files)
+
+
+# ---------------------------------------------------------------------------
+# Multi-wrapper inputSchema fixtures
+# ---------------------------------------------------------------------------
+
+MULTI_WRAPPER_REGISTRY = {
+    "version": "2025.06.01",
+    "connectors": {
+        "github": {
+            "display_name": "GitHub",
+            "category": "dev_tools",
+            "tools": {
+                "create_issue": {
+                    "toolId": "act_github_create_issue",
+                    "description": "Create an issue",
+                    "inputSchema": {
+                        "properties": {
+                            "body": {
+                                "type": "object",
+                                "properties": {
+                                    "title": {
+                                        "type": "string",
+                                        "description": "Issue title",
+                                    },
+                                    "body": {
+                                        "type": "string",
+                                        "description": "Issue body",
+                                    },
+                                    "labels": {
+                                        "type": "array",
+                                        "description": "Labels",
+                                    },
+                                },
+                                "required": ["title", "body"],
+                            },
+                            "url": {
+                                "type": "object",
+                                "properties": {
+                                    "OWNER": {
+                                        "type": "string",
+                                        "description": "Repo owner",
+                                    },
+                                    "REPO": {
+                                        "type": "string",
+                                        "description": "Repo name",
+                                    },
+                                },
+                                "required": ["OWNER", "REPO"],
+                            },
+                        },
+                        "required": ["body", "url"],
+                        "type": "object",
+                    },
+                },
+                "create_commit": {
+                    "toolId": "act_github_create_commit",
+                    "description": "Create a commit",
+                    "inputSchema": {
+                        "properties": {
+                            "body": {
+                                "type": "object",
+                                "properties": {
+                                    "message": {
+                                        "type": "string",
+                                        "description": "Commit message",
+                                    },
+                                    "author": {
+                                        "type": "object",
+                                        "description": "Author details",
+                                        "properties": {
+                                            "name": {
+                                                "type": "string",
+                                                "description": "Author name",
+                                            },
+                                            "email": {
+                                                "type": "string",
+                                                "description": "Author email",
+                                            },
+                                        },
+                                        "required": ["name", "email"],
+                                    },
+                                    "tree": {
+                                        "type": "string",
+                                        "description": "Tree SHA",
+                                    },
+                                },
+                                "required": ["message", "tree"],
+                            },
+                        },
+                        "required": ["body"],
+                        "type": "object",
+                    },
+                },
+            },
+        },
+    },
+}
+
+# Tool with the same param name in two wrappers (name conflict)
+CONFLICT_TOOL_DATA = {
+    "toolId": "act_conflict",
+    "description": "Tool with conflicting param names",
+    "inputSchema": {
+        "properties": {
+            "body": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "description": "Kind in body",
+                    },
+                },
+                "required": ["kind"],
+            },
+            "param": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "description": "Kind in param",
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Limit",
+                    },
+                },
+                "required": [],
+            },
+        },
+        "required": ["body"],
+        "type": "object",
+    },
+}
+
+
+class TestMultiWrapper:
+    """Tests for multi-wrapper inputSchema extraction."""
+
+    def test_all_wrappers_extracted(self) -> None:
+        """Params from all wrappers (body + url) appear in the flat list."""
+        parsed = parse_registry(MULTI_WRAPPER_REGISTRY)
+        gh = next(c for c in parsed["connectors"] if c["name"] == "github")
+        create_issue = next(t for t in gh["tools"] if t["name"] == "create_issue")
+        param_names = {p["name"] for p in create_issue["params"]}
+        # body wrapper fields
+        assert "title" in param_names
+        assert "body" in param_names
+        assert "labels" in param_names
+        # url wrapper fields
+        assert "OWNER" in param_names
+        assert "REPO" in param_names
+
+    def test_required_flags_from_inner_wrappers(self) -> None:
+        """Required status comes from each wrapper's own required list."""
+        parsed = parse_registry(MULTI_WRAPPER_REGISTRY)
+        gh = next(c for c in parsed["connectors"] if c["name"] == "github")
+        create_issue = next(t for t in gh["tools"] if t["name"] == "create_issue")
+        params_by_name = {p["name"]: p for p in create_issue["params"]}
+        assert params_by_name["title"]["required"] is True
+        assert params_by_name["OWNER"]["required"] is True
+        assert params_by_name["labels"]["required"] is False
+
+    def test_dedup_across_wrappers(self) -> None:
+        """Duplicate param names across wrappers: first wrapper wins."""
+        params = _extract_tool_params(CONFLICT_TOOL_DATA, tool_name="conflict")
+        kind_params = [p for p in params if p["name"] == "kind"]
+        assert len(kind_params) == 1
+        # First occurrence is from "body" (sorted alphabetically)
+        assert kind_params[0]["required"] is True  # body.kind is required
+
+    def test_non_conflict_params_all_present(self) -> None:
+        """Non-conflicting params from second wrapper still appear."""
+        params = _extract_tool_params(CONFLICT_TOOL_DATA, tool_name="conflict")
+        param_names = {p["name"] for p in params}
+        assert "limit" in param_names
+
+    def test_stub_contains_all_wrapper_params(self) -> None:
+        """Generated Python stub includes params from all wrappers."""
+        gen = StubGenerator(language="python")
+        parsed = parse_registry(MULTI_WRAPPER_REGISTRY)
+        gh = next(c for c in parsed["connectors"] if c["name"] == "github")
+        result = gen.generate_connector(gh)
+        assert "OWNER: str" in result
+        assert "REPO: str" in result
+        assert "title: str" in result
+
+
+class TestTypedDictGeneration:
+    """Tests for TypedDict generation from nested object params."""
+
+    def test_typed_dict_name_attached(self) -> None:
+        """Nested object params get a typed_dict_name."""
+        parsed = parse_registry(MULTI_WRAPPER_REGISTRY)
+        gh = next(c for c in parsed["connectors"] if c["name"] == "github")
+        create_commit = next(t for t in gh["tools"] if t["name"] == "create_commit")
+        author = next(p for p in create_commit["params"] if p["name"] == "author")
+        assert author["typed_dict_name"] == "_CreateCommitAuthor"
+        assert author["sub_params"] is not None
+        sub_names = {sp["name"] for sp in author["sub_params"]}
+        assert "name" in sub_names
+        assert "email" in sub_names
+
+    def test_typed_dicts_on_tool(self) -> None:
+        """Tool dict includes typed_dicts list for TypedDict rendering."""
+        parsed = parse_registry(MULTI_WRAPPER_REGISTRY)
+        gh = next(c for c in parsed["connectors"] if c["name"] == "github")
+        create_commit = next(t for t in gh["tools"] if t["name"] == "create_commit")
+        assert len(create_commit["typed_dicts"]) == 1
+        td = create_commit["typed_dicts"][0]
+        assert td["name"] == "_CreateCommitAuthor"
+        assert len(td["fields"]) == 2
+
+    def test_no_typed_dict_for_simple_params(self) -> None:
+        """Params with primitive types have typed_dict_name=None."""
+        parsed = parse_registry(MULTI_WRAPPER_REGISTRY)
+        gh = next(c for c in parsed["connectors"] if c["name"] == "github")
+        create_commit = next(t for t in gh["tools"] if t["name"] == "create_commit")
+        message = next(p for p in create_commit["params"] if p["name"] == "message")
+        assert message["typed_dict_name"] is None
+
+    def test_stub_renders_typed_dict_class(self) -> None:
+        """Generated stub contains TypedDict class definition."""
+        gen = StubGenerator(language="python")
+        parsed = parse_registry(MULTI_WRAPPER_REGISTRY)
+        gh = next(c for c in parsed["connectors"] if c["name"] == "github")
+        result = gen.generate_connector(gh)
+        assert "class _CreateCommitAuthor(TypedDict" in result
+        assert "name: str" in result
+        assert "email: str" in result
+
+    def test_stub_uses_typed_dict_in_signature(self) -> None:
+        """Method signature references the TypedDict name, not Dict[str, Any]."""
+        gen = StubGenerator(language="python")
+        parsed = parse_registry(MULTI_WRAPPER_REGISTRY)
+        gh = next(c for c in parsed["connectors"] if c["name"] == "github")
+        result = gen.generate_connector(gh)
+        assert "_CreateCommitAuthor" in result
+        # author is optional (not in body.required), so it should have Optional
+        assert "author: Optional[_CreateCommitAuthor]" in result
+
+    def test_tool_without_nested_objects_has_no_typed_dicts(self) -> None:
+        """Tools with only primitive params have empty typed_dicts list."""
+        parsed = parse_registry(MULTI_WRAPPER_REGISTRY)
+        gh = next(c for c in parsed["connectors"] if c["name"] == "github")
+        create_issue = next(t for t in gh["tools"] if t["name"] == "create_issue")
+        assert create_issue["typed_dicts"] == []

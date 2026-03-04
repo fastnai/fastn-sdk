@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class AnthropicClaudeConnector:
@@ -13,12 +13,12 @@ class AnthropicClaudeConnector:
     Provides 6 tools.
     """
 
-    def count_message_token(
+    def anthropic_claude_count_message_tokens(
         self,
         messages: Optional[List[Any]] = None,
         model: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Counts the number of tokens in a message for the specified messaging connector, helping to manage message size and character limits.
+        """Counts the number of tokens that a given message would consume when sent to an Anthropic Claude model, without actually sending the message. Use this tool to estimate token usage before making a request, to stay within model context limits or manage API costs. Do not use this tool to send a message — use anthropic_claude_create_message instead.
 
         Args:
             messages: 
@@ -28,7 +28,7 @@ class AnthropicClaudeConnector:
         """
         ...
 
-    def create_message(
+    def anthropic_claude_create_message(
         self,
         max_tokens: Optional[int] = None,
         messages: Optional[List[Any]] = None,
@@ -36,7 +36,7 @@ class AnthropicClaudeConnector:
         tool_choice: Optional[str] = None,
         tools: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a new message using the specified messaging connector, allowing users to send text, images, or other content to recipients.
+        """Sends a synchronous message request to an Anthropic Claude model and returns the models response, supporting text and image inputs. Use this tool for real-time, single-turn or multi-turn AI interactions where an immediate response is required. Do not use this tool for processing large volumes of prompts — use anthropic_claude_create_message_batch instead.
 
         Args:
             max_tokens: 
@@ -49,11 +49,11 @@ class AnthropicClaudeConnector:
         """
         ...
 
-    def create_message_batch(
+    def anthropic_claude_create_message_batch(
         self,
         requests: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a batch of messages using the specified messaging connector, enabling users to send multiple messages at once for efficiency.
+        """Submits a batch of message requests to the Anthropic Claude API for asynchronous processing, allowing multiple prompts to be handled in a single operation. Use this tool when you need to process a large number of prompts efficiently without waiting for each response individually. Results are not returned immediately — use anthropic_claude_get_message_batch_result to retrieve outputs once processing is complete. Do not use this tool for single, synchronous message interactions — use anthropic_claude_create_message instead.
 
         Args:
             requests: 
@@ -62,11 +62,11 @@ class AnthropicClaudeConnector:
         """
         ...
 
-    def get_message_batch(
+    def anthropic_claude_get_message_batch(
         self,
         messageBatch: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a batch of messages from the specified messaging connector, allowing users to access and manage previously sent messages.
+        """Retrieves the status and metadata of a specific Anthropic Claude message batch by its batch ID, including processing state and request counts. Use this tool to check whether a batch has completed before fetching its results. Do not use this tool to retrieve the individual message responses — use anthropic_claude_get_message_batch_result instead.
 
         Args:
             messageBatch: 
@@ -75,11 +75,11 @@ class AnthropicClaudeConnector:
         """
         ...
 
-    def get_message_batch_result(
+    def anthropic_claude_get_message_batch_result(
         self,
         messageBatchId: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Obtains the results of a message batch operation from the specified messaging connector, providing status updates and feedback on message delivery.
+        """Retrieves the individual results of a completed Anthropic Claude message batch operation by batch ID, returning the models responses for each request in the batch. Use this tool after a batch has finished processing to collect outputs. Do not use this tool to check the status of a batch — use anthropic_claude_get_message_batch instead.
 
         Args:
             messageBatchId: 
@@ -88,10 +88,10 @@ class AnthropicClaudeConnector:
         """
         ...
 
-    def get_modals(
+    def anthropic_claude_list_models(
         self,
     ) -> Dict[str, Any]:
-        """Fetches available modals related to the specified messaging connector, allowing users to access interactive elements for enhancing user engagement.
+        """Lists all available Anthropic Claude AI models accessible via the API, including their IDs and capabilities. Use this tool to discover which models are available for use in message creation or batch operations. Do not use this tool to create messages or count tokens.
         Returns:
             API response as a dictionary.
         """

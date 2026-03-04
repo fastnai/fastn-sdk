@@ -4,20 +4,44 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+
+class _CopyFileZohoData(TypedDict, total=False):
+    attributes: Dict[str, Any]
+    type: str
+
+class _CreateFolderData(TypedDict, total=False):
+    attributes: Dict[str, Any]
+    type: str
+
+class _DeleteFileZohoData(TypedDict, total=False):
+    attributes: Dict[str, Any]
+    type: str
+
+class _MoveToTrashData(TypedDict, total=False):
+    attributes: Dict[str, Any]
+    type: str
+
+class _RenameFileData(TypedDict, total=False):
+    attributes: Dict[str, Any]
+    type: str
+
+class _RestoreFileData(TypedDict, total=False):
+    attributes: Dict[str, Any]
+    type: str
 
 class ZohoConnector:
     """Zoho connector ().
 
-    Provides 28 tools.
+    Provides 30 tools.
     """
 
-    def add_note(
+    def add_note_zoho(
         self,
         data: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Adds a note to a specified record in the application.
+        """Adds a note to a specified record in Zoho for additional context.
 
         Args:
             data: 
@@ -26,24 +50,26 @@ class ZohoConnector:
         """
         ...
 
-    def copy_file(
+    def copy_file_zoho(
         self,
-        data: Dict[str, Any],
+        data: _CopyFileZohoData,
+        destinationId: str,
     ) -> Dict[str, Any]:
-        """Copies a specified file to a new location within the application.
+        """Copies a file within Zoho for backup or reuse in business tasks.
 
         Args:
             data: The data to be sent to the Zoho WorkDrive API. (required)
+            destinationId: The ID of the destination for the operation. (required)
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def create_contact(
+    def create_contact_zoho(
         self,
         data: List[Any],
     ) -> Dict[str, Any]:
-        """Creates a new contact entry in the specified address book of the application.
+        """Creates a new contact in Zoho for customer relationship management.
 
         Args:
             data:  (required)
@@ -69,11 +95,13 @@ class ZohoConnector:
 
     def create_field(
         self,
+        fields: Optional[List[Any]] = None,
         module: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Creates a new field for data entry in the application.
 
         Args:
+            fields: 
             module: 
         Returns:
             API response as a dictionary.
@@ -82,7 +110,7 @@ class ZohoConnector:
 
     def create_folder(
         self,
-        data: Dict[str, Any],
+        data: _CreateFolderData,
     ) -> Dict[str, Any]:
         """Creates a new folder in the specified directory of the application.
 
@@ -93,13 +121,13 @@ class ZohoConnector:
         """
         ...
 
-    def create_leads(
+    def create_leads_zoho(
         self,
         data: List[Any],
         lar_id: Optional[str] = None,
         trigger: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a new lead entry in the CRM of the application.
+        """Creates a new lead in Zoho for potential sales tracking.
 
         Args:
             data:  (required)
@@ -110,11 +138,11 @@ class ZohoConnector:
         """
         ...
 
-    def delete_contact(
+    def delete_contact_zoho(
         self,
         record_id: str,
     ) -> Dict[str, Any]:
-        """Deletes a specified contact from the address book in the application.
+        """Deletes a specific contact in Zoho to remove outdated information.
 
         Args:
             record_id: The ID of the record. (required)
@@ -136,27 +164,42 @@ class ZohoConnector:
         """
         ...
 
-    def delete_file(
+    def delete_file_zoho(
         self,
-        data: Dict[str, Any],
+        data: _DeleteFileZohoData,
+        resourceId: str,
     ) -> Dict[str, Any]:
-        """Permanently deletes a specified file from the application.
+        """Deletes a specified file in Zoho to manage storage and organization.
 
         Args:
             data: Contains attributes of the resource. (required)
+            resourceId: The ID of the resource in Zoho WorkDrive. (required)
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def delete_lead(
+    def delete_lead_zoho(
         self,
         record_id: str,
     ) -> Dict[str, Any]:
-        """Deletes a specified lead from the CRM of the application.
+        """Deletes a specific lead in Zoho to clean up sales pipeline.
 
         Args:
             record_id: The ID of the record to access. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def get_account_zoho(
+        self,
+        accountId: str,
+    ) -> Dict[str, Any]:
+        """Fetches details of a specific account in Zoho for account management.
+
+        Args:
+            accountId: The identifier of the Zoho account to target in the request URL or path. (required)
         Returns:
             API response as a dictionary.
         """
@@ -216,7 +259,7 @@ class ZohoConnector:
         """
         ...
 
-    def get_deals(
+    def get_deals_zoho(
         self,
         criteria: Optional[str] = None,
         exclude_associated_modules: Optional[str] = None,
@@ -233,7 +276,7 @@ class ZohoConnector:
         to: Optional[str] = None,
         trigger: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves deals from the CRM of the application.
+        """Retrieves a list of deals from Zoho for sales analysis.
 
         Args:
             criteria: Criteria for filtering records.
@@ -281,7 +324,20 @@ class ZohoConnector:
         """
         ...
 
-    def get_leads(
+    def get_lead_zoho(
+        self,
+        leadId: str,
+    ) -> Dict[str, Any]:
+        """Retrieves details of a specific lead in Zoho for evaluation.
+
+        Args:
+            leadId: The unique identifier of the Lead resource in Zoho; used to target a specific lead for this endpoint. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def get_leads_zoho(
         self,
         page: Optional[str] = None,
         page_token: Optional[str] = None,
@@ -289,7 +345,7 @@ class ZohoConnector:
         sort_by: Optional[str] = None,
         sort_order: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves leads associated with the specified accounts in the application.
+        """Retrieves leads from Zoho for ongoing sales processes.
 
         Args:
             page: 
@@ -326,11 +382,13 @@ class ZohoConnector:
 
     def move_to_trash(
         self,
-        data: Optional[Dict[str, Any]] = None,
+        resourceId: str,
+        data: Optional[_MoveToTrashData] = None,
     ) -> Dict[str, Any]:
         """Moves a specified file to the trash in the application.
 
         Args:
+            resourceId: The ID of the resource being accessed. (required)
             data: The data object containing attributes and type information.
         Returns:
             API response as a dictionary.
@@ -339,12 +397,14 @@ class ZohoConnector:
 
     def rename_file(
         self,
-        data: Dict[str, Any],
+        data: _RenameFileData,
+        resourceId: str,
     ) -> Dict[str, Any]:
         """Renames a specified file within the application.
 
         Args:
             data: The main data object for the request. (required)
+            resourceId: The ID of the resource. (required)
         Returns:
             API response as a dictionary.
         """
@@ -352,12 +412,14 @@ class ZohoConnector:
 
     def restore_file(
         self,
-        data: Dict[str, Any],
+        data: _RestoreFileData,
+        resourceId: str,
     ) -> Dict[str, Any]:
         """Restores a previously deleted file from the trash in the application.
 
         Args:
             data: The data object containing attributes and type information. (required)
+            resourceId: The ID of the resource being accessed. (required)
         Returns:
             API response as a dictionary.
         """
@@ -365,6 +427,7 @@ class ZohoConnector:
 
     def search(
         self,
+        Module: Optional[str] = None,
         criteria: Optional[str] = None,
         page: Optional[str] = None,
         per_page: Optional[str] = None,
@@ -373,6 +436,7 @@ class ZohoConnector:
         """Performs a search operation within the application based on specified parameters.
 
         Args:
+            Module: Module
             criteria: 
             page: 
             per_page: 
@@ -398,24 +462,28 @@ class ZohoConnector:
     def update_contact(
         self,
         data: List[Any],
+        record_id: str,
     ) -> Dict[str, Any]:
         """Updates details of an existing contact in the application.
 
         Args:
             data:  (required)
+            record_id: The ID of the record to be accessed. (required)
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def update_deals(
+    def update_deals_zoho(
         self,
         data: List[Any],
+        record_id: str,
     ) -> Dict[str, Any]:
-        """Updates an existing deal in the CRM of the application.
+        """Updates an existing deal in Zoho to reflect current progress.
 
         Args:
             data:  (required)
+            record_id: The ID of the Zoho record. (required)
         Returns:
             API response as a dictionary.
         """
@@ -424,11 +492,13 @@ class ZohoConnector:
     def update_leads(
         self,
         data: List[Any],
+        record_id: str,
     ) -> Dict[str, Any]:
         """Updates an existing lead in the CRM of the application.
 
         Args:
             data:  (required)
+            record_id: ID of the Zoho record. (required)
         Returns:
             API response as a dictionary.
         """

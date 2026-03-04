@@ -33,7 +33,7 @@ from fastn.cli import (
     SOURCE_ORG,
     SOURCE_WORKSPACE,
 )
-from fastn.client import GET_ORGANIZATIONS_QUERY
+from fastn._constants import GET_ORGANIZATIONS_QUERY
 
 # Helpers from the helpers module
 from fastn.cli._helpers import (
@@ -375,7 +375,7 @@ def _parse_tool_node(node: dict) -> dict:
     return {
         "key": key,
         "data": {
-            "actionId": action_id,
+            "toolId": action_id,
             "name": tool_name,
             "description": description,
             "params": params,
@@ -572,11 +572,11 @@ def _resolve_friendly_names(
     resolved_tool_id = ""
     resolved_action_info: Optional[dict] = None
 
-    # Search the registry by actionId to find the friendly names
+    # Search the registry by toolId to find the friendly names
     for cname, cdata in connectors.items():
         actions = cdata.get("tools", {})
         for tname, tinfo in actions.items():
-            if tinfo.get("actionId") == action_id:
+            if (tinfo.get("toolId") or tinfo.get("actionId")) == action_id:
                 friendly_tool = cname
                 friendly_action = tname
                 resolved_tool_id = cdata.get("id", "")

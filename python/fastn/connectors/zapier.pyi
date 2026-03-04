@@ -4,8 +4,18 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+
+class _GetChoicesZapierData(TypedDict, total=False):
+    authentication: str
+    inputs: Dict[str, Any]
+
+class _GetInputFieldsZapierData(TypedDict, total=False):
+    authentication: str
+    inputs: Dict[str, Any]
+    limit: int
+    offset: int
 
 class ZapierConnector:
     """Zapier connector ().
@@ -13,12 +23,12 @@ class ZapierConnector:
     Provides 11 tools.
     """
 
-    def get_actions(
+    def get_actions_zapier(
         self,
         action_type: Optional[str] = None,
         app: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves the available actions that can be performed within a specific application in your Zapier integration, guiding users in setting up Zaps effectively.
+        """Retrieves the actions available for selected apps in Zapier. Use this to define what automated tasks can be performed in your workflows.
 
         Args:
             action_type: 
@@ -41,10 +51,10 @@ class ZapierConnector:
         """
         ...
 
-    def get_apps_v2(
+    def get_apps_v2_zapier(
         self,
     ) -> Dict[str, Any]:
-        """Obtains a list of available applications that can be integrated within your Zapier account, allowing you to explore potential automation options through Zapier.
+        """Fetches a list of apps available in your Zapier account for automating workflows. Use this to discover new integrations within Zapier.
         Returns:
             API response as a dictionary.
         """
@@ -59,26 +69,32 @@ class ZapierConnector:
         """
         ...
 
-    def get_choices(
+    def get_choices_zapier(
         self,
-        data: Optional[Dict[str, Any]] = None,
+        actionId: Optional[str] = None,
+        data: Optional[_GetChoicesZapierData] = None,
+        inputId: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of choices available for specific inputs in your Zapier integration, helping users make informed selections during Zap setup.
+        """Retrieves available choices for input fields when configuring actions in Zapier. Use this to ensure correct selections in your automated workflows.
 
         Args:
+            actionId: 
             data: 
+            inputId: 
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_input_fields(
+    def get_input_fields_zapier(
         self,
-        data: Optional[Dict[str, Any]] = None,
+        actionId: Optional[str] = None,
+        data: Optional[_GetInputFieldsZapierData] = None,
     ) -> Dict[str, Any]:
-        """Fetches the input fields necessary for setting up actions in your Zapier integration, ensuring that all required data is captured.
+        """Fetches the input fields required for actions in Zapier. This helps in setting up the necessary information for automated workflows.
 
         Args:
+            actionId: 
             data: 
         Returns:
             API response as a dictionary.
@@ -115,11 +131,13 @@ class ZapierConnector:
     def guess_zap_beta(
         self,
         client_id: Optional[str] = None,
+        description: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Attempts to guess the Zap configuration based on the inputs provided, utilizing the Zapier integration to streamline your automation process.
 
         Args:
             client_id: 
+            description: 
         Returns:
             API response as a dictionary.
         """
@@ -127,8 +145,14 @@ class ZapierConnector:
 
     def trigger_zap(
         self,
+        body: Dict[str, Any],
+        zapHook: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Triggers a specific Zap to run immediately in your Zapier integration, initiating the predefined automation process.
+
+        Args:
+            body:  (required)
+            zapHook: 
         Returns:
             API response as a dictionary.
         """

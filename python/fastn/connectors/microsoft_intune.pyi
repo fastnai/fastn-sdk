@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class MicrosoftIntuneConnector:
@@ -13,29 +13,22 @@ class MicrosoftIntuneConnector:
     Provides 18 tools.
     """
 
-    def add_device_to_group(
+    def microsoft_intune_add_device_to_group(
         self,
         deviceId: str,
+        groupId: str,
     ) -> Dict[str, Any]:
-        """Adds a device to a specified group, facilitating organized management and oversight of devices.
+        """Adds a device as a member of a specified Azure AD group using the groups ID. Use this to organize devices into groups for policy assignment, conditional access, or management scope targeting. Requires a valid group ID and device object reference. This action modifies group membership and may immediately affect any policies or access rules applied to that group.
 
         Args:
             deviceId: ID of the device in Microsoft Intune. (required)
+            groupId: ID of the group in Microsoft Intune. (required)
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def batch(
-        self,
-    ) -> Dict[str, Any]:
-        """Executes a batch process in the system to efficiently handle multiple tasks or operations at once.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def create_group(
+    def microsoft_intune_create_group(
         self,
         displayName: str,
         mailEnabled: bool,
@@ -44,7 +37,7 @@ class MicrosoftIntuneConnector:
         description: Optional[str] = None,
         groupTypes: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a new group within the system, facilitating the organization of users or devices for better management.
+        """Creates a new Azure AD group for organizing users or devices within the organization. Use this when you need a new group to apply Intune policies, conditional access rules, or management scopes. This action has persistent side effects — the group is created in Azure AD and will remain until explicitly deleted. Do not use this to modify or add members to an existing group.
 
         Args:
             displayName: Display name of the group. (required)
@@ -58,7 +51,7 @@ class MicrosoftIntuneConnector:
         """
         ...
 
-    def create_script(
+    def microsoft_intune_create_script(
         self,
         displayName: str,
         fileName: str,
@@ -67,7 +60,7 @@ class MicrosoftIntuneConnector:
         enforceSignatureCheck: Optional[bool] = None,
         runAs32Bit: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Creates a new script in the system, allowing for automation and execution of specific tasks.
+        """Creates a new device management script in Microsoft Intune. Use this when you need to deploy a new PowerShell or shell script to managed devices for automation or configuration tasks. The script will be stored in Intune and can subsequently be assigned to device groups. This action has persistent side effects — the script is saved to the system and will remain until explicitly deleted. Do not use this to update an existing script.
 
         Args:
             displayName: Display name of the script. (required)
@@ -81,65 +74,94 @@ class MicrosoftIntuneConnector:
         """
         ...
 
-    def create_subscription(
+    def microsoft_intune_create_subscription(
         self,
-        changeType: str,
-        expirationDateTime: str,
-        resource: str,
         NotificationUrl: Optional[str] = None,
-        clientState: Optional[str] = None,
+        changeType: Optional[str] = None,
+        expirationDateTime: Optional[str] = None,
         lifecycleNotificationUrl: Optional[str] = None,
+        resource: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new subscription in the system, allowing access to specific features or services.
+        """Creates a new Microsoft Graph change notification subscription to receive real-time webhook notifications for Intune or Azure AD resource changes such as device state changes or group membership updates. Use this when you need continuous event-driven notifications delivered to a configured webhook endpoint. The subscription remains active until it expires or is explicitly deleted. This action has persistent side effects — notifications will be sent to the webhook endpoint until the subscription is removed. Do not use this for one-time data queries; use the appropriate list or get tool instead.
 
         Args:
-            changeType: Type of change that triggered the notification. (required)
-            expirationDateTime: Expiration date and time for the notification. (required)
-            resource: Resource related to the notification. (required)
-            NotificationUrl: URL to receive notifications.
-            clientState: 
-            lifecycleNotificationUrl: URL for lifecycle notifications.
+            NotificationUrl: 
+            changeType: 
+            expirationDateTime: 
+            lifecycleNotificationUrl: 
+            resource: 
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def delete_subscription(
+    def microsoft_intune_delete_subscription(
         self,
+        subId: str,
+        body: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Deletes an existing subscription in the system, terminating access to specific services or features.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def delta_track(
-        self,
-        deltaToken: Optional[str] = None,
-        filter: Optional[str] = None,
-        select: Optional[str] = None,
-        skipToken: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Tracks changes in a given context to ensure accurate updates and modifications are recorded.
+        """Permanently deletes an existing Microsoft Graph change notification subscription identified by its subscription ID. Use this when you want to stop receiving webhook notifications for a previously created subscription. This action is irreversible — once deleted, the subscription cannot be restored and notifications will cease immediately. Do not use this to temporarily pause notifications; there is no pause mechanism.
 
         Args:
-            deltaToken: Delta token for retrieving changes since the last request.
-            filter: OData filter expression to filter the results.
-            select: Comma-separated list of properties to select.
-            skipToken: Skip token for paging.
+            subId: The Azure subscription ID associated with the Microsoft Intune tenant. (required)
+            body: The main body of the request for the Microsoft Intune API.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_devices(
+    def microsoft_intune_execute_batch(
+        self,
+        body: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Executes multiple Microsoft Graph API requests in a single HTTP call using the Graph batch endpoint. Use this to combine up to 20 independent requests into one network round-trip, improving efficiency when multiple read or write operations need to be performed together. Each request in the batch is processed independently and may succeed or fail individually. Side effects depend on the individual requests included in the batch — write operations within the batch will modify data. Do not use this for single operations; use the appropriate dedicated tool instead.
+
+        Args:
+            body: Request body for the Microsoft Intune API.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def microsoft_intune_get_group(
+        self,
+        id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves detailed information about a specific Azure AD group using its unique group ID. Use this to fetch properties such as display name, membership type, and settings for a single known group. Requires a valid group ID. Do not use this to list all groups; use microsoft_intune_list_groups for that. This tool is read-only and has no side effects.
+
+        Args:
+            id: 
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def microsoft_intune_get_organization(
+        self,
+    ) -> Dict[str, Any]:
+        """Retrieves details about the organizations Azure AD tenant, including its display name, verified domains, and configuration settings. Use this to obtain tenant-level metadata for auditing or configuration purposes. This tool is read-only and has no side effects.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def microsoft_intune_get_security_groups_count(
+        self,
+    ) -> Dict[str, Any]:
+        """Returns the total count of mail-disabled security groups in the organization. Use this to obtain a numeric summary of security groups for reporting or threshold checks without retrieving full group details. Do not use this to retrieve the groups themselves; use microsoft_intune_list_security_groups for that. This tool is read-only and has no side effects.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def microsoft_intune_list_devices(
         self,
         count: Optional[str] = None,
         filter: Optional[str] = None,
         orderBy: Optional[str] = None,
         select: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of devices within the system, enabling effective device management and monitoring.
+        """Lists all devices registered in Azure AD within the organization. Use this to retrieve a broad inventory of all Azure AD-joined or registered devices for monitoring or auditing purposes. This differs from listing Intune-managed devices specifically; use microsoft_intune_list_managed_devices if you need only Intune-enrolled devices. This tool is read-only and has no side effects.
 
         Args:
             count: Indicates whether to return the total number of records.
@@ -151,20 +173,22 @@ class MicrosoftIntuneConnector:
         """
         ...
 
-    def get_devices_by_group(
+    def microsoft_intune_list_devices_by_group(
         self,
+        groupId: str,
         select: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves devices associated with a specific group, allowing for targeted management under the designated group.
+        """Lists all devices that are transitive members of a specified Azure AD group, including devices inherited through nested groups. Use this to identify all devices in scope for a particular group, regardless of nesting depth. Requires a valid group ID. Do not use this if you only need direct device members; this returns the full transitive closure. This tool is read-only and has no side effects.
 
         Args:
+            groupId: ID of the group. (required)
             select: Specifies the fields to be returned in the response.  (e.g.,  'displayName,id')
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_groups(
+    def microsoft_intune_list_groups(
         self,
         count: Optional[bool] = None,
         expand: Optional[str] = None,
@@ -173,7 +197,7 @@ class MicrosoftIntuneConnector:
         skipToken: Optional[str] = None,
         top: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches a list of all groups within the organization, assisting in group management and oversight.
+        """Lists all Azure AD groups within the organization. Use this to retrieve a complete collection of groups for auditing, selection, or management tasks. Do not use this to retrieve a single group by ID; use microsoft_intune_get_group for that. This tool is read-only and has no side effects.
 
         Args:
             count: Indicates whether to include the total count of results.
@@ -187,28 +211,38 @@ class MicrosoftIntuneConnector:
         """
         ...
 
-    def get_groups_by_id(
+    def microsoft_intune_list_groups_delta(
         self,
-        id: Optional[str] = None,
+        deltaToken: Optional[str] = None,
+        filter: Optional[str] = None,
+        select: Optional[str] = None,
+        skipToken: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches information about a specific group using its ID, allowing for detailed management and modifications.
+        """Retrieves incremental changes to Azure AD groups since the last delta query, using the Microsoft Graph delta tracking mechanism. Use this for efficient change tracking to detect newly created, updated, or deleted groups without fetching the full group list each time. Requires a delta token from a previous delta query for incremental results; omit it for the initial full sync. Do not use this if you need the complete current list of groups without change context; use microsoft_intune_list_groups instead. This tool is read-only and has no side effects.
 
         Args:
-            id: 
+            deltaToken: Delta token for retrieving changes since the last request.
+            filter: OData filter expression to filter the results.
+            select: Comma-separated list of properties to select.
+            skipToken: Skip token for paging.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_managed_device(
+    def microsoft_intune_list_managed_devices(
         self,
+        ConsistencyLevel: str,
+        deviceId: str,
         filter: Optional[str] = None,
         search: Optional[str] = None,
         select: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches information about a managed device in the system, enabling effective monitoring and management of device status.
+        """Lists all managed devices registered in Microsoft Intune. Use this to retrieve a collection of devices under Intune management for monitoring, auditing, or status review. Returns device metadata such as OS, compliance state, and enrollment details. Do not use this to retrieve a single device by ID; use a get action for that. This tool is read-only and has no side effects.
 
         Args:
+            ConsistencyLevel: Consistency level for the Microsoft Intune API request. (required)
+            deviceId: ID of the device for the Microsoft Intune API request. (required)
             filter: Filter criteria for the Microsoft Intune API request.
             search: Search term for the Microsoft Intune API request.
             select: Fields to select in the Microsoft Intune API response.
@@ -217,35 +251,28 @@ class MicrosoftIntuneConnector:
         """
         ...
 
-    def get_organization(
+    def microsoft_intune_list_scripts(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves information about the organization, including its details and settings within the system.
+        """Lists all device management scripts configured in Microsoft Intune. Use this to retrieve available scripts for review, auditing, or selecting a script to assign or execute. Returns script metadata including name, description, and platform. This tool is read-only and has no side effects. Do not use this to create or modify scripts.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_scripts(
+    def microsoft_intune_list_security_groups(
         self,
-    ) -> Dict[str, Any]:
-        """Fetches a list of scripts available in the system, enabling management and execution of predefined tasks.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_security_groups(
-        self,
+        body: Dict[str, Any],
         expand: Optional[str] = None,
         filter: Optional[str] = None,
         select: Optional[str] = None,
         skipToken: Optional[str] = None,
         top: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Retrieves detailed information about security groups, enabling management of security settings across various groups.
+        """Lists all security groups in the organization from Azure AD, including their properties and membership configuration. Use this to retrieve security groups for auditing, policy assignment, or access control reviews. Do not use this to retrieve distribution or Microsoft 365 groups; apply filters if a specific group type is needed. This tool is read-only and has no side effects.
 
         Args:
+            body: Body of the request for Microsoft Intune API.  May be empty for some requests. (required)
             expand: OData expand expression
             filter: OData filter expression
             select: OData select expression
@@ -256,17 +283,10 @@ class MicrosoftIntuneConnector:
         """
         ...
 
-    def get_security_groups_count(
+    def microsoft_intune_list_transitive_members(
         self,
-    ) -> Dict[str, Any]:
-        """Fetches the count of security groups in the system, providing insights into the security structure and organization.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_transitive_members(
-        self,
+        ConsistencyLevel: str,
+        groupId: str,
         filter: Optional[str] = None,
         orderby: Optional[str] = None,
         search: Optional[str] = None,
@@ -275,9 +295,11 @@ class MicrosoftIntuneConnector:
         skipToken: Optional[str] = None,
         top: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves members of a group, including transitive members, allowing for a comprehensive view of group composition.
+        """Lists all device members of a specified group, including members inherited transitively through nested groups. Use this when you need a complete, flattened view of all devices belonging to a group hierarchy, not just direct members. Requires a valid group ID. Do not use this if you only need direct members of a group. This tool is read-only and has no side effects.
 
         Args:
+            ConsistencyLevel: Specifies the consistency level for the request. (required)
+            groupId: ID of the group. (required)
             filter: OData filter expression.
             orderby: Property to order results by.
             search: Search term.
@@ -290,11 +312,11 @@ class MicrosoftIntuneConnector:
         """
         ...
 
-    def reauthorize_subscription(
+    def microsoft_intune_reauthorize_subscription(
         self,
         subscriptionId: str,
     ) -> Dict[str, Any]:
-        """Reauthorizes an existing subscription in the system, ensuring continued access to services or features.
+        """Reauthorizes an existing Microsoft Graph change notification subscription to extend or renew its authorization. Use this when a subscriptions authorization has expired or been revoked and you need to restore notification delivery without deleting and recreating it. Requires a valid subscription ID. This action modifies the subscription state. Do not use this to create a new subscription or update subscription filters.
 
         Args:
             subscriptionId: Subscription ID for accessing the Microsoft Intune service. (required)

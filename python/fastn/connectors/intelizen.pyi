@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class IntelizenConnector:
@@ -13,12 +13,12 @@ class IntelizenConnector:
     Provides 4 tools.
     """
 
-    def create_contract(
+    def intelizen_create_contract(
         self,
         file: str,
         type: str,
     ) -> Dict[str, Any]:
-        """Creates a new contract using the createContract connector. This tool allows for the definition of a new contract in the system with specified parameters.
+        """Creates a new contract in the Intelizen system with specified parameters. Use this tool when you need to define and register a new contract. This tool does not update or replace existing contracts — use a dedicated update endpoint for modifications. Note: this action is irreversible; once created, the contract is committed to the system and cannot be automatically rolled back.
 
         Args:
             file: File to be processed. (required)
@@ -28,11 +28,11 @@ class IntelizenConnector:
         """
         ...
 
-    def get_contract(
+    def intelizen_get_contract(
         self,
         contractId: str,
     ) -> Dict[str, Any]:
-        """Retrieves a specific contract using the getContract connector. This tool requires the contract ID to fetch the details of the specified contract.
+        """Retrieves the full details of a single contract from the Intelizen system by its unique contract ID. Use this tool when you need complete information about a specific contract. Requires a valid contractId; use intelizen_list_contracts first if you need to discover available contract IDs. This is a read-only operation with no side effects.
 
         Args:
             contractId: ID of the contract. (required)
@@ -41,21 +41,21 @@ class IntelizenConnector:
         """
         ...
 
-    def get_contracts(
+    def intelizen_list_contracts(
         self,
     ) -> Dict[str, Any]:
-        """Fetches a list of contracts using the getContracts connector. This tool provides an overview of all contracts available in the system.
+        """Retrieves a list of all contracts available in the Intelizen system. Use this tool when you need an overview of all contracts, such as for display, filtering, or bulk processing. For details about a single specific contract, use intelizen_get_contract instead. This is a read-only operation with no side effects.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def upload_file___deprecated__(
+    def intelizen_upload_file_deprecated(
         self,
         file: str,
         type: str,
     ) -> Dict[str, Any]:
-        """Uploads a file using the uploadFile (deprecated) connector. Note that this tool is deprecated and should be avoided in favor of updated methods.
+        """DEPRECATED. Previously used to upload a file to the Intelizen contracts endpoint. Do not use this tool in new workflows; it is retained only for legacy compatibility. Use intelizen_create_contract instead for all file upload and contract creation operations. Calling this tool may result in unexpected behavior or future breakage.
 
         Args:
             file: File to be processed by the Intelizen API. (required)

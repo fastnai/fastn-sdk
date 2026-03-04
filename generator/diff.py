@@ -290,7 +290,7 @@ def compute_schema_hash(
     for tool_name in sorted(tools.keys()):
         tool = tools[tool_name]
         canonical[tool_name] = {
-            "actionId": tool.get("actionId", ""),
+            "toolId": tool.get("toolId", "") or tool.get("actionId", ""),
             "inputSchema": tool.get("inputSchema", {}),
         }
 
@@ -390,7 +390,7 @@ def build_migrations(
             )
             old_tool = old_tools.get(tool_name, {})
             conn_mig["deprecated_tools"][tool_name] = {
-                "actionId": old_tool.get("actionId", ""),
+                "toolId": old_tool.get("toolId", "") or old_tool.get("actionId", ""),
                 "paramKey": _get_param_key_from_tool(old_tool),
                 "message": (
                     f"'{conn_name}.{tool_name}()' has been removed. "

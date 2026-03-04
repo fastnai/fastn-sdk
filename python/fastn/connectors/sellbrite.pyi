@@ -4,8 +4,12 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+
+class _SellbriteUpsertProductCustomAttributes(TypedDict, total=False):
+    attribute1: str
+    attribute2: str
 
 class SellbriteConnector:
     """Sellbrite connector ().
@@ -13,7 +17,7 @@ class SellbriteConnector:
     Provides 9 tools.
     """
 
-    def create_warehouse(
+    def sellbrite_create_warehouse(
         self,
         address_line_1: str,
         city: str,
@@ -24,7 +28,7 @@ class SellbriteConnector:
         address_line_2: Optional[str] = None,
         phone: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new warehouse for storing products using the Warehouses connector.
+        """Creates a new warehouse in Sellbrite for storing and managing product inventory. Use this tool when adding a new physical or virtual warehouse location to your Sellbrite account. Do not use this tool to update an existing warehouse.
 
         Args:
             address_line_1: First line of the customer's address. (required)
@@ -40,11 +44,11 @@ class SellbriteConnector:
         """
         ...
 
-    def delete_product(
+    def sellbrite_delete_product(
         self,
         productSku: str,
     ) -> Dict[str, Any]:
-        """Removes a product from the inventory via the Products connector.
+        """Permanently deletes a product from Sellbrite, identified by its SKU. Use this tool only when a product must be fully removed from the catalog. This action is irreversible and cannot be undone. Do not use this tool to simply update or deactivate a product.
 
         Args:
             productSku: Product SKU for Sellbrite API request. (required)
@@ -53,29 +57,11 @@ class SellbriteConnector:
         """
         ...
 
-    def get_inventory(
-        self,
-    ) -> Dict[str, Any]:
-        """Fetches the current inventory levels for products from the Inventory connector.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_orders(
-        self,
-    ) -> Dict[str, Any]:
-        """Retrieves a list of orders placed using the Orders connector.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_product(
+    def sellbrite_get_product(
         self,
         productSku: str,
     ) -> Dict[str, Any]:
-        """Fetches detailed information about a specific product using the Products connector.
+        """Retrieves detailed information about a single product in Sellbrite, identified by its SKU. Use this tool to fetch product title, description, pricing, and attributes for a specific SKU. Do not use this tool to retrieve a list of all products.
 
         Args:
             productSku: Product SKU for the Sellbrite API request. (required)
@@ -84,27 +70,46 @@ class SellbriteConnector:
         """
         ...
 
-    def get_products(
+    def sellbrite_list_inventory(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves a list of products in the inventory using the Products connector.
+        """Lists current inventory levels for all products in Sellbrite. Use this tool to retrieve stock quantities, warehouse allocations, and inventory details across all SKUs. Do not use this tool to update inventory levels or retrieve details for a single product.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_warehouses(
+    def sellbrite_list_orders(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves a list of warehouses where products are stored using the Warehouses connector.
+        """Lists all orders in Sellbrite. Use this tool to retrieve a collection of orders, optionally filtered by status or date range. Returns order details including line items, quantities, shipping information, and fulfillment status. Do not use this tool to retrieve a single order by ID.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def updatewarehouses(
+    def sellbrite_list_products(
+        self,
+    ) -> Dict[str, Any]:
+        """Lists all products in the Sellbrite catalog. Use this tool to retrieve a collection of products including their SKUs, titles, pricing, and inventory details. Do not use this tool to retrieve a single product by SKU.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def sellbrite_list_warehouses(
+        self,
+    ) -> Dict[str, Any]:
+        """Lists all warehouses configured in Sellbrite. Use this tool to retrieve warehouse names, addresses, and identifiers. Do not use this tool to retrieve, update, or create a single warehouse.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def sellbrite_update_warehouse(
         self,
         name: str,
+        warehouseId: str,
         address_line_1: Optional[str] = None,
         city: Optional[str] = None,
         country: Optional[str] = None,
@@ -112,10 +117,11 @@ class SellbriteConnector:
         postal_code: Optional[str] = None,
         state: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates information for existing warehouses using the Warehouses connector.
+        """Updates the details of an existing warehouse in Sellbrite, identified by its warehouse ID. Use this tool to modify warehouse name, address, or other configuration fields. This operation overwrites the existing warehouse record. Do not use this tool to create a new warehouse.
 
         Args:
             name: The name. (required)
+            warehouseId: The ID of the warehouse. (required)
             address_line_1: The first line of the address.
             city: The city.
             country: The country.
@@ -127,16 +133,17 @@ class SellbriteConnector:
         """
         ...
 
-    def upsert_product(
+    def sellbrite_upsert_product(
         self,
         category_name: str,
         name: str,
         price: str,
+        productSku: str,
         asin: Optional[str] = None,
         brand: Optional[str] = None,
         condition: Optional[str] = None,
         condition_note: Optional[str] = None,
-        custom_attributes: Optional[Dict[str, Any]] = None,
+        custom_attributes: Optional[_SellbriteUpsertProductCustomAttributes] = None,
         description: Optional[str] = None,
         ean: Optional[str] = None,
         epid: Optional[str] = None,
@@ -157,12 +164,13 @@ class SellbriteConnector:
         upc: Optional[str] = None,
         warranty: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Adds or updates a product in the inventory through the Products connector.
+        """Creates a new product or updates an existing product in Sellbrite, identified by its SKU. Use this tool when you need to insert a product that may or may not already exist, or when updating product details such as title, price, or description. If the SKU already exists, the existing record will be overwritten. Do not use this tool for partial updates to a single field.
 
         Args:
             category_name: Name of the product category. (required)
             name: Name of the product. (required)
             price: Price of the product. (required)
+            productSku: SKU of the product to be updated.  Required for updates. (required)
             asin: ASIN of the product.
             brand: Brand of the product.
             condition: Condition of the product (e.g., new, used).

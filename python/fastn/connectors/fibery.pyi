@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class FiberyConnector:
@@ -13,11 +13,11 @@ class FiberyConnector:
     Provides 2 tools.
     """
 
-    def get_file(
+    def fibery_get_file(
         self,
         fileId: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a file from the designated cloud storage in the file management connector.
+        """Downloads or retrieves a specific file stored in the Fibery workspace, identified by its file ID. Use this tool when you need to access the binary content or metadata of a file previously uploaded to Fibery. Do not use this tool to upload new files or to list all available files.
 
         Args:
             fileId: 
@@ -26,11 +26,11 @@ class FiberyConnector:
         """
         ...
 
-    def upload_file(
+    def fibery_upload_file(
         self,
         file: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Uploads a file to the designated cloud storage in the file management connector.
+        """Uploads a new file to the Fibery workspace file storage. Use this tool when you need to attach or store a file within Fibery for later reference or linkage to workspace entities. This action creates a new file record and returns a file ID that can be used in subsequent operations. Do not use this tool to retrieve or update an existing file.
 
         Args:
             file: 

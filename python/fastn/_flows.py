@@ -158,7 +158,7 @@ def _build_nested_schema(fields: Set[str]) -> Dict[str, Any]:
     }
 
 
-def _extract_input_fields(flow_data: Dict[str, Any]) -> Dict[str, Any]:
+def _extract_flow_input_fields(flow_data: Dict[str, Any]) -> Dict[str, Any]:
     """Extract input field names by walking the entire flow response tree.
 
     Scans every string value anywhere in *flow_data* for input references
@@ -356,7 +356,7 @@ def _extract_output_fields(flow_data: Dict[str, Any]) -> Dict[str, Any]:
     - ``code`` strings with JSON key patterns or return statements
     - Any ``outputSchema`` dict attached to the node
 
-    Returns the same shape as ``_extract_input_fields``:
+    Returns the same shape as ``_extract_flow_input_fields``:
     ``{"fields": [...], "schema": {...}}``.
     """
     collected_schemas: List[Dict[str, Any]] = []
@@ -712,7 +712,7 @@ class _FlowsSync:
             (JSON-Schema-style object).
         """
         flow_data = self.get(flow_name)
-        return _extract_input_fields(flow_data)
+        return _extract_flow_input_fields(flow_data)
 
     def get_run(self, run_id: str) -> Dict[str, Any]:
         """Get the status of a flow run.
@@ -888,7 +888,7 @@ class _FlowsAsync:
     async def schema(self, flow_name: str) -> Dict[str, Any]:
         """Discover the input schema of a flow (async)."""
         flow_data = await self.get(flow_name)
-        return _extract_input_fields(flow_data)
+        return _extract_flow_input_fields(flow_data)
 
     async def get_run(self, run_id: str) -> Dict[str, Any]:
         """Get the status of a flow run (async)."""

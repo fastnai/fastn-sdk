@@ -4,8 +4,34 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+
+class _UprocProcessMultipleParams(TypedDict, total=False):
+    mobile: List[Any]
+
+class _UprocProcessMultipleCallback(TypedDict, total=False):
+    data: str
+    end: str
+    error: str
+    progress: str
+    start: str
+
+class _UprocProcessRowParams(TypedDict, total=False):
+    mobile: str
+
+class _UprocProcessRowWithCallbackCallback(TypedDict, total=False):
+    data: str
+
+class _UprocProcessRowWithCallbackParams(TypedDict, total=False):
+    mobile: str
+
+class _UprocStreamProcessCallback(TypedDict, total=False):
+    data: str
+    end: str
+    error: str
+    progress: str
+    start: str
 
 class UprocConnector:
     """uProc connector ().
@@ -13,16 +39,16 @@ class UprocConnector:
     Provides 4 tools.
     """
 
-    def multiple(
+    def uproc_process_multiple(
         self,
-        params: Dict[str, Any],
+        params: _UprocProcessMultipleParams,
         processor: str,
-        callback: Optional[Dict[str, Any]] = None,
+        callback: Optional[_UprocProcessMultipleCallback] = None,
         limit: Optional[str] = None,
         normalized: Optional[bool] = None,
         write_titles: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Executes multiple operations sequentially using the 'multiple' connector, allowing for handling various tasks in a single workflow.
+        """Submits multiple data rows to the uProc API for batch processing in a single request, allowing validation, cleaning, or enrichment of several records at once. Use this tool when you have more than one record to process and want to reduce the number of API calls. Do not use this tool for a single record — use uproc_process_row instead. Do not use this tool for continuous real-time data streams — use uproc_stream_process instead.
 
         Args:
             params: Parameters for the uProc request. (required)
@@ -36,15 +62,15 @@ class UprocConnector:
         """
         ...
 
-    def one_row(
+    def uproc_process_row(
         self,
-        params: Dict[str, Any],
+        params: _UprocProcessRowParams,
         processor: str,
         cache: Optional[bool] = None,
         limit: Optional[str] = None,
         normalized: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Performs a single row operation with the 'oneRow' connector, suitable for tasks that require manipulation of individual data entries.
+        """Submits a single data row to the uProc API for synchronous processing, such as validating, cleaning, or enriching an individual data record. Use this tool when you need to process exactly one record and want an immediate response. Do not use this tool for multiple records — use uproc_process_multiple instead. Do not use this tool if you need an asynchronous callback — use uproc_process_row_with_callback instead.
 
         Args:
             params: Additional parameters for processing. (required)
@@ -57,16 +83,16 @@ class UprocConnector:
         """
         ...
 
-    def one_row_with_callback(
+    def uproc_process_row_with_callback(
         self,
-        callback: Dict[str, Any],
-        params: Dict[str, Any],
+        callback: _UprocProcessRowWithCallbackCallback,
+        params: _UprocProcessRowWithCallbackParams,
         processor: str,
         cache: Optional[bool] = None,
         limit: Optional[str] = None,
         normalized: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Handles a single row operation with the option for a callback using the 'oneRowWithCallback' connector, facilitating additional processing after the main task completion.
+        """Submits a single data row to the uProc API for processing and registers a callback URL to receive the result asynchronously once processing is complete. Use this tool when you need to process one record at a time and want to be notified upon completion rather than waiting for a synchronous response. Do not use this tool if you do not need a callback — use uproc_process_row for synchronous single-row processing instead.
 
         Args:
             callback: Callback information. (required)
@@ -80,18 +106,18 @@ class UprocConnector:
         """
         ...
 
-    def stream(
+    def uproc_stream_process(
         self,
         processors: List[Any],
         stream: str,
-        callback: Optional[Dict[str, Any]] = None,
+        callback: Optional[_UprocStreamProcessCallback] = None,
         first_row: Optional[str] = None,
         last_row: Optional[str] = None,
         limit: Optional[str] = None,
         upload_results: Optional[bool] = None,
         write_titles: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Streams data in real-time using the 'stream' connector, perfect for continuous data flow tasks that require immediate processing.
+        """Streams a continuous flow of data records to the uProc API for real-time processing. Use this tool when you need to process a high-throughput or ongoing stream of data that requires immediate handling as records arrive. Do not use this tool for single-record or small batch operations — use uproc_process_row or uproc_process_multiple instead.
 
         Args:
             processors:  (required)

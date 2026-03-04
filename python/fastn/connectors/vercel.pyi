@@ -1,26 +1,33 @@
-"""Fastn vercel connector — auto-generated type stubs.
+"""Fastn Vercel connector — auto-generated type stubs.
 
 Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+
+class _VercelCreateDeploymentProjectsettings(TypedDict, total=False):
+    buildCommand: str
+    devCommand: str
+    framework: str
+    installCommand: str
+    outputDirectory: str
 
 class VercelConnector:
-    """vercel connector ().
+    """Vercel connector ().
 
     Provides 3 tools.
     """
 
-    def create_deployment(
+    def vercel_create_deployment(
         self,
         files: List[Any],
         name: str,
-        projectSettings: Optional[Dict[str, Any]] = None,
+        projectSettings: Optional[_VercelCreateDeploymentProjectsettings] = None,
         target: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new deployment within the specified connector's infrastructure.
+        """Creates and triggers a new deployment on Vercel for a specified project. Upon success, Vercel begins building and deploying the application, returning a deployment ID and preview URL. Use this tool when you need to deploy new or updated application code to Vercel. Note that this initiates a build process that may incur usage costs. Do not use this tool to list or inspect existing deployments — use vercel_list_deployments instead.
 
         Args:
             files:  (required)
@@ -32,13 +39,13 @@ class VercelConnector:
         """
         ...
 
-    def create_project(
+    def vercel_create_project(
         self,
         name: str,
         framework: Optional[str] = None,
         publicSource: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Creates a new project in the specified connector environment.
+        """Creates a new project in the authenticated Vercel account, setting up the project configuration required before deployments can be made. Use this tool when you are onboarding a new application or repository to Vercel for the first time. Do not use this tool to deploy code — use vercel_create_deployment after the project has been created.
 
         Args:
             name: The name of the project. (required)
@@ -49,7 +56,7 @@ class VercelConnector:
         """
         ...
 
-    def get_deployments(
+    def vercel_list_deployments(
         self,
         app: Optional[str] = None,
         from: Optional[str] = None,
@@ -63,7 +70,7 @@ class VercelConnector:
         teamId: Optional[str] = None,
         to: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of all deployments associated with the specified connector.
+        """Retrieves a list of all deployments associated with the authenticated Vercel account, including deployment status, creation date, and associated project details. Use this tool when you need an overview of current or past deployments. Do not use this tool to create a new deployment — use vercel_create_deployment instead.
 
         Args:
             app: Name of the application.

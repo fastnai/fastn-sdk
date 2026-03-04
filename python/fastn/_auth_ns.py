@@ -25,7 +25,7 @@ def _build_custom_auth_step(client_id: str, userinfo_url: str) -> Dict[str, Any]
                         "enum": [],
                         "title": "",
                         "description": "",
-                        "isRequred": False,
+                        "isRequred": False,  # NB: typo matches the API schema
                         "default": "",
                         "autoEscape": "MANUAL",
                     }
@@ -35,7 +35,7 @@ def _build_custom_auth_step(client_id: str, userinfo_url: str) -> Dict[str, Any]
                 "enum": [],
                 "title": "",
                 "description": "",
-                "isRequred": False,
+                "isRequred": False,  # NB: typo matches the API schema
                 "default": [],
             },
             "url": {
@@ -65,7 +65,7 @@ def _build_custom_auth_step(client_id: str, userinfo_url: str) -> Dict[str, Any]
                 "enum": [],
                 "title": "",
                 "description": "",
-                "isRequred": False,
+                "isRequred": False,  # NB: typo matches the API schema
                 "default": [],
                 "autoEscape": "MANUAL",
                 "byUser": True,
@@ -82,7 +82,7 @@ def _build_custom_auth_step(client_id: str, userinfo_url: str) -> Dict[str, Any]
                 "enum": [],
                 "title": "",
                 "description": "",
-                "isRequred": False,
+                "isRequred": False,  # NB: typo matches the API schema
                 "default": [],
                 "autoEscape": "MANUAL",
                 "byUser": True,

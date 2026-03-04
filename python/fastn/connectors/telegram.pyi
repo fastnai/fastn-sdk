@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class TelegramConnector:
@@ -13,12 +13,12 @@ class TelegramConnector:
     Provides 10 tools.
     """
 
-    def delete_message(
+    def telegram_delete_message(
         self,
         chat_id: str,
         message_id: str,
     ) -> Dict[str, Any]:
-        """Deletes a message from a user or group in the messaging platform using the messaging connector.
+        """Permanently deletes a specific message from a Telegram chat by chat ID and message ID. Use this tool when you need to remove an incorrect, outdated, or inappropriate message sent by the bot. Note that message deletion is irreversible—the message cannot be recovered after deletion. The bot must have the appropriate delete permissions in the target chat. Do not use this tool to edit message content (use telegram_edit_message_text or telegram_edit_message_caption instead).
 
         Args:
             chat_id: Unique identifier for the target chat. (required)
@@ -28,7 +28,7 @@ class TelegramConnector:
         """
         ...
 
-    def edit_message_caption(
+    def telegram_edit_message_caption(
         self,
         chat_id: str,
         message_id: str,
@@ -40,7 +40,7 @@ class TelegramConnector:
         reply_markup: Optional[str] = None,
         show_caption_above_media: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Edits the caption of an existing media message in the messaging platform via the messaging connector.
+        """Edits the caption of a previously sent Telegram message that contains media (such as a photo, video, or document). Use this tool when you need to update the descriptive text attached to a media message without resending the media. Do not use this tool to edit plain text messages (use telegram_edit_message_text) or to modify the media file itself. Only messages sent by the bot can be edited.
 
         Args:
             chat_id: Unique identifier for the target chat. (required)
@@ -57,7 +57,7 @@ class TelegramConnector:
         """
         ...
 
-    def edit_message_text(
+    def telegram_edit_message_text(
         self,
         chat_id: str,
         message_id: str,
@@ -70,7 +70,7 @@ class TelegramConnector:
         parse_mode: Optional[str] = None,
         reply_markup: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Edits the text of an existing message in the messaging platform using the messaging connector.
+        """Edits the text content of a previously sent Telegram text message. Use this tool when you need to correct, update, or append information to an existing bot message in a chat. Do not use this tool to edit media captions (use telegram_edit_message_caption) or to send a new message (use telegram_send_message). Only messages originally sent by the bot can be edited, and edits are visible to all chat participants.
 
         Args:
             chat_id: Unique identifier for the target chat. (required)
@@ -88,11 +88,11 @@ class TelegramConnector:
         """
         ...
 
-    def get_chat(
+    def telegram_get_chat(
         self,
         chat_id: str,
     ) -> Dict[str, Any]:
-        """Retrieves information about a specific chat in the messaging platform through the messaging connector.
+        """Retrieves detailed metadata for a specific Telegram chat, including its title, type (private, group, supergroup, or channel), description, member count, and settings. Use this tool when you need to inspect or validate chat properties before sending messages or performing administrative actions. Do not use this tool to retrieve message history or chat updates (use telegram_list_updates instead).
 
         Args:
             chat_id: The unique identifier for the Telegram chat. (required)
@@ -101,14 +101,14 @@ class TelegramConnector:
         """
         ...
 
-    def get_updates(
+    def telegram_list_updates(
         self,
         allowed_updates: Optional[str] = None,
         limit: Optional[str] = None,
         offset: Optional[str] = None,
         timeout: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves updates and messages from the messaging platform, allowing you to get the latest communications through the messaging connector.
+        """Retrieves a list of pending incoming updates for the bot, including new messages, edited messages, callback queries, and other events, using Telegrams long-polling mechanism. Use this tool to process incoming user interactions when webhooks are not configured. Do not use this tool to retrieve static chat metadata (use telegram_get_chat) or to send messages. Note that confirmed updates are removed from the queue once acknowledged, so each update should be processed exactly once.
 
         Args:
             allowed_updates: Specifies the types of updates to receive.
@@ -120,7 +120,7 @@ class TelegramConnector:
         """
         ...
 
-    def send_audio(
+    def telegram_send_audio(
         self,
         audio: str,
         chat_id: str,
@@ -140,7 +140,7 @@ class TelegramConnector:
         thumbnail: Optional[str] = None,
         title: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Sends an audio file to a user or group in the messaging platform using the messaging connector.
+        """Sends an audio file to a specified Telegram chat or user, displayed in the Telegram music player with support for title and performer metadata. Use this tool when you need to share music or audio recordings in formats such as MP3. Do not use this tool for OGG/OPUS voice messages (use telegram_send_voice) or general file attachments (use telegram_send_document). Sending audio is a write operation and is visible to all participants in the target chat.
 
         Args:
             audio: Audio file to be sent (if applicable). (required)
@@ -165,7 +165,7 @@ class TelegramConnector:
         """
         ...
 
-    def send_document(
+    def telegram_send_document(
         self,
         chat_id: str,
         document: str,
@@ -183,7 +183,7 @@ class TelegramConnector:
         reply_to_message_id: Optional[str] = None,
         thumbnail: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Sends a document file to a user or group in the messaging platform via the messaging connector.
+        """Sends a file as a document to a specified Telegram chat or user. Use this tool when you need to deliver files such as PDFs, spreadsheets, ZIPs, or other file types that should be received as downloadable attachments. Do not use this tool for sending photos intended for inline display (use telegram_send_photo), audio files (use telegram_send_audio), or voice messages (use telegram_send_voice). Sending a document is a write operation and is visible to all participants in the target chat.
 
         Args:
             chat_id: Unique identifier for the target chat. (required)
@@ -206,7 +206,7 @@ class TelegramConnector:
         """
         ...
 
-    def send_message(
+    def telegram_send_message(
         self,
         chat_id: str,
         text: str,
@@ -223,7 +223,7 @@ class TelegramConnector:
         reply_markup: Optional[str] = None,
         reply_to_message_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Sends a text message to a user or group in the messaging platform via the messaging connector.
+        """Sends a plain text message to a specified Telegram user, group, supergroup, or channel using the bot. Supports optional formatting modes (Markdown or HTML) and reply markup. Use this tool for delivering text-based notifications, responses, or alerts. Do not use this tool to send media such as photos (use telegram_send_photo), audio (use telegram_send_audio), documents (use telegram_send_document), or voice messages (use telegram_send_voice). Sending a message is a write operation and is immediately visible to all participants in the target chat.
 
         Args:
             chat_id: Unique identifier for the target chat. (required)
@@ -245,7 +245,7 @@ class TelegramConnector:
         """
         ...
 
-    def send_photo(
+    def telegram_send_photo(
         self,
         chat_id: str,
         photo: str,
@@ -262,7 +262,7 @@ class TelegramConnector:
         reply_markup: Optional[str] = None,
         reply_to_message_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Sends a photo to a user or group in the messaging platform through the messaging connector.
+        """Sends a photo to a specified Telegram chat or user, displayed inline in the chat. An optional caption can be included. Use this tool when you need to deliver image content such as screenshots, charts, or pictures. Do not use this tool for sending general files or non-image documents (use telegram_send_document) or audio content. Sending a photo is a write operation and is visible to all participants in the target chat.
 
         Args:
             chat_id: Unique identifier for the target chat. (required)
@@ -284,7 +284,7 @@ class TelegramConnector:
         """
         ...
 
-    def send_voice(
+    def telegram_send_voice(
         self,
         chat_id: str,
         voice: str,
@@ -301,7 +301,7 @@ class TelegramConnector:
         reply_markup: Optional[str] = None,
         reply_to_message_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Sends a voice message to a user or group in the messaging platform through the messaging connector.
+        """Sends an audio file as a voice message to a specified Telegram chat or user. The file must be in OGG format encoded with OPUS for Telegram to display it as a playable voice note. Use this tool when you need to deliver spoken audio content, such as voice notifications or recorded messages. Do not use this tool to send general audio files in other formats (use telegram_send_audio) or documents (use telegram_send_document). Sending a message is a write operation and is visible to all participants in the target chat.
 
         Args:
             chat_id: Telegram API Parameter: Unique identifier for the target chat. (required)

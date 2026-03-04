@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class AwsCloudwatchConnector:
@@ -13,7 +13,7 @@ class AwsCloudwatchConnector:
     Provides 1 tools.
     """
 
-    def execute_query(
+    def aws_cloudwatch_execute_query(
         self,
         endTime: Optional[str] = None,
         limit: Optional[int] = None,
@@ -21,7 +21,7 @@ class AwsCloudwatchConnector:
         queryString: Optional[str] = None,
         startTime: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Executes a SQL query against the connected database to retrieve or manipulate data.
+        """Executes a CloudWatch Logs Insights query against one or more CloudWatch log groups to retrieve and analyze log data. Use this tool when you need to run structured queries over CloudWatch logs to diagnose application issues, extract metrics from logs, or investigate system behavior. Do not use this tool for querying CloudWatch metrics (time-series data); use CloudWatch Metrics APIs for that purpose. Note: query execution may take time to complete depending on log volume.
 
         Args:
             endTime: End time for the log query (e.g., ISO8601 format).

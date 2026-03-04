@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class ZamzarConnector:
@@ -13,12 +13,12 @@ class ZamzarConnector:
     Provides 10 tools.
     """
 
-    def convert_amazon_file(
+    def convert_amazon_file_zamzar(
         self,
         source_file: str,
         target_format: str,
     ) -> Dict[str, Any]:
-        """Converts a file stored in Amazon S3 into the required format.
+        """Converts a file stored in Amazon using the Zamzar online service, enabling users to transform video, audio, image, or eBook formats without requiring an account or downloads.
 
         Args:
             source_file: URL or path to the source file. (required)
@@ -43,12 +43,12 @@ class ZamzarConnector:
         """
         ...
 
-    def convert_url_file(
+    def convert_url_file_zamzar(
         self,
         source_file: str,
         target_format: str,
     ) -> Dict[str, Any]:
-        """Converts a file located at a specified URL into the desired format.
+        """Converts a file located at a URL through the Zamzar online converter, allowing for media transformation without the necessity of download or account creation.
 
         Args:
             source_file: URL or path to the source file to be converted. (required)
@@ -73,11 +73,11 @@ class ZamzarConnector:
         """
         ...
 
-    def delete_file(
+    def delete_file_zamzar(
         self,
         fileId: str,
     ) -> Dict[str, Any]:
-        """Removes a file from the specified storage system.
+        """Deletes a specific file from the Zamzar service, allowing users to manage their converted files online without the necessity of creating an account or downloading any software.
 
         Args:
             fileId: The unique identifier of the file on Zamzar. (required)
@@ -86,11 +86,11 @@ class ZamzarConnector:
         """
         ...
 
-    def get_file(
+    def get_file_zamzar(
         self,
         fileId: str,
     ) -> Dict[str, Any]:
-        """Fetches details of a single file from the specified storage system.
+        """Fetches a specific file from the Zamzar platform, enabling users to access their converted video, audio, image, or eBook files online without any downloads or account requirements.
 
         Args:
             fileId: The ID of the file to be processed on Zamzar. (required)

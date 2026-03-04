@@ -56,14 +56,17 @@ def _extract_org_id(config):
     return ""
 
 
-def _handle_401(resp: httpx.Response, config=None) -> None:
+def _handle_401(resp: httpx.Response, config=None, connector_label: str = "") -> None:
     """Raise a clear error for 401 responses.
 
-    If we can determine the token is still valid locally, the 401 is likely
-    a resource-access issue — show the API's own error message.  Otherwise
-    assume an auth problem and suggest re-login.
+    If the user's Fastn token is still valid locally, the 401 is most likely
+    a *connector*-level auth failure (the downstream connector's OAuth token
+    has expired or been revoked).  In that case we suggest reconnecting the
+    connector rather than re-logging in.
+
+    When we can't determine token status, we suggest ``fastn login``.
     """
-    # Try to figure out whether the token is actually expired.
+    # Try to figure out whether the user's token is actually expired.
     token_expired = True  # pessimistic default
     if config is not None:
         try:
@@ -72,18 +75,37 @@ def _handle_401(resp: httpx.Response, config=None) -> None:
         except Exception:
             pass
 
-    if not token_expired:
-        # Token is still valid → the 401 is a resource/access issue.
-        try:
-            detail = resp.json().get("error", "")
-        except (ValueError, RuntimeError):
-            detail = ""
-        msg = detail or "Access denied"
-        raise click.ClickException(f"{msg}")
+    # Extract the API's own error detail regardless of expiry path.
+    detail = ""
+    try:
+        body = resp.json()
+        if isinstance(body, dict):
+            detail = body.get("message", "") or body.get("error", "") or ""
+    except (ValueError, RuntimeError):
+        pass
 
-    # Token appears expired or we can't tell — assume auth issue.
+    if not token_expired:
+        # User's Fastn token is still valid → the 401 is likely a
+        # connector-level auth failure (e.g. Slack OAuth token expired).
+        hint = f" for '{connector_label}'" if connector_label else ""
+        workspace_id = ""
+        if config is not None:
+            try:
+                workspace_id = config.resolve_project_id()
+            except Exception:
+                pass
+        app_url = _workspace_url(workspace_id)
+        raise click.ClickException(
+            f"Connector authentication failed{hint}: {detail or 'token invalid'}.\n"
+            f"  Your Fastn login is valid — this means the connector's OAuth token\n"
+            f"  has expired or been revoked.\n"
+            f"  Reconnect it at: {app_url}\n"
+            f"  Then retry: fastn connector run ..."
+        )
+
+    # Token appears expired or we can't tell — assume platform auth issue.
     raise click.ClickException(
-        "Authentication failed. Run `fastn login` to re-authenticate."
+        detail or "Authentication failed. Run `fastn login` to re-authenticate."
     )
 
 
@@ -120,6 +142,15 @@ def _is_verbose() -> bool:
     return False
 
 
+def _build_curl(url: str, headers: dict, payload: dict) -> str:
+    """Build a copy-pasteable curl command from a request."""
+    parts = [f"curl -X POST '{url}'"]
+    for k, v in headers.items():
+        parts.append(f"  -H '{k}: {v}'")
+    parts.append(f"  -d '{json.dumps(payload)}'")
+    return " \\\n".join(parts)
+
+
 def _verbose_post(url: str, headers: dict, payload: dict, timeout: float = 30.0) -> httpx.Response:
     """Make a POST request with verbose logging when -v is enabled."""
     verbose = _is_verbose()
@@ -129,6 +160,10 @@ def _verbose_post(url: str, headers: dict, payload: dict, timeout: float = 30.0)
         click.echo(f"  [API] POST {url}")
         click.echo(f"  [API] Headers: {json.dumps(_redact_headers(headers), indent=2)}")
         click.echo(f"  [API] Payload: {json.dumps(payload, indent=2)}")
+        click.echo()
+        click.echo("  [curl]")
+        click.echo(f"  {_build_curl(url, headers, payload)}")
+        click.echo()
 
     resp = httpx.post(url, headers=headers, json=payload, timeout=timeout)
 
@@ -152,14 +187,14 @@ def _workspace_url(workspace_id: str) -> str:
 
 
 def _handle_execute_error(resp: httpx.Response, connector_label: str = "",
-                          workspace_id: str = "") -> None:
+                          workspace_id: str = "", config=None) -> None:
     """Check for execution errors and raise with helpful messages.
 
     Detects common error patterns from the executeTool API and provides
     actionable guidance, especially for connectors that aren't enabled yet.
     """
     if resp.status_code == 401:
-        _handle_401(resp)
+        _handle_401(resp, config, connector_label=connector_label)
 
     if resp.status_code >= 400:
         # Try to parse the error body for specific error types

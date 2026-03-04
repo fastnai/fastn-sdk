@@ -49,6 +49,9 @@ def _save_snapshot_and_generate_package_stubs(registry: dict) -> None:
 
     This writes stubs into ``python/fastn/`` so they ship in the published wheel.
     Only runs when executed from within the SDK repo (generator/ must exist).
+
+    Compares against the existing snapshot to detect changes. Skips stub
+    generation when nothing changed and highlights breaking changes.
     """
     from pathlib import Path as _Path
 
@@ -66,6 +69,41 @@ def _save_snapshot_and_generate_package_stubs(registry: dict) -> None:
         click.echo("  (Skipping package stub generation — generator not found)")
         return
 
+    # Load existing snapshot for comparison
+    old_registry: dict = {}
+    if snapshot_path.exists():
+        try:
+            old_registry = json.loads(snapshot_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Diff old vs new across all connectors
+    try:
+        from generator.diff import diff_registries
+
+        result = diff_registries(old_registry, registry)
+    except ImportError:
+        result = None
+
+    if result is not None and not result.changes:
+        click.echo("  Package stubs up to date — no changes detected.")
+        return
+
+    # Show what changed
+    if result is not None and result.changes:
+        summary = result.summary()
+        if summary:
+            click.echo()
+            click.echo(summary)
+
+        if result.has_breaking_changes:
+            click.echo()
+            click.echo(
+                f"  \u26a0 {len(result.breaking_changes)} breaking change(s) "
+                f"in package stubs!"
+            )
+        click.echo()
+
     # Save snapshot
     snapshot_path.write_text(json.dumps(registry, indent=2, sort_keys=True))
     click.echo(f"\u2713 Saved registry snapshot to {snapshot_path.relative_to(sdk_root)}")
@@ -80,7 +118,8 @@ def _save_snapshot_and_generate_package_stubs(registry: dict) -> None:
 
 
 @connector.command()
-def sync() -> None:
+@click.option("--force", is_flag=True, help="Re-fetch all tool schemas even if cached")
+def sync(force: bool = False) -> None:
     """Sync all connectors, fetch tool schemas, and generate type stubs."""
     config = load_config()
     if not config.auth_token and not config.api_key:
@@ -97,6 +136,18 @@ def sync() -> None:
     old_registry = load_registry(fastn_dir)
 
     registry = _fetch_registry_list(config)
+
+    # Preserve cached tool schemas from the previous sync so we only
+    # re-fetch connectors that are genuinely new or never had tools.
+    if not force:
+        old_connectors = old_registry.get("connectors", {})
+        for name, cdata in registry.get("connectors", {}).items():
+            if not cdata.get("tools") and name in old_connectors:
+                cached = old_connectors[name]
+                if cached.get("tools"):
+                    cdata["tools"] = cached["tools"]
+                    cdata["tool_count"] = cached.get("tool_count", len(cached["tools"]))
+
     save_registry(registry, fastn_dir)
 
     # Update manifest
@@ -108,7 +159,7 @@ def sync() -> None:
     connector_count = len(registry.get("connectors", {}))
     click.echo(f"\u2713 Registry synced: {connector_count} connectors available.")
 
-    # Fetch tool schemas for every connector (concurrently)
+    # Fetch tool schemas only for connectors without cached tools
     reg_connectors = registry.get("connectors", {})
     to_fetch = [
         (name, cdata)
@@ -421,24 +472,24 @@ def _show_active_connectors(
         click.echo(f"No active connectors. Enable connectors at: {app_url}")
         return
 
-    # --- 3. Build actionId -> connector_name reverse lookup ---------------
+    # --- 3. Build toolId -> connector_name reverse lookup ---------------
     # The getTools API response doesn't include connector names -- tools
-    # only have actionId, type, and function.{name, description, parameters}.
+    # only have toolId, type, and function.{name, description, parameters}.
     action_to_connector: Dict[str, str] = {}
     for cname, cdata in connectors.items():
         for _tkey, tinfo in cdata.get("tools", {}).items():
-            aid = tinfo.get("actionId", "")
+            aid = tinfo.get("toolId", "") or tinfo.get("actionId", "")
             if aid:
                 action_to_connector[aid] = cname
 
-    # Collect the set of active actionIds that still need resolving
+    # Collect the set of active toolIds that still need resolving
     active_action_ids = {
-        t.get("actionId", "") for t in tool_list if t.get("actionId")
+        (t.get("toolId", "") or t.get("actionId", "")) for t in tool_list if (t.get("toolId") or t.get("actionId"))
     }
     unresolved_ids = active_action_ids - set(action_to_connector.keys())
 
     # For connectors that haven't been `fastn connector add`-ed yet (tools dict is
-    # empty), fetch their tool list so we can map actionIds.
+    # empty), fetch their tool list so we can map toolIds.
     # Phase 1: workspace/org connectors (always fetched)
     # Phase 2: community connectors (only if unresolved IDs remain)
     unfetched_local = [
@@ -466,7 +517,7 @@ def _show_active_connectors(
             tools_map: Dict[str, Any] = {}
             for node in tool_nodes:
                 parsed = _parse_tool_node(node)
-                aid = parsed["data"].get("actionId", "")
+                aid = parsed["data"].get("toolId", "") or parsed["data"].get("actionId", "")
                 if aid:
                     action_to_connector[aid] = cname
                 tools_map[parsed["key"]] = parsed["data"]
@@ -499,7 +550,7 @@ def _show_active_connectors(
     # --- 4. Group active tools by connector name ---------------------------
     by_connector: dict = {}
     for tool_entry in tool_list:
-        action_id = tool_entry.get("actionId", "")
+        action_id = tool_entry.get("toolId", "") or tool_entry.get("actionId", "")
         func = tool_entry.get("function", {})
         tname = func.get("name", "") or action_id
         desc = func.get("description", "")
@@ -523,7 +574,7 @@ def _show_active_connectors(
         by_connector.setdefault(cname, []).append({
             "name": tname,
             "description": desc,
-            "actionId": action_id,
+            "toolId": action_id,
         })
 
     # --- 5. Include selected connectors with 0 active tools -------------
@@ -553,7 +604,7 @@ def _show_active_connectors(
         if verbose and tools_in_group:
             for t in sorted(tools_in_group, key=lambda x: x["name"]):
                 desc = t.get("description", "")
-                tname = _to_snake_case(t["name"]) if t["name"] else t["actionId"]
+                tname = _to_snake_case(t["name"]) if t["name"] else t["toolId"]
                 if desc:
                     click.echo(f"      {tname:<30} {desc}")
                 else:

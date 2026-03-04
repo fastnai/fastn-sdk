@@ -9,7 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from fastn.cli import cli
-from fastn._flows import _extract_input_fields, _extract_output_fields
+from fastn._flows import _extract_flow_input_fields as _extract_input_fields, _extract_output_fields
 
 
 # ---------------------------------------------------------------------------
@@ -548,7 +548,7 @@ class TestFlowsSchemaCommand:
     @patch("fastn.cli.flows_command._verbose_post")
     @patch("fastn.cli.flows_command.load_config")
     def test_schema_ai_tool_format(self, mock_load, mock_post):
-        """Outputs AI tool format JSON with name, description, actionId, inputSchema, outputSchema."""
+        """Outputs AI tool format JSON with name, description, toolId, inputSchema, outputSchema."""
         mock_load.return_value = _mock_config()
         mock_post.return_value = _mock_response(json_data=_SAMPLE_FLOW_WITH_STEPS)
 
@@ -559,7 +559,7 @@ class TestFlowsSchemaCommand:
         tool = json.loads(result.output)
         assert tool["name"] == "testflow"
         assert tool["description"] == "A test flow"
-        assert tool["actionId"] == "testflow"
+        assert tool["toolId"] == "testflow"
 
         # inputSchema discovered from steps
         inp = tool["inputSchema"]
@@ -606,7 +606,7 @@ class TestFlowsSchemaCommand:
         assert result.exit_code == 0
         tool = json.loads(result.output)
         assert tool["name"] == "Send to Slack"
-        assert tool["actionId"] == "slackflow"
+        assert tool["toolId"] == "slackflow"
         assert tool["inputSchema"] == input_schema
 
     @patch("fastn.cli.flows_command._verbose_post")

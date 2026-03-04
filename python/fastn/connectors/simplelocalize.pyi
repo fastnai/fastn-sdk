@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class SimplelocalizeConnector:
@@ -13,7 +13,7 @@ class SimplelocalizeConnector:
     Provides 10 tools.
     """
 
-    def add_translations(
+    def simplelocalize_add_translations(
         self,
         key: str,
         language: str,
@@ -22,7 +22,7 @@ class SimplelocalizeConnector:
         namespace: Optional[str] = None,
         reviewStatus: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Adds translations to specified translation keys in the translation management system.
+        """Adds or updates translation string values for specified translation keys in your SimpleLocalize project. Use this to supply translated content for existing keys across one or more languages. Do not use this to create new translation keys — use simplelocalize_create_translation_key first. This operation modifies translation data in place on the specified keys.
 
         Args:
             key: The key for the translation. (required)
@@ -36,12 +36,12 @@ class SimplelocalizeConnector:
         """
         ...
 
-    def create_language(
+    def simplelocalize_create_language(
         self,
         key: str,
         name: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new language entry in the translation management system.
+        """Creates a new language entry in your SimpleLocalize project. Use this when you want to add support for a new locale or language to your translation workspace. Do not use this to update an existing language — use simplelocalize_update_language instead. This operation creates a persistent language record in the project.
 
         Args:
             key: The key for the localization entry. (required)
@@ -51,7 +51,7 @@ class SimplelocalizeConnector:
         """
         ...
 
-    def create_translation_key(
+    def simplelocalize_create_translation_key(
         self,
         key: str,
         charactersLimit: Optional[int] = None,
@@ -60,7 +60,7 @@ class SimplelocalizeConnector:
         namespace: Optional[str] = None,
         tags: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a new translation key in the translation management system.
+        """Creates a new translation key in your SimpleLocalize project. Use this when you need to register a new string identifier that will later be translated into one or more languages. Do not use this to add translation values — use simplelocalize_add_translations after creating the key. Do not use this to update or delete existing keys. This operation creates a persistent key record in the project.
 
         Args:
             key: The unique identifier for the localization key. (required)
@@ -74,11 +74,11 @@ class SimplelocalizeConnector:
         """
         ...
 
-    def delete_language(
+    def simplelocalize_delete_language(
         self,
         languageKey: str,
     ) -> Dict[str, Any]:
-        """Deletes a language entry from the translation management system.
+        """Permanently deletes a language entry from your SimpleLocalize project, identified by its languageKey. Use this when you need to remove a language and all its associated translations from the project. This action is irreversible — deleted languages and their translation data cannot be recovered. Do not use this to simply disable or hide a language; use simplelocalize_update_language for modifications instead.
 
         Args:
             languageKey: The language key to specify the target language. (required)
@@ -87,12 +87,12 @@ class SimplelocalizeConnector:
         """
         ...
 
-    def delete_translation_keys(
+    def simplelocalize_delete_translation_keys(
         self,
         key: str,
         namespace: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Deletes specified translation keys from the translation management system.
+        """Permanently deletes one or more translation keys from your SimpleLocalize project, along with all associated translations across all languages. Use this when you need to remove obsolete or unused keys. This action is irreversible — deleted keys and their translations cannot be recovered. Do not use this to remove a single languages translation value; use simplelocalize_add_translations to update individual values instead.
 
         Args:
             key: The key of the translation. (required)
@@ -102,11 +102,11 @@ class SimplelocalizeConnector:
         """
         ...
 
-    def get_language(
+    def simplelocalize_get_language(
         self,
         languageKey: str,
     ) -> Dict[str, Any]:
-        """Retrieves details of a specific language from the translation management system.
+        """Retrieves the details of a single language from your SimpleLocalize project, identified by its languageKey. Use this when you need metadata about a specific language such as its name or configuration. Do not use this to retrieve all languages — use simplelocalize_list_languages for that. This is a read-only operation with no side effects.
 
         Args:
             languageKey: The language key for the requested translation. (required)
@@ -115,25 +115,25 @@ class SimplelocalizeConnector:
         """
         ...
 
-    def get_languages(
+    def simplelocalize_list_languages(
         self,
     ) -> Dict[str, Any]:
-        """Lists all languages available in the translation management system.
+        """Retrieves a list of all languages configured in your SimpleLocalize project. Use this to discover available locales, their language keys, and metadata. Do not use this to retrieve a single specific language — use simplelocalize_get_language for that. This is a read-only operation with no side effects.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_translation_keys(
+    def simplelocalize_list_translation_keys(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves all translation keys from the translation management system.
+        """Retrieves all translation keys defined in your SimpleLocalize project. Use this to browse or audit the full set of keys available for translation. Do not use this to retrieve the translated string values — use simplelocalize_list_translations for that. This is a read-only operation with no side effects.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_translations(
+    def simplelocalize_list_translations(
         self,
         baseOnly: Optional[str] = None,
         customerId: Optional[str] = None,
@@ -147,7 +147,7 @@ class SimplelocalizeConnector:
         text: Optional[str] = None,
         textStatus: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches translations for specific keys from the translation management system.
+        """Retrieves translation values for specific keys from your SimpleLocalize project. Use this to fetch the actual translated strings associated with one or more translation keys, optionally filtered by language. Do not use this to retrieve translation keys without their values — use simplelocalize_list_translation_keys for that. This is a read-only operation with no side effects.
 
         Args:
             baseOnly: Filter results to include only base translations.
@@ -166,15 +166,17 @@ class SimplelocalizeConnector:
         """
         ...
 
-    def update_language(
+    def simplelocalize_update_language(
         self,
         key: str,
+        languageKey: str,
         name: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates information for an existing language in the translation management system.
+        """Updates metadata for an existing language in SimpleLocalize, such as its name or custom properties. Use this when you need to modify the configuration of a language that already exists in your project. Do not use this to create a new language (use simplelocalize_create_language) or to delete one (use simplelocalize_delete_language). Requires the languageKey of the target language. This operation overwrites the specified fields on the language record.
 
         Args:
             key: The key for the translation. (required)
+            languageKey: The key representing the target language. (required)
             name: The name associated with the translation.
         Returns:
             API response as a dictionary.

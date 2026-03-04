@@ -47,7 +47,7 @@ class _ConnectorCatalog:
         """Get all tools for a connector with their raw schemas.
 
         Returns a list of tool dicts, each containing:
-            name, description, actionId, inputSchema, outputSchema
+            name, description, toolId, inputSchema, outputSchema
         """
         connectors = self._registry.get("connectors", {})
         data = connectors.get(connector_name)
@@ -58,7 +58,7 @@ class _ConnectorCatalog:
             result.append({
                 "name": tool_name,
                 "description": tool_info.get("description", ""),
-                "actionId": tool_info.get("actionId", ""),
+                "toolId": tool_info.get("toolId", "") or tool_info.get("actionId", ""),
                 "inputSchema": tool_info.get("inputSchema", {}),
                 "outputSchema": tool_info.get("outputSchema", {}),
             })
@@ -68,7 +68,7 @@ class _ConnectorCatalog:
         """Get a single tool's details including raw input/output schemas.
 
         Returns a dict with:
-            name, description, actionId, inputSchema, outputSchema
+            name, description, toolId, inputSchema, outputSchema
         """
         connectors = self._registry.get("connectors", {})
         data = connectors.get(connector_name)
@@ -84,7 +84,7 @@ class _ConnectorCatalog:
         return {
             "name": tool_name,
             "description": tool_info.get("description", ""),
-            "actionId": tool_info.get("actionId", ""),
+            "toolId": tool_info.get("toolId", "") or tool_info.get("actionId", ""),
             "inputSchema": tool_info.get("inputSchema", {}),
             "outputSchema": tool_info.get("outputSchema", {}),
         }

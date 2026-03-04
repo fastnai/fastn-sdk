@@ -4,8 +4,47 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+
+class _NucliaAskKnowledgeAuditMetadata(TypedDict, total=False):
+    environment: str
+    user: str
+
+class _NucliaAskKnowledgeFilterExpression(TypedDict, total=False):
+    field: Dict[str, Any]
+    operator: str
+    paragraph: Dict[str, Any]
+
+class _NucliaUpdateResourceExtra(TypedDict, total=False):
+    metadata: Dict[str, Any]
+
+class _NucliaUpdateResourceMetadata(TypedDict, total=False):
+    language: str
+    languages: List[Any]
+    metadata: Dict[str, Any]
+
+class _NucliaUpdateResourceOrigin(TypedDict, total=False):
+    collaborators: List[Any]
+    created: str
+    filename: str
+    metadata: Dict[str, Any]
+    modified: str
+    path: str
+    related: List[Any]
+    source_id: str
+    tags: List[Any]
+    url: str
+
+class _NucliaUpdateResourceProcessingOptions(TypedDict, total=False):
+    ml_text: bool
+
+class _NucliaUpdateResourceSecurity(TypedDict, total=False):
+    access_groups: List[Any]
+
+class _NucliaUpdateResourceUsermetadata(TypedDict, total=False):
+    classifications: List[Any]
+    relations: List[Any]
 
 class NucliaConnector:
     """Nuclia connector ().
@@ -13,10 +52,11 @@ class NucliaConnector:
     Provides 6 tools.
     """
 
-    def ask_knowledge(
+    def nuclia_ask_knowledge(
         self,
+        kbId: str,
         query: str,
-        audit_metadata: Optional[Dict[str, Any]] = None,
+        audit_metadata: Optional[_NucliaAskKnowledgeAuditMetadata] = None,
         autofilter: Optional[bool] = None,
         chat_history: Optional[List[Any]] = None,
         citations: Optional[bool] = None,
@@ -25,7 +65,7 @@ class NucliaConnector:
         features: Optional[List[Any]] = None,
         field_type_filter: Optional[List[Any]] = None,
         fields: Optional[List[Any]] = None,
-        filter_expression: Optional[Dict[str, Any]] = None,
+        filter_expression: Optional[_NucliaAskKnowledgeFilterExpression] = None,
         filters: Optional[List[Any]] = None,
         generate_answer: Optional[bool] = None,
         generative_model: Optional[str] = None,
@@ -47,9 +87,10 @@ class NucliaConnector:
         top_k: Optional[int] = None,
         vectorset: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Asks a question to the knowledge base connected via the specified connector.
+        """Submits a natural-language question to the Nuclia knowledge base and returns a generative AI answer grounded in the stored content. Use this tool when you need a synthesized, conversational response rather than raw search results. For raw document search, use nuclia_search_knowledge instead. Does not modify any data.
 
         Args:
+            kbId: The ID of the knowledge base to search. (required)
             query: The search query string. (required)
             audit_metadata: Metadata for auditing purposes.
             autofilter: Enable automatic filtering.
@@ -86,12 +127,12 @@ class NucliaConnector:
         """
         ...
 
-    def delete_resource(
+    def nuclia_delete_resource(
         self,
         kbId: str,
         resourceId: str,
     ) -> Dict[str, Any]:
-        """Deletes a resource from the system using the specified connector.
+        """Permanently deletes a specific resource from the Nuclia knowledge base by its resource ID. Use this tool only when a resource must be removed entirely. This action is irreversible—the resource cannot be recovered after deletion. Do not use this tool if you only need to update or deactivate a resource; use nuclia_update_resource instead.
 
         Args:
             kbId: The ID of the knowledge base. (required)
@@ -101,15 +142,19 @@ class NucliaConnector:
         """
         ...
 
-    def get_resource(
+    def nuclia_get_resource(
         self,
+        kbId: str,
+        resourceId: str,
         extracted: Optional[str] = None,
         field_type: Optional[str] = None,
         show: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches detailed information about a specific resource using the connector.
+        """Retrieves detailed information about a single resource from the Nuclia knowledge base by its resource ID. Use this tool when you need full metadata and content details for one specific resource. To retrieve a list of multiple resources, use nuclia_list_resources instead. Does not modify any data.
 
         Args:
+            kbId: The ID of the knowledge base to search. (required)
+            resourceId: The ID of the resource to search within the knowledge base. (required)
             extracted: Specifies which fields to extract.
             field_type: Specifies the type of field.
             show: Specifies the fields to include in the search results.
@@ -118,14 +163,16 @@ class NucliaConnector:
         """
         ...
 
-    def get_resources(
+    def nuclia_list_resources(
         self,
+        kbId: str,
         page: Optional[str] = None,
         size: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of resources from the specified connector.
+        """Retrieves a paginated list of all resources stored in the Nuclia knowledge base. Use this tool when you need an overview of available resources. For detailed information about a single resource, use nuclia_get_resource instead. Does not modify any data.
 
         Args:
+            kbId: The ID of the knowledge base. (required)
             page: The page number for pagination.
             size: The number of results per page.
         Returns:
@@ -133,8 +180,9 @@ class NucliaConnector:
         """
         ...
 
-    def search_knowledge(
+    def nuclia_search_knowledge(
         self,
+        kbId: str,
         query: str,
         autofilter: Optional[str] = None,
         debug: Optional[str] = None,
@@ -159,9 +207,10 @@ class NucliaConnector:
         with_duplicates: Optional[str] = None,
         with_synonyms: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Searches for information in the knowledge base using the specified connector.
+        """Searches for information across the Nuclia knowledge base using a query string. Use this tool when you need to retrieve relevant documents, passages, or resources matching a search query. Returns ranked results from the knowledge base. Does not generate a conversational answer—use nuclia_ask_knowledge for generative responses. Does not modify any data.
 
         Args:
+            kbId: The ID of the knowledge base to search. (required)
             query: The search query string. (required)
             autofilter: Enable or disable automatic filtering.
             debug: Enable debug mode for detailed logging.
@@ -190,28 +239,32 @@ class NucliaConnector:
         """
         ...
 
-    def update_resource(
+    def nuclia_update_resource(
         self,
+        kbId: str,
+        resourceId: str,
         title: str,
         conversations: Optional[Dict[str, Any]] = None,
-        extra: Optional[Dict[str, Any]] = None,
+        extra: Optional[_NucliaUpdateResourceExtra] = None,
         fieldmetadata: Optional[List[Any]] = None,
         files: Optional[Dict[str, Any]] = None,
         hidden: Optional[bool] = None,
         links: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        origin: Optional[Dict[str, Any]] = None,
-        processing_options: Optional[Dict[str, Any]] = None,
-        security: Optional[Dict[str, Any]] = None,
+        metadata: Optional[_NucliaUpdateResourceMetadata] = None,
+        origin: Optional[_NucliaUpdateResourceOrigin] = None,
+        processing_options: Optional[_NucliaUpdateResourceProcessingOptions] = None,
+        security: Optional[_NucliaUpdateResourceSecurity] = None,
         slug: Optional[str] = None,
         summary: Optional[str] = None,
         texts: Optional[Dict[str, Any]] = None,
         thumbnail: Optional[str] = None,
-        usermetadata: Optional[Dict[str, Any]] = None,
+        usermetadata: Optional[_NucliaUpdateResourceUsermetadata] = None,
     ) -> Dict[str, Any]:
-        """Updates the properties of an existing resource in the specified connector.
+        """Updates the properties of an existing resource in the Nuclia knowledge base using a partial PATCH request. Use this tool to modify metadata, content, or other fields of a resource identified by its resource ID. Only the fields provided will be updated; unspecified fields remain unchanged. To remove a resource entirely, use nuclia_delete_resource instead.
 
         Args:
+            kbId: The ID of the knowledge base. (required)
+            resourceId: The ID of the resource within the knowledge base. (required)
             title: The title of the resource. (required)
             conversations: Conversations associated with the resource.
             extra: Additional metadata.

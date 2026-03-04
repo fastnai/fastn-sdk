@@ -4,24 +4,194 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+
+class _Cin7CreateAdvancedPurchaseAdditionalattributes(TypedDict, total=False):
+    AdditionalAttribute1: str
+    AdditionalAttribute10: str
+    AdditionalAttribute2: str
+    AdditionalAttribute3: str
+    AdditionalAttribute4: str
+    AdditionalAttribute5: str
+    AdditionalAttribute6: str
+    AdditionalAttribute7: str
+    AdditionalAttribute8: str
+    AdditionalAttribute9: str
+
+class _Cin7CreateAdvancedPurchaseBillingaddress(TypedDict, total=False):
+    City: str
+    Country: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    State: str
+
+class _Cin7CreateAdvancedPurchaseShippingaddress(TypedDict, total=False):
+    City: str
+    Country: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    ShipToOther: bool
+    State: str
+
+class _Cin7CreateProductPricetiers(TypedDict, total=False):
+    Tier_1: float
+    Tier_10: float
+    Tier_2: float
+    Tier_3: float
+    Tier_4: float
+    Tier_5: float
+    Tier_6: float
+    Tier_7: float
+    Tier_8: float
+    Tier_9: float
+
+class _Cin7CreateSaleAdditionalattributes(TypedDict, total=False):
+    AdditionalAttribute1: str
+    AdditionalAttribute10: str
+    AdditionalAttribute2: str
+    AdditionalAttribute3: str
+    AdditionalAttribute4: str
+    AdditionalAttribute5: str
+    AdditionalAttribute6: str
+    AdditionalAttribute7: str
+    AdditionalAttribute8: str
+    AdditionalAttribute9: str
+
+class _Cin7CreateSaleBillingaddress(TypedDict, total=False):
+    City: str
+    Country: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    State: str
+
+class _Cin7CreateSaleShippingaddress(TypedDict, total=False):
+    City: str
+    Company: str
+    Contact: str
+    Country: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    ShipToOther: bool
+    State: str
+
+class _Cin7CreateSaleFulfillmentShipShippingaddress(TypedDict, total=False):
+    City: str
+    Company: str
+    Contact: str
+    Country: str
+    DisplayAddressLine1: str
+    DisplayAddressLine2: str
+    ID: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    ShipToOther: bool
+    State: str
+
+class _Cin7UpdateAdvancedPurchaseAdditionalattributes(TypedDict, total=False):
+    AdditionalAttribute1: str
+    AdditionalAttribute10: str
+    AdditionalAttribute2: str
+    AdditionalAttribute3: str
+    AdditionalAttribute4: str
+    AdditionalAttribute5: str
+    AdditionalAttribute6: str
+    AdditionalAttribute7: str
+    AdditionalAttribute8: str
+    AdditionalAttribute9: str
+
+class _Cin7UpdateAdvancedPurchaseBillingaddress(TypedDict, total=False):
+    City: str
+    Country: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    State: str
+
+class _Cin7UpdateAdvancedPurchaseShippingaddress(TypedDict, total=False):
+    City: str
+    Country: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    ShipToOther: bool
+    State: str
+
+class _Cin7UpdateProductsPricetiers(TypedDict, total=False):
+    Tier_1: float
+    Tier_10: float
+    Tier_2: float
+    Tier_3: float
+    Tier_4: float
+    Tier_5: float
+    Tier_6: float
+    Tier_7: float
+    Tier_8: float
+    Tier_9: float
+
+class _Cin7UpdatePurchaseAdditionalattributes(TypedDict, total=False):
+    AdditionalAttribute1: str
+    AdditionalAttribute10: str
+    AdditionalAttribute2: str
+    AdditionalAttribute3: str
+    AdditionalAttribute4: str
+    AdditionalAttribute5: str
+    AdditionalAttribute6: str
+    AdditionalAttribute7: str
+    AdditionalAttribute8: str
+    AdditionalAttribute9: str
+
+class _Cin7UpdatePurchaseBillingaddress(TypedDict, total=False):
+    City: str
+    Country: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    State: str
+
+class _Cin7UpdatePurchaseShippingaddress(TypedDict, total=False):
+    City: str
+    Country: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    ShipToOther: bool
+    State: str
+
+class _Cin7UpdateSaleFulfillmentShipShippingaddress(TypedDict, total=False):
+    City: str
+    Company: str
+    Contact: str
+    Country: str
+    DisplayAddressLine1: str
+    DisplayAddressLine2: str
+    ID: str
+    Line1: str
+    Line2: str
+    Postcode: str
+    ShipToOther: bool
+    State: str
 
 class Cin7Connector:
     """Cin7 connector ().
 
-    Provides 83 tools.
+    Provides 88 tools.
     """
 
-    def create_advanced_purchase(
+    def cin7_create_advanced_purchase(
         self,
         Approach: str,
         Location: str,
         Supplier: str,
         SupplierID: str,
         TaxRule: str,
-        AdditionalAttributes: Optional[Dict[str, Any]] = None,
-        BillingAddress: Optional[Dict[str, Any]] = None,
+        AdditionalAttributes: Optional[_Cin7CreateAdvancedPurchaseAdditionalattributes] = None,
+        BillingAddress: Optional[_Cin7CreateAdvancedPurchaseBillingaddress] = None,
         BlindReceipt: Optional[bool] = None,
         Contact: Optional[str] = None,
         CurrencyRate: Optional[int] = None,
@@ -29,11 +199,11 @@ class Cin7Connector:
         Phone: Optional[str] = None,
         PurchaseType: Optional[str] = None,
         RequiredBy: Optional[str] = None,
-        ShippingAddress: Optional[Dict[str, Any]] = None,
+        ShippingAddress: Optional[_Cin7CreateAdvancedPurchaseShippingaddress] = None,
         TaxCalculation: Optional[str] = None,
         Terms: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new advanced purchase record in the system.
+        """Creates a new advanced purchase record in Cin7. Use this when purchasing goods under an advanced purchase workflow that includes separate steps for invoicing, stock receipts, and payments. Do not use this for standard purchase orders — use the standard purchase tools instead. This operation initiates a multi-step procurement process.
 
         Args:
             Approach: Specifies the processing approach or method. (required)
@@ -58,7 +228,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_advanced_purchase_credit_note(
+    def cin7_create_advanced_purchase_credit_note(
         self,
         CreditNoteDate: str,
         CreditNoteInvoiceNumber: str,
@@ -74,7 +244,7 @@ class Cin7Connector:
         TotalBeforeTax: Optional[float] = None,
         Unstock: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a new credit note for advanced purchases in the system.
+        """Creates a credit note for an advanced purchase in Cin7, typically to record a supplier credit or return. Use this when a supplier issues a credit against an advanced purchase. Do not use this for sale credit notes — use cin7_create_credit_note instead. This operation creates a financial record that may affect accounts payable.
 
         Args:
             CreditNoteDate: The date the credit note was issued (e.g., YYYY-MM-DD). (required)
@@ -95,7 +265,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_advanced_purchase_invoice(
+    def cin7_create_advanced_purchase_invoice(
         self,
         InvoiceDate: str,
         InvoiceDueDate: str,
@@ -112,7 +282,7 @@ class Cin7Connector:
         Total: Optional[int] = None,
         TotalBeforeTax: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Creates a new invoice for an advanced purchase in the system.
+        """Creates a supplier invoice for an advanced purchase in Cin7. Use this to record a payable invoice against an advanced purchase order. Do not use this for sale invoices — use cin7_create_sale_invoice instead. This operation creates a financial liability in the system.
 
         Args:
             InvoiceDate: Date of the invoice in YYYY-MM-DD format. (required)
@@ -134,14 +304,14 @@ class Cin7Connector:
         """
         ...
 
-    def create_advanced_purchase_manual_journals(
+    def cin7_create_advanced_purchase_manual_journals(
         self,
         PurchaseID: str,
         Status: str,
         TaskID: str,
         Lines: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a new manual journal entry for advanced purchases in the system.
+        """Creates a manual journal entry associated with an advanced purchase in Cin7. Use this to post accounting adjustments or corrections related to an advanced purchase. Do not use this for standard invoice or payment entries — use the dedicated invoice and payment tools instead. This operation creates a financial record in the system.
 
         Args:
             PurchaseID: Unique identifier for the purchase. (required)
@@ -153,7 +323,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_advanced_purchase_payments(
+    def cin7_create_advanced_purchase_payments(
         self,
         Account: str,
         CurrencyRate: int,
@@ -165,7 +335,7 @@ class Cin7Connector:
         DepositID: Optional[str] = None,
         Reference: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates new payments associated with advanced purchases in the system.
+        """Creates new payment records associated with an advanced purchase in Cin7. Use this to record a payment against an advanced purchase order. Do not use this to update an existing payment — use cin7_update_advanced_purchase_payments instead. This operation adds a financial transaction to the advanced purchase.
 
         Args:
             Account: The account related to the transaction. (required)
@@ -182,14 +352,14 @@ class Cin7Connector:
         """
         ...
 
-    def create_advanced_purchase_put_away(
+    def cin7_create_advanced_purchase_put_away(
         self,
         PurchaseID: str,
         Status: str,
         Lines: Optional[List[Any]] = None,
         TaskID: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new put away record for advanced purchases in the system.
+        """Creates a put-away record for received stock associated with an advanced purchase in Cin7. Use this to assign received inventory to specific warehouse locations after a purchase receipt. Do not use this for standard purchase put-aways outside the advanced purchase workflow. This operation updates inventory location data.
 
         Args:
             PurchaseID: Unique identifier for the purchase. (required)
@@ -201,14 +371,14 @@ class Cin7Connector:
         """
         ...
 
-    def create_advanced_purchase_stock(
+    def cin7_create_advanced_purchase_stock(
         self,
         PurchaseID: str,
         Status: str,
         Lines: Optional[List[Any]] = None,
         TaskID: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates stock records associated with advanced purchases in the system.
+        """Creates stock receipt records associated with an advanced purchase in Cin7. Use this to record received inventory against an advanced purchase order. Do not use this to update existing stock records — use cin7_update_advanced_purchase_stock instead. This operation increases inventory levels in Cin7.
 
         Args:
             PurchaseID: Identifier for the Purchase record. (required)
@@ -220,7 +390,20 @@ class Cin7Connector:
         """
         ...
 
-    def create_credit_note(
+    def cin7_create_carrier(
+        self,
+        Description: str,
+    ) -> Dict[str, Any]:
+        """Creates a new carrier record in Cin7. Use this to add a shipping carrier that can be assigned to fulfillments and shipments. Do not use this to update an existing carrier — use cin7_update_carrier instead. This operation permanently adds a new carrier to the system.
+
+        Args:
+            Description: A descriptive name or details for the carrier. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_create_credit_note(
         self,
         Account: Optional[str] = None,
         CombineAdditionalCharges: Optional[bool] = None,
@@ -235,7 +418,7 @@ class Cin7Connector:
         Status: Optional[str] = None,
         TaskID: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Issues a credit note for a specific sale in the system.
+        """Issues a credit note against a sale in Cin7, typically to record a customer refund or return. Use this when a customer is owed a credit against a previously invoiced sale. Do not use this for supplier credit notes — use cin7_create_advanced_purchase_credit_note instead. This operation creates an accounts receivable credit that may affect financial reporting.
 
         Args:
             Account: 
@@ -255,7 +438,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_customer(
+    def cin7_create_customer(
         self,
         AccountReceivable: str,
         Currency: str,
@@ -287,7 +470,7 @@ class Cin7Connector:
         Tags: Optional[str] = None,
         TaxNumber: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new customer profile in the system.
+        """Creates a new customer profile in Cin7, including contact details, billing address, and payment terms. Use this to onboard a new customer before creating sales or invoices for them. Do not use this to update an existing customer — use cin7_update_customer instead.
 
         Args:
             AccountReceivable:  (required)
@@ -324,7 +507,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_product(
+    def cin7_create_product(
         self,
         Category: str,
         CostingMethod: str,
@@ -371,7 +554,7 @@ class Cin7Connector:
         PriceTier7: Optional[float] = None,
         PriceTier8: Optional[float] = None,
         PriceTier9: Optional[float] = None,
-        PriceTiers: Optional[Dict[str, Any]] = None,
+        PriceTiers: Optional[_Cin7CreateProductPricetiers] = None,
         PurchaseTaxRule: Optional[str] = None,
         ReorderQuantity: Optional[float] = None,
         RevenueAccount: Optional[str] = None,
@@ -382,7 +565,7 @@ class Cin7Connector:
         Weight: Optional[float] = None,
         Width: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Creates a new product in the system.
+        """Creates a new product record in Cin7, including SKU, name, category, and pricing details. Use this to add a product to the catalog before it can be sold or purchased. Do not use this to update an existing product — use cin7_update_products instead.
 
         Args:
             Category:  (required)
@@ -445,13 +628,13 @@ class Cin7Connector:
         """
         ...
 
-    def create_sale(
+    def cin7_create_sale(
         self,
         Customer: str,
         CustomerID: str,
-        AdditionalAttributes: Optional[Dict[str, Any]] = None,
+        AdditionalAttributes: Optional[_Cin7CreateSaleAdditionalattributes] = None,
         AutoPickPackShipMode: Optional[str] = None,
-        BillingAddress: Optional[Dict[str, Any]] = None,
+        BillingAddress: Optional[_Cin7CreateSaleBillingaddress] = None,
         Carrier: Optional[str] = None,
         Contact: Optional[str] = None,
         CurrencyRate: Optional[str] = None,
@@ -465,14 +648,14 @@ class Cin7Connector:
         SaleOrderDate: Optional[str] = None,
         SalesRepresentative: Optional[str] = None,
         ShipBy: Optional[str] = None,
-        ShippingAddress: Optional[Dict[str, Any]] = None,
+        ShippingAddress: Optional[_Cin7CreateSaleShippingaddress] = None,
         ShippingNotes: Optional[str] = None,
         SkipQuote: Optional[str] = None,
         TaxInclusive: Optional[str] = None,
         TaxRule: Optional[str] = None,
         Terms: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new sale transaction in the system.
+        """Creates a new top-level sale record in Cin7. Use this to initiate a sale transaction that can then have orders, invoices, fulfillments, and payments added to it. Do not use this to create a sale order or quote directly — use cin7_create_sale_order or cin7_create_sale_quote instead.
 
         Args:
             Customer:  (required)
@@ -504,11 +687,11 @@ class Cin7Connector:
         """
         ...
 
-    def create_sale_fulfillment(
+    def cin7_create_sale_fulfillment(
         self,
         SaleID: str,
     ) -> Dict[str, Any]:
-        """Creates a new sale fulfillment record in the system.
+        """Creates a new fulfillment record for a sale in Cin7, initiating the pick, pack, and ship workflow. Use this after a sale order is confirmed and ready to be dispatched. Do not use this to update an existing fulfillment — use the dedicated update tools for each fulfillment stage. This operation allocates stock against the sale.
 
         Args:
             SaleID: Identifier of the sale record in Cin7. (required)
@@ -517,13 +700,13 @@ class Cin7Connector:
         """
         ...
 
-    def create_sale_fulfillment_pack(
+    def cin7_create_sale_fulfillment_pack(
         self,
         Lines: List[Any],
         Status: str,
         TaskID: str,
     ) -> Dict[str, Any]:
-        """Creates a new fulfillment pack in the system.
+        """Creates a new packing record within a sale fulfillment in Cin7. Use this to record that items have been packed for shipment as part of a fulfillment. Do not use this to update an existing pack record — use cin7_update_sale_fulfillment_pack instead.
 
         Args:
             Lines:  (required)
@@ -534,14 +717,14 @@ class Cin7Connector:
         """
         ...
 
-    def create_sale_fulfillment_pick(
+    def cin7_create_sale_fulfillment_pick(
         self,
         Status: str,
         TaskID: str,
         AutoPickMode: Optional[str] = None,
         Lines: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a new fulfillment pick for a sale in the system.
+        """Creates a new pick record within a sale fulfillment in Cin7. Use this to record that items have been picked from the warehouse for a sale fulfillment. Do not use this to update an existing pick — use cin7_update_sale_fulfillment_pick instead.
 
         Args:
             Status: Current status of the task. (required)
@@ -553,16 +736,16 @@ class Cin7Connector:
         """
         ...
 
-    def create_sale_fulfillment_ship(
+    def cin7_create_sale_fulfillment_ship(
         self,
         Lines: List[Any],
         Status: str,
         TaskID: str,
         RequireBy: Optional[str] = None,
-        ShippingAddress: Optional[Dict[str, Any]] = None,
+        ShippingAddress: Optional[_Cin7CreateSaleFulfillmentShipShippingaddress] = None,
         ShippingNotes: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new shipment for a sale fulfillment in the system.
+        """Creates a new shipment record within a sale fulfillment in Cin7. Use this to record that goods have been shipped to a customer as part of a sale fulfillment. Do not use this to update an existing shipment — use cin7_update_sale_fulfillment_ship instead. This operation updates inventory dispatch records.
 
         Args:
             Lines:  (required)
@@ -576,7 +759,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_sale_invoice(
+    def cin7_create_sale_invoice(
         self,
         InvoiceDate: str,
         InvoiceDueDate: str,
@@ -592,7 +775,7 @@ class Cin7Connector:
         LinkedFulfillmentNumber: Optional[str] = None,
         Memo: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new invoice for a sale in the system.
+        """Creates a new invoice for a sale in Cin7. Use this to generate a customer invoice from a sale order. Do not use this for supplier invoices — use cin7_create_advanced_purchase_invoice instead. This operation creates an accounts receivable record and may trigger downstream accounting entries.
 
         Args:
             InvoiceDate: Date when the invoice was issued. (required)
@@ -613,7 +796,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_sale_order(
+    def cin7_create_sale_order(
         self,
         AdditionalCharges: Optional[List[Any]] = None,
         AutoPickPackShipMode: Optional[str] = None,
@@ -625,7 +808,7 @@ class Cin7Connector:
         Total: Optional[int] = None,
         TotalBeforeTax: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Creates a new sale order in the system.
+        """Creates a new sale order in Cin7, confirming a customers intent to purchase. Use this after a quote has been accepted or when creating an order directly. Do not use this to create a quote — use cin7_create_sale_quote instead. Creating a sale order may allocate stock.
 
         Args:
             AdditionalCharges: 
@@ -642,7 +825,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_sale_payment(
+    def cin7_create_sale_payment(
         self,
         Account: Optional[str] = None,
         Amount: Optional[int] = None,
@@ -653,7 +836,7 @@ class Cin7Connector:
         TaskID: Optional[str] = None,
         Type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Processes a payment for a specific sale in the system.
+        """Records a payment received against a sale in Cin7. Use this to mark a sale invoice as partially or fully paid. Do not use this to create a supplier payment — use cin7_create_advanced_purchase_payments instead. This operation reduces the outstanding accounts receivable balance.
 
         Args:
             Account: Account associated with the task in Cin7.
@@ -669,7 +852,32 @@ class Cin7Connector:
         """
         ...
 
-    def create_stock_adjustment(
+    def cin7_create_sale_quote(
+        self,
+        AdditionalCharges: Optional[List[Any]] = None,
+        CombineAdditionalCharges: Optional[bool] = None,
+        Lines: Optional[List[Any]] = None,
+        Memo: Optional[str] = None,
+        Prepayments: Optional[List[Any]] = None,
+        SaleID: Optional[str] = None,
+        Status: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Creates a new sale quote in Cin7 for a prospective customer order. Use this to generate a quote before converting it to a sale order. Do not use this to create a confirmed sale order — use cin7_create_sale_order instead. Creating a quote does not commit stock or generate an invoice.
+
+        Args:
+            AdditionalCharges: 
+            CombineAdditionalCharges: 
+            Lines: 
+            Memo: 
+            Prepayments: 
+            SaleID: 
+            Status: 
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_create_stock_adjustment(
         self,
         EffectiveDate: str,
         Status: str,
@@ -678,7 +886,7 @@ class Cin7Connector:
         Reference: Optional[str] = None,
         StocktakeNumber: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new stock adjustment record in the system.
+        """Creates a new stock adjustment record in Cin7 to manually increase or decrease inventory levels. Use this to correct stock discrepancies or record write-offs. Do not use this for stock takes — use cin7_create_stock_take instead. Posting the adjustment will permanently update inventory levels.
 
         Args:
             EffectiveDate: The date when the stocktake becomes effective. (required)
@@ -692,7 +900,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_stock_take(
+    def cin7_create_stock_take(
         self,
         EffectiveDate: str,
         Location: str,
@@ -702,7 +910,7 @@ class Cin7Connector:
         Reference: Optional[str] = None,
         Tags: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a new stock take in the system.
+        """Creates a new stock take record in Cin7 to count and reconcile physical inventory against system records. Use this to initiate a stock count. Do not use this to update an existing stock take — use cin7_update_stock_take instead. Completing a stock take may adjust inventory levels in the system.
 
         Args:
             EffectiveDate: The date when the request or changes take effect. (required)
@@ -717,7 +925,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_stock_transfer(
+    def cin7_create_stock_transfer(
         self,
         From: str,
         Status: str,
@@ -734,7 +942,7 @@ class Cin7Connector:
         SkipOrder: Optional[bool] = None,
         ToLocation: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new stock transfer order in the system.
+        """Creates a new stock transfer record in Cin7 to move inventory between warehouse locations. Use this to initiate the top-level stock transfer. Do not confuse this with cin7_create_stock_transfer_order, which creates the order sub-resource. This operation initiates an inventory movement between locations.
 
         Args:
             From: Origin location of the transfer. (required)
@@ -756,13 +964,13 @@ class Cin7Connector:
         """
         ...
 
-    def create_stock_transfer_order(
+    def cin7_create_stock_transfer_order(
         self,
         Lines: List[Any],
         Status: str,
         TaskID: str,
     ) -> Dict[str, Any]:
-        """Creates a new stock transfer order record in the system.
+        """Creates a new stock transfer order in Cin7 to move inventory between warehouse locations. Use this to initiate a transfer of stock from one location to another. Do not use this for the top-level stock transfer record — use cin7_create_stock_transfer instead. This operation reserves stock for transfer.
 
         Args:
             Lines:  (required)
@@ -773,7 +981,7 @@ class Cin7Connector:
         """
         ...
 
-    def create_webhook(
+    def cin7_create_webhook(
         self,
         ExternalAuthorizationType: Optional[str] = None,
         ExternalBearerToken: Optional[str] = None,
@@ -784,7 +992,7 @@ class Cin7Connector:
         IsActive: Optional[bool] = None,
         Type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new webhook in the system to listen for specific events.
+        """Registers a new webhook in Cin7 to receive event notifications at a specified URL. Use this to subscribe to Cin7 events such as sale creation or stock changes. Do not use this to update an existing webhook — use cin7_update_webhook instead. The webhook will begin receiving events immediately after creation.
 
         Args:
             ExternalAuthorizationType: 
@@ -800,12 +1008,12 @@ class Cin7Connector:
         """
         ...
 
-    def delete_advanced_purchase(
+    def cin7_delete_advanced_purchase(
         self,
         ID: str,
         Void: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Deletes a specific advanced purchase from the system.
+        """Permanently deletes an advanced purchase record from Cin7. Use this only when an advanced purchase was created in error and has no associated invoices, payments, or stock receipts. Do not use this on active or partially fulfilled advanced purchases. This action is irreversible.
 
         Args:
             ID: Unique identifier for the resource. (required)
@@ -815,11 +1023,11 @@ class Cin7Connector:
         """
         ...
 
-    def delete_advanced_purchase_credit_note(
+    def cin7_delete_advanced_purchase_credit_note(
         self,
         TaskID: str,
     ) -> Dict[str, Any]:
-        """Deletes a specific credit note for advanced purchases from the system.
+        """Permanently deletes a credit note associated with an advanced purchase from Cin7. Use this only to remove an erroneous credit note before it has been applied. Do not use this if the credit note has already been reconciled. This action is irreversible.
 
         Args:
             TaskID: Identifier for the specific task to operate on. (required)
@@ -828,12 +1036,12 @@ class Cin7Connector:
         """
         ...
 
-    def delete_advanced_purchase_invoice(
+    def cin7_delete_advanced_purchase_invoice(
         self,
         TaskID: str,
         Void: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Deletes a specific advanced purchase invoice from the system.
+        """Permanently deletes an invoice associated with an advanced purchase from Cin7. Use this only to remove an incorrect invoice before it has been posted or paid. Do not use this if the invoice is linked to completed payments. This action is irreversible.
 
         Args:
             TaskID: Unique identifier for the Cin7 task. (required)
@@ -843,12 +1051,12 @@ class Cin7Connector:
         """
         ...
 
-    def delete_advanced_purchase_payments(
+    def cin7_delete_advanced_purchase_payments(
         self,
         ID: str,
         DeleteAllocation: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Deletes specific payments related to advanced purchases from the system.
+        """Permanently deletes a payment record associated with an advanced purchase from Cin7. Use this only when an erroneous payment entry needs to be removed. Do not use this if the payment has already been reconciled or posted to accounting. This action is irreversible — deleted payment records cannot be recovered.
 
         Args:
             ID: The unique identifier of the allocation to delete. (required)
@@ -858,12 +1066,12 @@ class Cin7Connector:
         """
         ...
 
-    def delete_advanced_purchase_stock(
+    def cin7_delete_advanced_purchase_stock(
         self,
         TaskID: str,
         Void: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Deletes specific stock records related to advanced purchases from the system.
+        """Permanently deletes a stock record associated with an advanced purchase from Cin7. Use this to remove an incorrect or cancelled stock receipt linked to an advanced purchase. Do not use this if the stock has already been allocated or consumed downstream. This action is irreversible.
 
         Args:
             TaskID: The unique identifier of the task to operate on. (required)
@@ -873,11 +1081,24 @@ class Cin7Connector:
         """
         ...
 
-    def delete_sale(
+    def cin7_delete_carrier(
+        self,
+        ID: str,
+    ) -> Dict[str, Any]:
+        """Permanently deletes a carrier from Cin7. Use this only when a carrier record is no longer needed. Do not use this if the carrier is referenced by active shipments or fulfillments. This action is irreversible — deleted carriers cannot be recovered.
+
+        Args:
+            ID: Identifier of the carrier resource to retrieve or modify. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_delete_sale(
         self,
         ID: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Deletes a specific sale from the system.
+        """Permanently deletes a sale record from Cin7. Use this only to remove a sale that was created in error and has no associated invoices, payments, or fulfillments. Do not use this on an active or completed sale. This action is irreversible and may affect revenue reporting.
 
         Args:
             ID: 
@@ -886,12 +1107,12 @@ class Cin7Connector:
         """
         ...
 
-    def delete_sale_fulfillment(
+    def cin7_delete_sale_fulfillment(
         self,
         TaskID: str,
         Void: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Deletes a specific sale fulfillment from the system.
+        """Permanently deletes a sale fulfillment record from Cin7. Use this only to remove an erroneous fulfillment that has not been shipped or completed. Do not use this on a fulfillment with associated shipments or stock movements. This action is irreversible.
 
         Args:
             TaskID: The identifier for the specific task. (required)
@@ -901,12 +1122,12 @@ class Cin7Connector:
         """
         ...
 
-    def delete_sale_invoice(
+    def cin7_delete_sale_invoice(
         self,
         TaskID: str,
         Void: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Deletes a specific sale invoice from the system.
+        """Permanently deletes a sale invoice from Cin7. Use this only to remove an erroneous invoice that has not been sent to the customer or reconciled. Do not use this on a paid or partially paid invoice. This action is irreversible and may affect accounts receivable.
 
         Args:
             TaskID: Unique identifier for the specific task. (required)
@@ -916,12 +1137,12 @@ class Cin7Connector:
         """
         ...
 
-    def delete_stock_adjustment(
+    def cin7_delete_stock_adjustment(
         self,
         ID: str,
         Void: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Deletes a specific stock adjustment from the system.
+        """Permanently deletes a stock adjustment record from Cin7. Use this only to remove an erroneous adjustment that has not yet been posted. Do not use this on a completed adjustment that has already changed inventory levels. This action is irreversible and may affect stock counts.
 
         Args:
             ID: Unique identifier for the resource or item. (required)
@@ -931,12 +1152,12 @@ class Cin7Connector:
         """
         ...
 
-    def delete_stock_take(
+    def cin7_delete_stock_take(
         self,
         ID: str,
         Void: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Deletes a specific stock take from the system.
+        """Permanently deletes a stock take record from Cin7. Use this only to remove an erroneous stock take that has not been completed or posted. Do not use this on a completed stock take that has already adjusted inventory. This action is irreversible.
 
         Args:
             ID: The identifier for the resource or entity in Cin7. (required)
@@ -946,12 +1167,12 @@ class Cin7Connector:
         """
         ...
 
-    def delete_stock_transfer(
+    def cin7_delete_stock_transfer(
         self,
         ID: str,
         Void: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Deletes a specific stock transfer from the system.
+        """Permanently deletes a stock transfer from Cin7. Use this only when a stock transfer was created in error and has not yet been processed or received. Do not use this on completed or in-transit transfers. This action is irreversible and may affect inventory counts.
 
         Args:
             ID: Unique identifier for the resource in Cin7. (required)
@@ -961,11 +1182,11 @@ class Cin7Connector:
         """
         ...
 
-    def delete_webhook(
+    def cin7_delete_webhook(
         self,
         ID: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Deletes an existing webhook from the system.
+        """Permanently deletes a registered webhook from Cin7. Use this to remove a webhook that is no longer needed or that points to an invalid endpoint. Do not use this if the webhook is still actively receiving events needed by downstream systems. This action is irreversible.
 
         Args:
             ID: ID parameter for the My connectors API request.
@@ -974,11 +1195,11 @@ class Cin7Connector:
         """
         ...
 
-    def deprecate_product(
+    def cin7_deprecate_product(
         self,
         productId: str,
     ) -> Dict[str, Any]:
-        """Marks a product as deprecated in the system, making it unavailable for new transactions.
+        """Marks an existing product as deprecated in Cin7, preventing it from being selected for new sales or purchases. Use this when a product is being discontinued. Do not use this to delete a product — deprecated products remain in the system for historical records. This change takes effect immediately and may prevent future transactions for this product.
 
         Args:
             productId:  (required)
@@ -987,12 +1208,12 @@ class Cin7Connector:
         """
         ...
 
-    def get_advanced_purchase(
+    def cin7_get_advanced_purchase(
         self,
         ID: str,
         CombineAdditionalCharges: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Retrieves details of advanced purchases made in the system.
+        """Retrieves details of a specific advanced purchase in Cin7, including supplier, line items, and status. Use this to review a single advanced purchase record. Do not use this to list all advanced purchases — apply filters or use a list endpoint. This is a read-only operation with no side effects.
 
         Args:
             ID: The unique identifier for the record or item being referenced. (required)
@@ -1002,12 +1223,12 @@ class Cin7Connector:
         """
         ...
 
-    def get_advanced_purchase_credit_note(
+    def cin7_get_advanced_purchase_credit_note(
         self,
         PurchaseID: str,
         CombineAdditionalCharges: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Retrieves credit note details for advanced purchases in the system.
+        """Retrieves credit note details associated with an advanced purchase in Cin7. Use this to review supplier credits linked to a specific advanced purchase. This is a read-only operation with no side effects.
 
         Args:
             PurchaseID: Identifier of the purchase record to operate on. (required)
@@ -1017,12 +1238,12 @@ class Cin7Connector:
         """
         ...
 
-    def get_advanced_purchase_invoice(
+    def cin7_get_advanced_purchase_invoice(
         self,
         PurchaseID: str,
         CombineAdditionalCharges: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Fetches invoice details for an advanced purchase in the system.
+        """Retrieves invoice details for a specific advanced purchase in Cin7. Use this to review the payable invoice associated with an advanced purchase. Do not use this for sale invoices — use cin7_get_sale_invoice instead. This is a read-only operation with no side effects.
 
         Args:
             PurchaseID: The identifier for the purchase transaction. (required)
@@ -1032,11 +1253,11 @@ class Cin7Connector:
         """
         ...
 
-    def get_advanced_purchase_manual_journals(
+    def cin7_get_advanced_purchase_manual_journals(
         self,
         PurchaseID: str,
     ) -> Dict[str, Any]:
-        """Retrieves manual journal entries related to advanced purchases in the system.
+        """Retrieves manual journal entries associated with an advanced purchase in Cin7. Use this to review accounting adjustments linked to a specific advanced purchase. This is a read-only operation with no side effects.
 
         Args:
             PurchaseID: The unique identifier of the purchase in Cin7. (required)
@@ -1045,14 +1266,14 @@ class Cin7Connector:
         """
         ...
 
-    def get_advanced_purchase_payments(
+    def cin7_get_advanced_purchase_payments(
         self,
         PurchaseID: str,
         CreditNoteNumber: Optional[str] = None,
         InvoiceNumber: Optional[str] = None,
         OrderNumber: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves payment details related to advanced purchases in the system.
+        """Retrieves payment details associated with an advanced purchase in Cin7. Use this to review payments recorded against a specific advanced purchase. Do not use this to list all purchases — scope the request to a specific advanced purchase ID. This is a read-only operation with no side effects.
 
         Args:
             PurchaseID: The unique identifier of the purchase. (required)
@@ -1064,11 +1285,11 @@ class Cin7Connector:
         """
         ...
 
-    def get_advanced_purchase_put_away(
+    def cin7_get_advanced_purchase_put_away(
         self,
         PurchaseID: str,
     ) -> Dict[str, Any]:
-        """Retrieves put away details for advanced purchases in the system.
+        """Retrieves put-away details for stock associated with an advanced purchase in Cin7. Use this to review where received inventory has been placed in the warehouse. This is a read-only operation with no side effects.
 
         Args:
             PurchaseID:  (required)
@@ -1077,11 +1298,11 @@ class Cin7Connector:
         """
         ...
 
-    def get_advanced_purchase_stock(
+    def cin7_get_advanced_purchase_stock(
         self,
         PurchaseID: str,
     ) -> Dict[str, Any]:
-        """Fetches stock details related to an advanced purchase in the system.
+        """Retrieves stock receipt details associated with an advanced purchase in Cin7. Use this to review inventory quantities and details received under an advanced purchase. This is a read-only operation with no side effects.
 
         Args:
             PurchaseID: The unique identifier for the Cin7 purchase. (required)
@@ -1090,7 +1311,7 @@ class Cin7Connector:
         """
         ...
 
-    def get_chart_of_accounts(
+    def cin7_get_chart_of_accounts(
         self,
         Class: Optional[str] = None,
         Code: Optional[str] = None,
@@ -1100,7 +1321,7 @@ class Cin7Connector:
         Status: Optional[str] = None,
         Type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves the chart of accounts in the financial system.
+        """Retrieves the chart of accounts from Cin7s financial configuration. Use this to look up valid account codes when posting invoices, payments, or journal entries. This is a read-only reference data operation with no side effects.
 
         Args:
             Class: 
@@ -1115,7 +1336,216 @@ class Cin7Connector:
         """
         ...
 
-    def get_customers(
+    def cin7_get_product_availability(
+        self,
+        batch: Optional[str] = None,
+        category: Optional[str] = None,
+        limit: Optional[str] = None,
+        location: Optional[str] = None,
+        page: Optional[str] = None,
+        sku: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Checks the availability and stock levels of a specific product in Cin7 across warehouse locations. Use this to determine whether a product is in stock before creating a sale or fulfillment. This is a read-only operation with no side effects.
+
+        Args:
+            batch: 
+            category: 
+            limit: 
+            location: 
+            page: 
+            sku: 
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_purchase(
+        self,
+        CombineAdditionalCharges: Optional[str] = None,
+        ID: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves the full details of a specific purchase order in Cin7, including line items, supplier, and status. Use this when you need complete information about a single purchase. Do not use this to list multiple purchases — use cin7_list_purchases instead. This is a read-only operation with no side effects.
+
+        Args:
+            CombineAdditionalCharges: 
+            ID: 
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_sale(
+        self,
+        CombineAdditionalCharges: Optional[str] = None,
+        CountryFormat: Optional[str] = None,
+        HideInventoryMovements: Optional[str] = None,
+        ID: Optional[str] = None,
+        IncludeTransactions: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves the full details of a specific sale in Cin7, including its status, associated orders, fulfillments, and invoices. Use this to inspect a single sale record. Do not use this to list all sales — use cin7_list_sales instead. This is a read-only operation with no side effects.
+
+        Args:
+            CombineAdditionalCharges: Specifies whether to combine additional charges.
+            CountryFormat: Specifies the country format for the response.
+            HideInventoryMovements: Specifies whether to hide inventory movements.
+            ID: Identifier for the request.
+            IncludeTransactions: Specifies whether to include transactions in the response.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_sale_fulfillment(
+        self,
+        SaleID: str,
+        IncludeProductInfo: Optional[bool] = None,
+        limit: Optional[int] = None,
+        page: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves fulfillment details for a specific sale in Cin7, including pick, pack, and ship status. Use this to inspect the fulfillment state of a sale. Do not use this for invoice or payment details — use the dedicated sale invoice tools instead. This is a read-only operation.
+
+        Args:
+            SaleID: The unique identifier for a sale. (required)
+            IncludeProductInfo: Flag to include detailed product information.
+            limit: Maximum number of items to return.
+            page: Specifies which page of results to retrieve.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_sale_fulfillment_pack(
+        self,
+        TaskID: str,
+        IncludeProductInfo: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves packing details for a specific sale fulfillment in Cin7. Use this to inspect what has been packed for a fulfillment. Do not use this for pick or ship details — use the dedicated pick and ship tools instead. This is a read-only operation with no side effects.
+
+        Args:
+            TaskID: Identifier for the specific task to perform. (required)
+            IncludeProductInfo: Flag to include detailed product information.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_sale_fulfillment_pick(
+        self,
+        TaskID: str,
+        IncludeProductInfo: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves pick details for a specific sale fulfillment in Cin7. Use this to inspect which items have been picked for a fulfillment. Do not use this for pack or ship details — use the dedicated pack and ship tools instead. This is a read-only operation with no side effects.
+
+        Args:
+            TaskID:  (required)
+            IncludeProductInfo: 
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_sale_fulfillment_ship(
+        self,
+        TaskID: str,
+    ) -> Dict[str, Any]:
+        """Retrieves shipment details for a specific sale fulfillment in Cin7, including carrier, tracking, and shipped quantities. Use this to inspect the shipment component of a fulfillment. Do not use this for pack or pick details — use the dedicated pack and pick tools instead. This is a read-only operation.
+
+        Args:
+            TaskID: Unique identifier for the task in Cin7. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_sale_invoice(
+        self,
+        SaleID: str,
+        CombineAdditionalCharges: Optional[bool] = None,
+        IncludeProductInfo: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves invoice details for a specific sale in Cin7, including line items, amounts, and payment status. Use this to inspect a single sale invoice. Do not use this for supplier invoices — use cin7_get_advanced_purchase_invoice instead. This is a read-only operation with no side effects.
+
+        Args:
+            SaleID: Unique identifier for the sale transaction. (required)
+            CombineAdditionalCharges: Flag to indicate if additional charges should be combined.
+            IncludeProductInfo: Flag to include product information in the response.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_stock_adjustment(
+        self,
+        TaskID: str,
+    ) -> Dict[str, Any]:
+        """Retrieves the details of a specific stock adjustment in Cin7, including quantities, reason, and status. Use this to inspect a single adjustment record. Do not use this to list all adjustments — use cin7_list_stock_adjustments instead. This is a read-only operation with no side effects.
+
+        Args:
+            TaskID: Identifier of the task to process. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_stock_take(
+        self,
+        TaskID: str,
+    ) -> Dict[str, Any]:
+        """Retrieves the details of a specific stock take in Cin7, including counted quantities and status. Use this to inspect a single stock take record. Do not use this to list all stock takes — use cin7_list_stock_takes instead. This is a read-only operation with no side effects.
+
+        Args:
+            TaskID: Unique identifier for the task. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_stock_transfer(
+        self,
+        TaskID: str,
+    ) -> Dict[str, Any]:
+        """Retrieves the details of a specific stock transfer in Cin7, including items, quantities, and status. Use this to inspect a single stock transfer record. Do not use this to list all transfers — use cin7_list_stock_transfers instead. This is a read-only operation with no side effects.
+
+        Args:
+            TaskID: Identifier for the task to be processed. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_get_stock_transfer_order(
+        self,
+        TaskID: str,
+    ) -> Dict[str, Any]:
+        """Retrieves the details of a specific stock transfer order in Cin7, including items, quantities, and source/destination locations. Use this to review the order component of a stock transfer. Do not use this to retrieve the top-level stock transfer — use cin7_get_stock_transfer instead. This is a read-only operation.
+
+        Args:
+            TaskID: Unique identifier for the task you want to perform. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_list_carriers(
+        self,
+        CarrierID: Optional[str] = None,
+        Description: Optional[str] = None,
+        Limit: Optional[str] = None,
+        Page: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves a list of all carriers configured in Cin7. Use this to browse or search available carriers for use in shipments or fulfillments. Do not use this to retrieve a single carrier by ID — filter the results after fetching. This is a read-only operation with no side effects.
+
+        Args:
+            CarrierID: Unique identifier of a specific carrier. Provide this to retrieve or act on a single carrier.
+            Description: A text description or name of the carrier to filter results or provide context.
+            Limit: Maximum number of carrier records to return per page.
+            Page: Page number for paginated results when listing carriers.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_list_customers(
         self,
         ContactFilter: Optional[str] = None,
         ID: Optional[str] = None,
@@ -1126,7 +1556,7 @@ class Cin7Connector:
         Name: Optional[str] = None,
         Page: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches a list of customers in the system.
+        """Retrieves a paginated list of customers in Cin7. Use this to browse or search for customers by name, email, or other attributes. Do not use this to get the full details of a single customer — filter results after fetching. This is a read-only operation with no side effects.
 
         Args:
             ContactFilter: Filter contacts based on specified criteria.
@@ -1142,7 +1572,7 @@ class Cin7Connector:
         """
         ...
 
-    def get_locations(
+    def cin7_list_locations(
         self,
         Deprecated: Optional[str] = None,
         ID: Optional[str] = None,
@@ -1150,7 +1580,7 @@ class Cin7Connector:
         Name: Optional[str] = None,
         Page: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches the available locations in the system.
+        """Retrieves all warehouse and storage locations configured in Cin7. Use this to look up valid location IDs when creating stock transfers, adjustments, or purchase receipts. This is a read-only reference data operation with no side effects.
 
         Args:
             Deprecated: 
@@ -1163,54 +1593,31 @@ class Cin7Connector:
         """
         ...
 
-    def get_payment_terms(
+    def cin7_list_payment_terms(
         self,
     ) -> Dict[str, Any]:
-        """Fetches the payment terms applicable to transactions in the system.
+        """Retrieves all payment terms configured in Cin7 (e.g., Net 30, Due on Receipt). Use this to look up valid payment term options when creating or updating customers, suppliers, or purchase and sale orders. This is a read-only reference data operation with no side effects.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_price_tiers(
+    def cin7_list_price_tiers(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves the pricing tiers used for pricing products in the system.
+        """Retrieves all price tiers configured in Cin7. Use this to look up available pricing tiers when creating or updating products, customers, or sale orders. This is a read-only reference data operation with no side effects.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_product_availability(
-        self,
-        batch: Optional[str] = None,
-        category: Optional[str] = None,
-        limit: Optional[str] = None,
-        location: Optional[str] = None,
-        page: Optional[str] = None,
-        sku: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Checks the availability status of a specific product in the system.
-
-        Args:
-            batch: 
-            category: 
-            limit: 
-            location: 
-            page: 
-            sku: 
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_product_categories(
+    def cin7_list_product_categories(
         self,
         Limit: Optional[str] = None,
         Name: Optional[str] = None,
         Page: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of product categories available in the system.
+        """Retrieves all product categories configured in Cin7. Use this to look up valid category IDs when creating or updating products. This is a read-only reference data operation with no side effects.
 
         Args:
             Limit: Number of records per page.
@@ -1221,7 +1628,7 @@ class Cin7Connector:
         """
         ...
 
-    def get_products(
+    def cin7_list_products(
         self,
         ID: Optional[str] = None,
         ModifiedSince: Optional[str] = None,
@@ -1237,7 +1644,7 @@ class Cin7Connector:
         status: Optional[str] = None,
         updatedSince: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of all products available in the system.
+        """Retrieves a list of all products available in Cin7, including SKU, name, category, and pricing. Use this to browse or search the product catalog. Do not use this to check stock levels — use cin7_get_product_availability instead. This is a read-only operation with no side effects.
 
         Args:
             ID: 
@@ -1258,28 +1665,13 @@ class Cin7Connector:
         """
         ...
 
-    def get_purchase(
-        self,
-        CombineAdditionalCharges: Optional[str] = None,
-        ID: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Retrieves details of a specific purchase in the system.
-
-        Args:
-            CombineAdditionalCharges: 
-            ID: 
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_purchase_list(
+    def cin7_list_purchases(
         self,
         UpdatedSince: Optional[str] = None,
         limit: Optional[str] = None,
         page: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches a list of purchases in the system.
+        """Retrieves a paginated list of purchase orders in Cin7. Use this to browse or filter purchases by date, supplier, or status. Do not use this to retrieve the full details of a single purchase — use cin7_get_purchase instead. This is a read-only operation with no side effects.
 
         Args:
             UpdatedSince: 
@@ -1290,107 +1682,7 @@ class Cin7Connector:
         """
         ...
 
-    def get_sale(
-        self,
-        CombineAdditionalCharges: Optional[str] = None,
-        CountryFormat: Optional[str] = None,
-        HideInventoryMovements: Optional[str] = None,
-        ID: Optional[str] = None,
-        IncludeTransactions: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Retrieves details about a specific sale in the system.
-
-        Args:
-            CombineAdditionalCharges: Specifies whether to combine additional charges.
-            CountryFormat: Specifies the country format for the response.
-            HideInventoryMovements: Specifies whether to hide inventory movements.
-            ID: Identifier for the request.
-            IncludeTransactions: Specifies whether to include transactions in the response.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_sale_fulfillment(
-        self,
-        SaleID: str,
-        IncludeProductInfo: Optional[bool] = None,
-        limit: Optional[int] = None,
-        page: Optional[int] = None,
-    ) -> Dict[str, Any]:
-        """Retrieves fulfillment details for a specific sale in the system.
-
-        Args:
-            SaleID: The unique identifier for a sale. (required)
-            IncludeProductInfo: Flag to include detailed product information.
-            limit: Maximum number of items to return.
-            page: Specifies which page of results to retrieve.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_sale_fulfillment_pack(
-        self,
-        TaskID: str,
-        IncludeProductInfo: Optional[bool] = None,
-    ) -> Dict[str, Any]:
-        """Retrieves details of a specific fulfillment pack for a sale in the system.
-
-        Args:
-            TaskID: Identifier for the specific task to perform. (required)
-            IncludeProductInfo: Flag to include detailed product information.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_sale_fulfillment_pick(
-        self,
-        TaskID: str,
-        IncludeProductInfo: Optional[bool] = None,
-    ) -> Dict[str, Any]:
-        """Retrieves details of a specific fulfillment pick within a sale in the system.
-
-        Args:
-            TaskID:  (required)
-            IncludeProductInfo: 
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_sale_fulfillment_ship(
-        self,
-        TaskID: str,
-    ) -> Dict[str, Any]:
-        """Retrieves shipment details for a specific sale fulfillment in the system.
-
-        Args:
-            TaskID: Unique identifier for the task in Cin7. (required)
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_sale_invoice(
-        self,
-        SaleID: str,
-        CombineAdditionalCharges: Optional[bool] = None,
-        IncludeProductInfo: Optional[bool] = None,
-    ) -> Dict[str, Any]:
-        """Retrieves invoice details for a specific sale in the system.
-
-        Args:
-            SaleID: Unique identifier for the sale transaction. (required)
-            CombineAdditionalCharges: Flag to indicate if additional charges should be combined.
-            IncludeProductInfo: Flag to include product information in the response.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_sales_list(
+    def cin7_list_sales(
         self,
         CombinedInvoiceStatus: Optional[str] = None,
         CombinedPackStatus: Optional[str] = None,
@@ -1410,7 +1702,7 @@ class Cin7Connector:
         Status: Optional[str] = None,
         UpdatedSince: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves the list of sales recorded in the system.
+        """Retrieves a paginated list of sales recorded in Cin7. Use this to browse or filter sales by date, customer, or status. Do not use this to get full details of a single sale — use cin7_get_sale instead. This is a read-only operation with no side effects.
 
         Args:
             CombinedInvoiceStatus: Filter orders by combined invoice status.
@@ -1435,26 +1727,13 @@ class Cin7Connector:
         """
         ...
 
-    def get_stock_adjustment(
-        self,
-        TaskID: str,
-    ) -> Dict[str, Any]:
-        """Retrieves details about a specific stock adjustment in the system.
-
-        Args:
-            TaskID: Identifier of the task to process. (required)
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_stock_adjustment_list(
+    def cin7_list_stock_adjustments(
         self,
         Limit: Optional[int] = None,
         Page: Optional[int] = None,
         Status: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of stock adjustments made in the system.
+        """Retrieves a paginated list of stock adjustments in Cin7. Use this to browse or filter adjustments by date, location, or status. Do not use this to get the full details of a single adjustment — use cin7_get_stock_adjustment instead. This is a read-only operation with no side effects.
 
         Args:
             Limit: Maximum number of items to retrieve.
@@ -1465,26 +1744,13 @@ class Cin7Connector:
         """
         ...
 
-    def get_stock_take(
-        self,
-        TaskID: str,
-    ) -> Dict[str, Any]:
-        """Fetches details of a specific stock take in the system.
-
-        Args:
-            TaskID: Unique identifier for the task. (required)
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_stock_take_list(
+    def cin7_list_stock_takes(
         self,
         Limit: Optional[int] = None,
         Page: Optional[int] = None,
         Status: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of stock takes conducted in the system.
+        """Retrieves a paginated list of stock takes conducted in Cin7. Use this to browse or filter stock takes by date or status. Do not use this to get the full details of a single stock take — use cin7_get_stock_take instead. This is a read-only operation with no side effects.
 
         Args:
             Limit: Maximum number of items to retrieve per request.
@@ -1495,27 +1761,14 @@ class Cin7Connector:
         """
         ...
 
-    def get_stock_transfer(
-        self,
-        TaskID: str,
-    ) -> Dict[str, Any]:
-        """Fetches details of a specific stock transfer in the system.
-
-        Args:
-            TaskID: Identifier for the task to be processed. (required)
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_stock_transfer_list(
+    def cin7_list_stock_transfers(
         self,
         Limit: Optional[int] = None,
         Page: Optional[int] = None,
         Search: Optional[str] = None,
         Status: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of stock transfers in the system.
+        """Retrieves a paginated list of stock transfers in Cin7. Use this to browse or filter transfers by date, location, or status. Do not use this to get full details of a single transfer — use cin7_get_stock_transfer instead. This is a read-only operation with no side effects.
 
         Args:
             Limit: Maximum number of items to return per request.
@@ -1527,20 +1780,7 @@ class Cin7Connector:
         """
         ...
 
-    def get_stock_transfer_order(
-        self,
-        TaskID: str,
-    ) -> Dict[str, Any]:
-        """Retrieves details of a specific stock transfer order in the system.
-
-        Args:
-            TaskID: Unique identifier for the task you want to perform. (required)
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_tax_rules(
+    def cin7_list_tax_rules(
         self,
         Account: Optional[str] = None,
         ID: Optional[str] = None,
@@ -1551,7 +1791,7 @@ class Cin7Connector:
         Name: Optional[str] = None,
         Page: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches all tax rules currently implemented in the system.
+        """Retrieves all tax rules configured in Cin7. Use this to look up valid tax codes when creating or updating products, sales, or purchases. This is a read-only reference data operation with no side effects.
 
         Args:
             Account: 
@@ -1567,22 +1807,26 @@ class Cin7Connector:
         """
         ...
 
-    def get_webhooks(
+    def cin7_list_webhooks(
         self,
+        body: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Fetches all registered webhooks within the system.
+        """Retrieves all webhooks registered in Cin7. Use this to review existing webhook configurations and their subscribed events. Do not use this to create or update webhooks — use the dedicated create and update tools. This is a read-only operation with no side effects.
+
+        Args:
+            body:  (required)
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def update_advanced_purchase(
+    def cin7_update_advanced_purchase(
         self,
         ID: str,
         Supplier: str,
         TaxRule: str,
-        AdditionalAttributes: Optional[Dict[str, Any]] = None,
-        BillingAddress: Optional[Dict[str, Any]] = None,
+        AdditionalAttributes: Optional[_Cin7UpdateAdvancedPurchaseAdditionalattributes] = None,
+        BillingAddress: Optional[_Cin7UpdateAdvancedPurchaseBillingaddress] = None,
         BlindReceipt: Optional[bool] = None,
         Contact: Optional[str] = None,
         CurrencyRate: Optional[int] = None,
@@ -1590,12 +1834,12 @@ class Cin7Connector:
         Note: Optional[str] = None,
         Phone: Optional[str] = None,
         RequiredBy: Optional[str] = None,
-        ShippingAddress: Optional[Dict[str, Any]] = None,
+        ShippingAddress: Optional[_Cin7UpdateAdvancedPurchaseShippingaddress] = None,
         SupplierID: Optional[str] = None,
         TaxCalculation: Optional[str] = None,
         Terms: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates details of an existing advanced purchase in the system.
+        """Updates the details of an existing advanced purchase in Cin7 (e.g., supplier, dates, or line items). Use this to amend an advanced purchase that has been created but not yet fully processed. Do not use this to create a new advanced purchase — use cin7_create_advanced_purchase instead.
 
         Args:
             ID: Unique identifier for the record. (required)
@@ -1619,7 +1863,7 @@ class Cin7Connector:
         """
         ...
 
-    def update_advanced_purchase_payments(
+    def cin7_update_advanced_purchase_payments(
         self,
         TaskID: str,
         Account: Optional[str] = None,
@@ -1631,7 +1875,7 @@ class Cin7Connector:
         Reference: Optional[str] = None,
         Type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates details of payments related to advanced purchases in the system.
+        """Updates payment records associated with an advanced purchase in Cin7. Use this to modify payment amounts, dates, or references on an existing advanced purchase payment. Do not use this to create a new payment — use cin7_create_advanced_purchase_payments instead. This operation modifies existing financial records.
 
         Args:
             TaskID: Unique identifier for the task. (required)
@@ -1648,14 +1892,14 @@ class Cin7Connector:
         """
         ...
 
-    def update_advanced_purchase_stock(
+    def cin7_update_advanced_purchase_stock(
         self,
         PurchaseID: str,
         Status: str,
         TaskID: str,
         Lines: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Updates details of stock records related to advanced purchases in the system.
+        """Updates stock records associated with an advanced purchase in Cin7 (e.g., quantities, batch details, or location). Use this to correct or amend stock receipt information on an advanced purchase. Do not use this to create new stock records — use cin7_create_advanced_purchase_stock instead.
 
         Args:
             PurchaseID: Unique identifier for the purchase order. (required)
@@ -1667,7 +1911,22 @@ class Cin7Connector:
         """
         ...
 
-    def update_customer(
+    def cin7_update_carrier(
+        self,
+        CarrierID: str,
+        Description: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Updates the details of an existing carrier in Cin7 (e.g., carrier name, contact info, or shipping settings). Use this when you need to modify a carrier record that already exists. Do not use this to create a new carrier or delete one. This operation overwrites existing carrier data with the values provided.
+
+        Args:
+            CarrierID: Unique identifier for the carrier. Required to reference or update a specific carrier. (required)
+            Description: A descriptive name or notes for the carrier.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_update_customer(
         self,
         AccountReceivable: Optional[str] = None,
         AdditionalAttribute1: Optional[str] = None,
@@ -1704,7 +1963,7 @@ class Cin7Connector:
         TaxNumber: Optional[str] = None,
         TaxRule: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates an existing customer profile in the system.
+        """Updates the profile details of an existing customer in Cin7 (e.g., contact information, addresses, or payment terms). Use this to modify a customer record that already exists. Do not use this to create a new customer — use cin7_create_customer instead.
 
         Args:
             AccountReceivable: 
@@ -1746,7 +2005,7 @@ class Cin7Connector:
         """
         ...
 
-    def update_products(
+    def cin7_update_products(
         self,
         ID: str,
         AdditionalAttribute1: Optional[str] = None,
@@ -1789,7 +2048,7 @@ class Cin7Connector:
         PriceTier7: Optional[float] = None,
         PriceTier8: Optional[float] = None,
         PriceTier9: Optional[float] = None,
-        PriceTiers: Optional[Dict[str, Any]] = None,
+        PriceTiers: Optional[_Cin7UpdateProductsPricetiers] = None,
         PurchaseTaxRule: Optional[str] = None,
         ReorderQuantity: Optional[float] = None,
         RevenueAccount: Optional[str] = None,
@@ -1804,7 +2063,7 @@ class Cin7Connector:
         Weight: Optional[float] = None,
         Width: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Updates existing products in the system based on provided details.
+        """Updates the details of one or more existing products in Cin7 (e.g., name, SKU, price, or category). Use this to modify product records in bulk or individually. Do not use this to create new products — use cin7_create_product instead. Do not use this to deprecate a product — use cin7_deprecate_product instead.
 
         Args:
             ID:  (required)
@@ -1867,11 +2126,11 @@ class Cin7Connector:
         """
         ...
 
-    def update_purchase(
+    def cin7_update_purchase(
         self,
-        AdditionalAttributes: Optional[Dict[str, Any]] = None,
+        AdditionalAttributes: Optional[_Cin7UpdatePurchaseAdditionalattributes] = None,
         Approach: Optional[str] = None,
-        BillingAddress: Optional[Dict[str, Any]] = None,
+        BillingAddress: Optional[_Cin7UpdatePurchaseBillingaddress] = None,
         BlindReceipt: Optional[bool] = None,
         Contact: Optional[str] = None,
         CurrencyRate: Optional[int] = None,
@@ -1880,14 +2139,14 @@ class Cin7Connector:
         Note: Optional[str] = None,
         Phone: Optional[str] = None,
         RequiredBy: Optional[str] = None,
-        ShippingAddress: Optional[Dict[str, Any]] = None,
+        ShippingAddress: Optional[_Cin7UpdatePurchaseShippingaddress] = None,
         Supplier: Optional[str] = None,
         SupplierID: Optional[str] = None,
         TaxCalculation: Optional[str] = None,
         TaxRule: Optional[str] = None,
         Terms: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates details of a specific purchase in the system.
+        """Updates the details of an existing purchase order in Cin7 (e.g., quantities, supplier, or line items). Use this when you need to modify a purchase that has already been created. Do not use this to create a new purchase or to update sub-resources such as invoices or payments. This operation overwrites existing purchase data with the values provided.
 
         Args:
             AdditionalAttributes: 
@@ -1912,13 +2171,13 @@ class Cin7Connector:
         """
         ...
 
-    def update_sale_fulfillment_pack(
+    def cin7_update_sale_fulfillment_pack(
         self,
         Status: str,
         TaskID: str,
         Lines: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Updates an existing fulfillment pack in the system.
+        """Updates an existing packing record within a sale fulfillment in Cin7. Use this to amend pack details such as carton counts or packed quantities. Do not use this to create a new pack record — use cin7_create_sale_fulfillment_pack instead.
 
         Args:
             Status: Current status of the task. (required)
@@ -1929,14 +2188,14 @@ class Cin7Connector:
         """
         ...
 
-    def update_sale_fulfillment_pick(
+    def cin7_update_sale_fulfillment_pick(
         self,
         Status: str,
         TaskID: str,
         AutoPickMode: Optional[str] = None,
         Lines: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Updates an existing fulfillment pick in the system.
+        """Updates an existing pick record within a sale fulfillment in Cin7. Use this to amend pick details such as quantities or picker assignments. Do not use this to create a new pick record — use cin7_create_sale_fulfillment_pick instead.
 
         Args:
             Status: Current status of the task. (required)
@@ -1948,17 +2207,17 @@ class Cin7Connector:
         """
         ...
 
-    def update_sale_fulfillment_ship(
+    def cin7_update_sale_fulfillment_ship(
         self,
         Lines: List[Any],
         Status: str,
         TaskID: str,
         AddTrackingNumbers: Optional[bool] = None,
         RequireBy: Optional[str] = None,
-        ShippingAddress: Optional[Dict[str, Any]] = None,
+        ShippingAddress: Optional[_Cin7UpdateSaleFulfillmentShipShippingaddress] = None,
         ShippingNotes: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates an existing shipment's details in the system.
+        """Updates the details of an existing shipment within a sale fulfillment in Cin7 (e.g., carrier, tracking number, or shipped quantities). Use this to amend a shipment record after it has been created. Do not use this to create a new shipment — use cin7_create_sale_fulfillment_ship instead.
 
         Args:
             Lines:  (required)
@@ -1973,7 +2232,7 @@ class Cin7Connector:
         """
         ...
 
-    def update_sale_invoice(
+    def cin7_update_sale_invoice(
         self,
         SaleID: str,
         TaskID: str,
@@ -1989,7 +2248,7 @@ class Cin7Connector:
         Memo: Optional[str] = None,
         Status: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates the details of an existing sale invoice in the system.
+        """Updates the details of an existing sale invoice in Cin7 (e.g., line items, amounts, or due date). Use this to correct or amend an invoice before it is paid. Do not use this to create a new invoice — use cin7_create_sale_invoice instead.
 
         Args:
             SaleID: Unique identifier for the sale. (required)
@@ -2010,7 +2269,7 @@ class Cin7Connector:
         """
         ...
 
-    def update_stock_adjustment(
+    def cin7_update_stock_adjustment(
         self,
         EffectiveDate: str,
         Status: str,
@@ -2021,7 +2280,7 @@ class Cin7Connector:
         StocktakeNumber: Optional[str] = None,
         UpdateOnHand: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Updates an existing stock adjustment record in the system.
+        """Updates an existing stock adjustment record in Cin7 (e.g., quantities, reason, or location). Use this to correct an adjustment before it has been posted. Do not use this to create a new adjustment — use cin7_create_stock_adjustment instead.
 
         Args:
             EffectiveDate: The date when the task or data becomes effective. (required)
@@ -2037,7 +2296,50 @@ class Cin7Connector:
         """
         ...
 
-    def update_stock_transfer(
+    def cin7_update_stock_take(
+        self,
+        Status: str,
+        TaskID: str,
+        Account: Optional[str] = None,
+        Bins: Optional[List[Any]] = None,
+        Brands: Optional[List[Any]] = None,
+        Categories: Optional[List[Any]] = None,
+        EffectiveDate: Optional[str] = None,
+        Location: Optional[str] = None,
+        LocationID: Optional[str] = None,
+        NonZeroStockOnHandProducts: Optional[List[Any]] = None,
+        PickZones: Optional[List[Any]] = None,
+        Reference: Optional[str] = None,
+        StockLocators: Optional[List[Any]] = None,
+        Tags: Optional[List[Any]] = None,
+        UseRelativeQuantity: Optional[bool] = None,
+        ZeroStockOnHandProducts: Optional[List[Any]] = None,
+    ) -> Dict[str, Any]:
+        """Updates an existing stock take record in Cin7 (e.g., counted quantities or notes). Use this to amend a stock take that is still in progress. Do not use this to create a new stock take — use cin7_create_stock_take instead. Changes to a completed stock take may affect inventory valuation.
+
+        Args:
+            Status: Current status of the task. (required)
+            TaskID: Unique identifier for the task. (required)
+            Account: Account associated with the task.
+            Bins: List of bins.
+            Brands: List of brands.
+            Categories: 
+            EffectiveDate: The date when the task becomes effective.
+            Location: Name or details of the location.
+            LocationID: Identifier for the location.
+            NonZeroStockOnHandProducts: 
+            PickZones: Array of pick zones.
+            Reference: Reference identifier.
+            StockLocators: Array of stock locators.
+            Tags: Array of tags associated with the task.
+            UseRelativeQuantity: Flag to determine if relative quantities are used.
+            ZeroStockOnHandProducts: 
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def cin7_update_stock_transfer(
         self,
         From: str,
         Lines: List[Any],
@@ -2055,7 +2357,7 @@ class Cin7Connector:
         To: Optional[str] = None,
         ToLocation: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates an existing stock transfer in the system.
+        """Updates an existing stock transfer in Cin7 (e.g., quantities, locations, or reference details). Use this to amend a transfer before it has been completed. Do not use this to create a new transfer — use cin7_create_stock_transfer instead.
 
         Args:
             From: Origin location or entity. (required)
@@ -2078,7 +2380,7 @@ class Cin7Connector:
         """
         ...
 
-    def update_webhook(
+    def cin7_update_webhook(
         self,
         ExternalAuthorizationType: str,
         ExternalURL: str,
@@ -2091,7 +2393,7 @@ class Cin7Connector:
         Name: Optional[str] = None,
         Type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates an existing webhook configuration in the system.
+        """Updates the configuration of an existing webhook in Cin7 (e.g., target URL, subscribed events, or active status). Use this when you need to modify a webhook that has already been registered. Do not use this to create a new webhook — use cin7_create_webhook instead. Changes take effect immediately for future events.
 
         Args:
             ExternalAuthorizationType: Type of external authorization used. (required)
@@ -2104,49 +2406,6 @@ class Cin7Connector:
             ExternalUserName: Username for external authentication, if applicable.
             Name: Human-readable name for the item.
             Type: The type/category of the record to process.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def updatet_stock_take(
-        self,
-        Status: str,
-        TaskID: str,
-        Account: Optional[str] = None,
-        Bins: Optional[List[Any]] = None,
-        Brands: Optional[List[Any]] = None,
-        Categories: Optional[List[Any]] = None,
-        EffectiveDate: Optional[str] = None,
-        Location: Optional[str] = None,
-        LocationID: Optional[str] = None,
-        NonZeroStockOnHandProducts: Optional[List[Any]] = None,
-        PickZones: Optional[List[Any]] = None,
-        Reference: Optional[str] = None,
-        StockLocators: Optional[List[Any]] = None,
-        Tags: Optional[List[Any]] = None,
-        UseRelativeQuantity: Optional[bool] = None,
-        ZeroStockOnHandProducts: Optional[List[Any]] = None,
-    ) -> Dict[str, Any]:
-        """Updates an existing stock take in the system.
-
-        Args:
-            Status: Current status of the task. (required)
-            TaskID: Unique identifier for the task. (required)
-            Account: Account associated with the task.
-            Bins: List of bins.
-            Brands: List of brands.
-            Categories: 
-            EffectiveDate: The date when the task becomes effective.
-            Location: Name or details of the location.
-            LocationID: Identifier for the location.
-            NonZeroStockOnHandProducts: 
-            PickZones: Array of pick zones.
-            Reference: Reference identifier.
-            StockLocators: Array of stock locators.
-            Tags: Array of tags associated with the task.
-            UseRelativeQuantity: Flag to determine if relative quantities are used.
-            ZeroStockOnHandProducts: 
         Returns:
             API response as a dictionary.
         """

@@ -69,11 +69,11 @@ def _create_test_env(tmpdir: str, with_schemas: bool = False) -> str:
 
     tools = {
         "send_message": {
-            "actionId": "act_slack_send_message",
+            "toolId": "act_slack_send_message",
             "description": "Send a message to a channel",
         },
         "create_channel": {
-            "actionId": "act_slack_create_channel",
+            "toolId": "act_slack_create_channel",
             "description": "Create a new channel",
         },
     }
@@ -133,12 +133,12 @@ def _create_multi_connector_env(tmpdir: str) -> str:
                 "category": "communication",
                 "tools": {
                     "send_message": {
-                        "actionId": "act_slack_send_message",
+                        "toolId": "act_slack_send_message",
                         "description": "Send a message to a channel",
                         "inputSchema": _SAMPLE_INPUT_SCHEMA,
                     },
                     "create_channel": {
-                        "actionId": "act_slack_create_channel",
+                        "toolId": "act_slack_create_channel",
                         "description": "Create a new channel",
                         "inputSchema": {
                             "type": "object",
@@ -161,7 +161,7 @@ def _create_multi_connector_env(tmpdir: str) -> str:
                 "category": "project_management",
                 "tools": {
                     "create_issue": {
-                        "actionId": "act_jira_create_issue",
+                        "toolId": "act_jira_create_issue",
                         "description": "Create a Jira issue",
                         "inputSchema": {
                             "type": "object",
@@ -260,7 +260,7 @@ class TestFastnClient:
             request = httpx_mock.get_request()
             assert request is not None
             body = json.loads(request.content)
-            assert body["input"]["actionId"] == "act_slack_send_message"
+            assert body["input"]["toolId"] == "act_slack_send_message"
             assert body["input"]["parameters"]["body"]["channel"] == "general"
             assert body["input"]["parameters"]["body"]["text"] == "Hello"
 
@@ -387,7 +387,7 @@ class TestExecute:
 
             request = httpx_mock.get_request()
             body = json.loads(request.content)
-            assert body["input"]["actionId"] == "act_slack_send_message"
+            assert body["input"]["toolId"] == "act_slack_send_message"
             # execute() sends params flat (no wrapper key)
             assert body["input"]["parameters"]["channel"] == "general"
 
@@ -507,7 +507,7 @@ class TestGetToolsFor:
 
             assert len(tools) == 2
             send = next(t for t in tools if t["name"] == "send_message")
-            assert send["actionId"] == "act_slack_send_message"
+            assert send["toolId"] == "act_slack_send_message"
             assert "inputSchema" in send
             assert "outputSchema" in send
 
@@ -601,7 +601,7 @@ class TestGetToolsFor:
                 json={
                     "tools": [
                         {
-                            "actionId": "act_slack_send_message",
+                            "toolId": "act_slack_send_message",
                             "name": "send_message",
                             "description": "Send a message",
                             "inputSchema": _SAMPLE_INPUT_SCHEMA,
@@ -644,7 +644,7 @@ class TestGetToolsFor:
             client = self._make_client(tmpdir)
 
             raw_tool = {
-                "actionId": "act_slack_send_message",
+                "toolId": "act_slack_send_message",
                 "name": "send_message",
                 "description": "Send a message",
                 "inputSchema": _SAMPLE_INPUT_SCHEMA,
@@ -656,7 +656,7 @@ class TestGetToolsFor:
 
             tools = client.get_tools_for("Send a Slack message", format="raw")
             assert len(tools) == 1
-            assert tools[0]["actionId"] == "act_slack_send_message"
+            assert tools[0]["toolId"] == "act_slack_send_message"
 
     def test_prompt_api_error(self, httpx_mock: HTTPXMock) -> None:
         """Prompt-based discovery raises APIError on failure."""
@@ -669,7 +669,7 @@ class TestGetToolsFor:
                 text="Internal Server Error",
             )
 
-            with pytest.raises(APIError, match="Tool discovery failed"):
+            with pytest.raises(APIError, match="500"):
                 client.get_tools_for("Send a message", format="openai")
 
 
@@ -694,7 +694,7 @@ class TestGetTools:
             client = FastnClient(config_path=config_path)
             tool = client.get_tool("slack", "send_message")
             assert tool["name"] == "send_message"
-            assert tool["actionId"] == "act_slack_send_message"
+            assert tool["toolId"] == "act_slack_send_message"
             assert "inputSchema" in tool
 
     def test_tool_not_found(self) -> None:
@@ -783,7 +783,7 @@ class TestAsyncFastnClient:
 
             request = httpx_mock.get_request()
             body = json.loads(request.content)
-            assert body["input"]["actionId"] == "act_slack_send_message"
+            assert body["input"]["toolId"] == "act_slack_send_message"
 
     @pytest.mark.asyncio
     async def test_get_tools_for_connector_openai(self) -> None:

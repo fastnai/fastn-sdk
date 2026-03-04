@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class AutomConnector:
@@ -13,7 +13,7 @@ class AutomConnector:
     Provides 6 tools.
     """
 
-    def bing_search(
+    def autom_bing_search(
         self,
         query: str,
         cc: Optional[str] = None,
@@ -24,7 +24,7 @@ class AutomConnector:
         num: Optional[int] = None,
         page: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Executes a web search utilizing the Bing Search connector to gather diverse results from the Bing search engine.
+        """Performs a web search using the Bing search engine and returns diverse search results including web pages, news, and other content. Use this tool when you need to retrieve search results specifically from Bing. Do not use this tool when you need Google-specific results, image search, or search autocomplete suggestions.
 
         Args:
             query: Search query. (required)
@@ -40,12 +40,12 @@ class AutomConnector:
         """
         ...
 
-    def brave_search(
+    def autom_brave_search(
         self,
         query: str,
         page: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Conducts a web search through the Brave Search connector, allowing users to access information while prioritizing privacy.
+        """Performs a privacy-focused web search using the Brave search engine and returns search results. Use this tool when you need web search results from Braves independent index, especially when privacy is a priority. Do not use this tool when you need results from Google or Bing specifically, or when you need image search or autocomplete suggestions.
 
         Args:
             query: The search query for the Autom API. (required)
@@ -55,23 +55,23 @@ class AutomConnector:
         """
         ...
 
-    def get_usage(
+    def autom_get_usage(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves usage statistics from the getUsage connector to analyze and report on system or application performance.
+        """Retrieves current API usage statistics for the authenticated Autom.dev account, including request counts and consumption metrics. Use this tool when you need to monitor API quota consumption or audit usage. Do not use this tool to perform searches or retrieve external content.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def google_images(
+    def autom_google_images_search(
         self,
         query: str,
         gl: Optional[str] = None,
         hl: Optional[str] = None,
         page: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Searches for and retrieves images using the Google Images connector to find relevant visual content based on user queries.
+        """Searches for and retrieves image results from Google Images based on a provided query. Returns image URLs and metadata for visually relevant content. Use this tool when you need to find images matching a search query. Do not use this tool for general web searches, news searches, or autocomplete suggestions.
 
         Args:
             query: The search query string. (required)
@@ -83,7 +83,7 @@ class AutomConnector:
         """
         ...
 
-    def google_search(
+    def autom_google_search(
         self,
         gl: Optional[str] = None,
         hl: Optional[str] = None,
@@ -93,7 +93,7 @@ class AutomConnector:
         query: Optional[str] = None,
         uule: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Performs a web search using the Google Search connector to retrieve relevant information from the internet.
+        """Performs a web search using Google Search and returns relevant results including web pages, snippets, and links. Use this tool when you need to retrieve general search results from Google. Do not use this tool when you need image results (use autom_google_images_search), autocomplete suggestions (use autom_google_search_autocomplete), or results from Bing or Brave.
 
         Args:
             gl: Geographic location code (country code).
@@ -108,14 +108,14 @@ class AutomConnector:
         """
         ...
 
-    def google_search_autocomplete(
+    def autom_google_search_autocomplete(
         self,
         query: str,
         cp: Optional[int] = None,
         gl: Optional[str] = None,
         hl: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Generates autocomplete suggestions for search queries with the Google Search Autocomplete connector to enhance user search experiences.
+        """Generates autocomplete query suggestions from Google Search based on a partial search query. Use this tool when you need to discover popular or predicted search terms related to a topic, or to enhance a search interface with suggestions. Do not use this tool to retrieve full search results or images.
 
         Args:
             query: The search query to be executed. (required)

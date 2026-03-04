@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class HrPartnerConnector:
@@ -13,20 +13,11 @@ class HrPartnerConnector:
     Provides 10 tools.
     """
 
-    def company_details(
-        self,
-    ) -> Dict[str, Any]:
-        """Fetches detailed information about a company in the specified system.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_applicant(
+    def hr_partner_get_applicant(
         self,
         applicantEmail: str,
     ) -> Dict[str, Any]:
-        """Retrieves information about a specific applicant from the provided database or system.
+        """Retrieves full details for a single applicant in HR Partner identified by their email address. Use this when you need complete information about one specific candidate. To browse all applicants, use hr_partner_list_applicants instead. No data is modified by this call.
 
         Args:
             applicantEmail: Email address of the applicant. (required)
@@ -35,20 +26,20 @@ class HrPartnerConnector:
         """
         ...
 
-    def get_applicants(
+    def hr_partner_get_company_details(
         self,
     ) -> Dict[str, Any]:
-        """Obtains a list of all applicants stored in the database, providing an overview of potential candidates.
+        """Retrieves the company profile and configuration details from HR Partner. Use this to access company-level information such as name, address, and HR settings. Does not return employee or recruitment data — use the relevant employee or applicant tools for those. No data is modified by this call.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_employee(
+    def hr_partner_get_employee(
         self,
         employeeCode: str,
     ) -> Dict[str, Any]:
-        """Fetches information about a specific employee from the defined employee database.
+        """Retrieves full profile information for a single employee in HR Partner identified by their employee code. Use this when you need detailed data about one specific employee. To list all employees, use hr_partner_list_employees instead. No data is modified by this call.
 
         Args:
             employeeCode: Employee code to identify the employee in the HR Partner system. (required)
@@ -57,25 +48,47 @@ class HrPartnerConnector:
         """
         ...
 
-    def get_employee_absences(
+    def hr_partner_get_job(
         self,
+        jobID: str,
     ) -> Dict[str, Any]:
-        """Retrieves a list of recorded absences for an employee in the employee management system.
+        """Retrieves full details for a single job posting in HR Partner identified by its job ID. Use this when you know the specific job ID and need complete information about that posting. To browse all jobs, use hr_partner_list_jobs instead. No data is modified by this call.
+
+        Args:
+            jobID: ID of the job. (required)
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_employee_birthdays(
+    def hr_partner_list_applicants(
         self,
     ) -> Dict[str, Any]:
-        """Fetches upcoming employee birthdays from the HR database for planning celebrations.
+        """Lists all recruitment applicants stored in HR Partner. Use this to get an overview of all candidates in the hiring pipeline. Does not return details for a single applicant — use hr_partner_get_applicant for that. No data is modified by this call.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_employee_skills(
+    def hr_partner_list_employee_absences(
+        self,
+    ) -> Dict[str, Any]:
+        """Lists all recorded employee absences in HR Partner. Use this to review absence history or track leave across the workforce. Does not return details for a single employees absences in isolation — filter results as needed. No data is modified by this call.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def hr_partner_list_employee_birthdays(
+        self,
+    ) -> Dict[str, Any]:
+        """Lists upcoming employee birthdays from HR Partner. Use this when planning birthday celebrations or generating birthday reports. Returns birthday dates across all employees. No data is modified by this call.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def hr_partner_list_employee_skills(
         self,
         comments: Optional[str] = None,
         department: Optional[str] = None,
@@ -83,7 +96,7 @@ class HrPartnerConnector:
         skill_name: Optional[str] = None,
         skill_rating: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of skills associated with a specific employee from the skills management system.
+        """Lists all skills recorded in HR Partner across employees. Use this to retrieve the full skills inventory. To filter by a single employee, use additional endpoint parameters or filtering. No data is modified by this call.
 
         Args:
             comments: 
@@ -96,7 +109,7 @@ class HrPartnerConnector:
         """
         ...
 
-    def get_employees(
+    def hr_partner_list_employees(
         self,
         can_logon: Optional[str] = None,
         department: Optional[str] = None,
@@ -113,7 +126,7 @@ class HrPartnerConnector:
         search: Optional[str] = None,
         tag: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Obtains a comprehensive list of all employees from the provided employee database.
+        """Lists all employees stored in HR Partner. Use this to get a full directory of employees. Does not return detailed information for a single employee — use hr_partner_get_employee for that. No data is modified by this call.
 
         Args:
             can_logon: 
@@ -135,23 +148,10 @@ class HrPartnerConnector:
         """
         ...
 
-    def get_job(
-        self,
-        jobID: str,
-    ) -> Dict[str, Any]:
-        """Fetches details about a specific job listing within the job management system.
-
-        Args:
-            jobID: ID of the job. (required)
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_jobs(
+    def hr_partner_list_jobs(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves a comprehensive list of all available job postings from the job management system.
+        """Lists all available job postings in HR Partner. Use this when you need a full overview of open or active job listings. Does not return details for a single job — use hr_partner_get_job for that. No data is modified by this call.
         Returns:
             API response as a dictionary.
         """

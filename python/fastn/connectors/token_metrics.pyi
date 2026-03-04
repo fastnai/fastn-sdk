@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class TokenMetricsConnector:
@@ -13,26 +13,7 @@ class TokenMetricsConnector:
     Provides 6 tools.
     """
 
-    def ai_reports(
-        self,
-        limit: Optional[str] = None,
-        page: Optional[str] = None,
-        symbol: Optional[str] = None,
-        token_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Generates comprehensive reports using the AIReports tool to analyze data trends and insights.
-
-        Args:
-            limit: The maximum number of results to return.
-            page: The page number of the results to return.
-            symbol: The symbol of the token (e.g., BTC, ETH).
-            token_id: The unique identifier for the token.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def correlation(
+    def token_metrics_get_correlation(
         self,
         category: Optional[str] = None,
         exchange: Optional[str] = None,
@@ -41,7 +22,7 @@ class TokenMetricsConnector:
         symbol: Optional[str] = None,
         token_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Analyzes the relationship between multiple data sets using the correlation tool to identify dependencies and patterns.
+        """Retrieves correlation coefficients between multiple cryptocurrencies from Token Metrics, measuring how closely their price movements are related. Use this tool when you need to assess portfolio diversification, identify co-moving assets, or understand dependencies between tokens. Do not use this for trading signals, support/resistance levels, or individual token details — use the dedicated tools for those. This is a read-only operation with no side effects.
 
         Args:
             category: Filter results by token category.
@@ -55,7 +36,45 @@ class TokenMetricsConnector:
         """
         ...
 
-    def get_coins_detail(
+    def token_metrics_get_support_and_resistance(
+        self,
+        limit: Optional[str] = None,
+        page: Optional[str] = None,
+        symbol: Optional[str] = None,
+        token_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves key support and resistance price levels for cryptocurrencies from Token Metrics. Use this tool when you need to identify critical price zones for a token to inform entry/exit strategies or risk management. Do not use this for trading signals, market cap rankings, or correlation analysis — use the dedicated tools for those. This is a read-only operation with no side effects.
+
+        Args:
+            limit: The maximum number of results to return.
+            page: The page number of results to retrieve.
+            symbol: The symbol of the token (e.g., BTC, ETH).
+            token_id: The unique identifier for the token.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def token_metrics_list_ai_reports(
+        self,
+        limit: Optional[str] = None,
+        page: Optional[str] = None,
+        symbol: Optional[str] = None,
+        token_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retrieves AI-generated investment research reports for cryptocurrencies from Token Metrics, covering trend analysis, ratings, and data-driven insights. Use this tool when you need in-depth analytical reports on specific tokens or the broader market. Do not use this for raw trading signals, price levels, or coin metadata — use the dedicated tools for those. This is a read-only operation with no side effects.
+
+        Args:
+            limit: The maximum number of results to return.
+            page: The page number of the results to return.
+            symbol: The symbol of the token (e.g., BTC, ETH).
+            token_id: The unique identifier for the token.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def token_metrics_list_coins_detail(
         self,
         blockchain_address: Optional[str] = None,
         category: Optional[str] = None,
@@ -66,7 +85,7 @@ class TokenMetricsConnector:
         token_id: Optional[str] = None,
         token_name: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves detailed information about various cryptocurrencies using the getCoinsDetail tool to provide insights on market performance.
+        """Retrieves detailed information about one or more cryptocurrencies from Token Metrics, including token metadata, ratings, and market performance metrics. Use this tool when you need a comprehensive profile of specific tokens for research or due diligence. Do not use this for trading signals or top market cap rankings — use the dedicated tools for those. This is a read-only operation with no side effects.
 
         Args:
             blockchain_address: The blockchain address to filter by.
@@ -82,30 +101,11 @@ class TokenMetricsConnector:
         """
         ...
 
-    def support_and_resistance(
-        self,
-        limit: Optional[str] = None,
-        page: Optional[str] = None,
-        symbol: Optional[str] = None,
-        token_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Identifies key support and resistance levels in market data using the supportAndResistance tool for trading strategy development.
-
-        Args:
-            limit: The maximum number of results to return.
-            page: The page number of results to retrieve.
-            symbol: The symbol of the token (e.g., BTC, ETH).
-            token_id: The unique identifier for the token.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def top_token_by_market_cap(
+    def token_metrics_list_top_tokens_by_market_cap(
         self,
         top_k: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetches the top tokens ranked by market capitalization using the topTokenByMarketCap tool to inform investment decisions.
+        """Retrieves a ranked list of the top cryptocurrencies by market capitalization from Token Metrics. Use this tool when you need to identify the largest or most dominant tokens in the market for investment screening or portfolio analysis. Do not use this for trading signals, price history, or individual token details — use the dedicated tools for those. This is a read-only operation with no side effects.
 
         Args:
             top_k: Number of top results to return.
@@ -114,7 +114,7 @@ class TokenMetricsConnector:
         """
         ...
 
-    def trading_signal(
+    def token_metrics_list_trading_signals(
         self,
         category: Optional[str] = None,
         endDate: Optional[str] = None,
@@ -129,7 +129,7 @@ class TokenMetricsConnector:
         token_id: Optional[str] = None,
         volume: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Provides actionable trading signals based on market analysis using the tradingSignal tool to enhance trading strategies.
+        """Retrieves actionable buy, sell, or hold trading signals for cryptocurrencies from Token Metrics, based on AI-driven market analysis. Use this tool when you need to inform trading decisions with quantitative signals across one or more tokens. Do not use this for price data, market cap rankings, or support/resistance levels — use the dedicated tools for those. This is a read-only operation with no side effects.
 
         Args:
             category: Filter results by token category.

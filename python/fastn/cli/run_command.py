@@ -53,8 +53,6 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
     if not config.auth_token and not config.api_key:
         raise click.ClickException("Not authenticated. Run `fastn login` first.")
 
-    _ensure_fresh_token(config)
-
     fastn_dir = find_fastn_dir()
     registry = load_registry(fastn_dir)
     connectors = registry.get("connectors", {})
@@ -125,10 +123,10 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
             f"Available: {available}"
         )
 
-    action_id = tool_info.get("actionId", "")
-    if not action_id:
+    tool_id = tool_info.get("toolId", "") or tool_info.get("actionId", "")
+    if not tool_id:
         raise click.ClickException(
-            f"No actionId for '{tool_name}'. Run `fastn connector sync` and `fastn connector add {connector_name}`."
+            f"No toolId for '{tool_name}'. Run `fastn connector sync` and `fastn connector add {connector_name}`."
         )
 
     # Extract input fields from schema for interactive prompting
@@ -154,26 +152,30 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
     parameters = _build_params_from_schema(tool_info, params)
     payload: dict = {
         "input": {
-            "actionId": action_id,
-            "connectorId": connector_id,
-            "agentId": workspace_id,
-            "toolName": tool_name,
+            "toolId": tool_id,
             "parameters": parameters,
+            "agentId": workspace_id,
         }
     }
+    if connector_id:
+        payload["input"]["connectorId"] = connector_id
     if connection_id:
         payload["input"]["connectionId"] = connection_id
 
     effective_tenant = tenant_id or tenant
     if effective_tenant:
         config.tenant_id = effective_tenant
+
+    # Refresh token right before the call (not earlier — interactive
+    # prompting above can take long enough for the token to expire).
+    _ensure_fresh_token(config)
     headers = config.get_headers()
 
     click.echo()
     click.echo(f"Running {connector_name}.{tool_name}...")
     resp = _verbose_post(EXECUTE_URL, headers, payload)
 
-    _handle_execute_error(resp, f"{connector_name}.{tool_name}", workspace_id)
+    _handle_execute_error(resp, f"{connector_name}.{tool_name}", workspace_id, config=config)
 
     data = resp.json()
     # Unwrap: API returns {body, statusCode, rawBody} — show the body
@@ -228,7 +230,7 @@ def schema(connector_name: str, tool_name: Optional[str]) -> None:
         output = {
             "name": tool_name,
             "description": tool.get("description", ""),
-            "actionId": tool.get("actionId", ""),
+            "toolId": tool.get("toolId", "") or tool.get("actionId", ""),
             "inputSchema": tool.get("inputSchema", {}),
             "outputSchema": tool.get("outputSchema", {}),
         }
@@ -239,7 +241,7 @@ def schema(connector_name: str, tool_name: Optional[str]) -> None:
             output.append({
                 "name": _to_snake_case(name),
                 "description": tool.get("description", ""),
-                "actionId": tool.get("actionId", ""),
+                "toolId": tool.get("toolId", "") or tool.get("actionId", ""),
                 "inputSchema": tool.get("inputSchema", {}),
                 "outputSchema": tool.get("outputSchema", {}),
             })

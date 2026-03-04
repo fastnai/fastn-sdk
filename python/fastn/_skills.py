@@ -29,7 +29,6 @@ class _SkillsSync:
         Returns a list of dicts with ``id``, ``projectId``, ``name``,
         ``description``, ``createdAt``, ``updatedAt``.
         """
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         variables = {"input": {"projectId": project_id}}
         data = _gql_call_sync(self._client, LIST_SKILLS_QUERY, variables)
@@ -48,7 +47,6 @@ class _SkillsAsync:
 
     async def list(self) -> List[Dict[str, Any]]:
         """List all agent skills in the current project (async)."""
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         variables = {"input": {"projectId": project_id}}
         data = await _gql_call_async(self._client, LIST_SKILLS_QUERY, variables)

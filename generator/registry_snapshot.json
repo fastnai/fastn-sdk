@@ -14,16 +14,15 @@
       "source": "workspace",
       "tools": {
         "list_channels": {
-          "actionId": "act_slack_list_channels",
           "description": "List all channels",
           "inputSchema": {
             "properties": {},
             "type": "object"
           },
-          "name": "listChannels"
+          "name": "listChannels",
+          "toolId": "act_slack_list_channels"
         },
         "send_message": {
-          "actionId": "act_slack_send_message",
           "description": "Send a message to a channel",
           "inputSchema": {
             "properties": {
@@ -58,7 +57,8 @@
               }
             },
             "type": "object"
-          }
+          },
+          "toolId": "act_slack_send_message"
         }
       }
     }

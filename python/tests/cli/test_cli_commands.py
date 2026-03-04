@@ -64,7 +64,7 @@ def _make_registry_with_tools() -> dict:
                 "connector_type": "GROUP",
                 "tools": {
                     "send_message": {
-                        "actionId": "act_slack_send_message",
+                        "toolId": "act_slack_send_message",
                         "name": "sendMessage",
                         "description": "Send a message to a channel",
                         "inputSchema": {
@@ -95,7 +95,7 @@ def _make_registry_with_tools() -> dict:
                         },
                     },
                     "list_channels": {
-                        "actionId": "act_slack_list_channels",
+                        "toolId": "act_slack_list_channels",
                         "name": "listChannels",
                         "description": "List all channels",
                         "inputSchema": {
@@ -259,7 +259,7 @@ class TestSchemaCommand:
         assert data["name"] == "send_message"
         assert "inputSchema" in data
         assert "outputSchema" in data
-        assert data["actionId"] == "act_slack_send_message"
+        assert data["toolId"] == "act_slack_send_message"
 
     def test_schema_tool_not_found(self, runner, tmp_env):
         registry = _make_registry_with_tools()
@@ -300,7 +300,7 @@ class TestSchemaCommand:
                     "display_name": "Slack",
                     "tools": {
                         "sendmessage": {
-                            "actionId": "act_slack_sendmessage",
+                            "toolId": "act_slack_sendmessage",
                             "description": "Send a message",
                             "inputSchema": {},
                             "outputSchema": {},
@@ -313,7 +313,7 @@ class TestSchemaCommand:
         result = runner.invoke(cli, ["connector", "schema","slack", "send_message"])
         assert result.exit_code == 0
         data = json.loads(result.output)
-        assert data["actionId"] == "act_slack_sendmessage"
+        assert data["toolId"] == "act_slack_sendmessage"
 
 
 # ===================================================================
@@ -497,7 +497,7 @@ class TestRunCommand:
         # Verify API was called with correct action
         call_args = mock_post.call_args
         payload = call_args[0][2]
-        assert payload["input"]["actionId"] == "act_slack_send_message"
+        assert payload["input"]["toolId"] == "act_slack_send_message"
         # At least text should be in the params body
         params = payload["input"]["parameters"]
         assert params.get("body", {}).get("text") == "Hello!"
@@ -608,7 +608,7 @@ class TestRunCommand:
             "--channel", "general", "--text", "Hi"
         ])
         assert result.exit_code != 0
-        assert "Authentication" in result.output or "authentication" in result.output.lower()
+        assert "Unauthorized" in result.output or "Authentication" in result.output
 
     def test_run_interactive_prompt(self, runner, tmp_env):
         """When no params are given and there are fields, prompt interactively."""
@@ -787,7 +787,7 @@ class TestAgentCommand:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = [
-            {"actionId": "act_test", "function": {"name": "test_tool", "description": "test"}}
+            {"toolId": "act_test", "function": {"name": "test_tool", "description": "test"}}
         ]
         mock_resp.text = "[]"
         mock_post.return_value = mock_resp

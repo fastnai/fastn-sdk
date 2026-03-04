@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class MyToolsConnector:
@@ -16,6 +16,7 @@ class MyToolsConnector:
     def fastn_activation_flow_v1(
         self,
         authorization: Optional[str] = None,
+        input: Optional[Dict[str, Any]] = None,
         x_fastn_space_connection_id: Optional[str] = None,
         x_fastn_space_id: Optional[str] = None,
         x_fastn_space_tenantid: Optional[str] = None,
@@ -24,6 +25,7 @@ class MyToolsConnector:
 
         Args:
             authorization: 
+            input: Free form JSON
             x_fastn_space_connection_id: 
             x_fastn_space_id: 
             x_fastn_space_tenantid: 
@@ -34,6 +36,7 @@ class MyToolsConnector:
 
     def fastn_custom_auth_v1(
         self,
+        input: Optional[Dict[str, Any]] = None,
         x_fastn_api_key: Optional[str] = None,
         x_fastn_space_connection_id: Optional[str] = None,
         x_fastn_space_id: Optional[str] = None,
@@ -42,6 +45,7 @@ class MyToolsConnector:
         """Facilitates custom authentication procedures within the fastn connector, enabling the implementation of tailored user login and verification methods.
 
         Args:
+            input: Free form JSON
             x_fastn_api_key: 
             x_fastn_space_connection_id: 
             x_fastn_space_id: 
@@ -54,6 +58,7 @@ class MyToolsConnector:
     def testflow_v1(
         self,
         authorization: Optional[str] = None,
+        input: Optional[Dict[str, Any]] = None,
         x_fastn_space_connection_id: Optional[str] = None,
         x_fastn_space_id: Optional[str] = None,
         x_fastn_space_tenantid: Optional[str] = None,
@@ -62,6 +67,7 @@ class MyToolsConnector:
 
         Args:
             authorization: 
+            input: Free form JSON
             x_fastn_space_connection_id: 
             x_fastn_space_id: 
             x_fastn_space_tenantid: 

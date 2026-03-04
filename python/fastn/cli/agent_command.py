@@ -31,7 +31,7 @@ def _extract_tool_list(data: Any) -> list:
         - A plain list: ``[{...}, ...]``
         - ``{"tools": [...]}``, ``{"data": [...]}``
         - ``{"body": [...]}``, ``{"body": {"tools": [...]}}``
-        - A single tool dict: ``{actionId: ..., ...}``
+        - A single tool dict: ``{toolId: ..., ...}``
     """
     if isinstance(data, list):
         return data
@@ -55,11 +55,11 @@ def _extract_tool_list(data: Any) -> list:
             if isinstance(val, list):
                 return val
         # body itself might be a single tool
-        if "actionId" in body:
+        if "toolId" in body or "actionId" in body:
             return [body]
 
     # data itself is a single tool
-    if "actionId" in data:
+    if "toolId" in data or "actionId" in data:
         return [data]
 
     return []
@@ -70,30 +70,82 @@ def _extract_tool_list(data: Any) -> list:
 # ---------------------------------------------------------------------------
 
 def _setup_llm_provider(config: FastnConfig) -> Optional[FastnConfig]:
-    """Interactive LLM provider setup — choose provider, enter API key.
+    """Interactive LLM model setup in a single step.
+
+    Shows a flat numbered list of all available models (no provider
+    prefix — the model name makes it obvious). The last option lets
+    the user type any model name; the provider is auto-detected from
+    the prefix.
 
     Returns the updated config with LLM settings, or None if user cancels.
     """
-    from fastn.config import LLM_PROVIDERS
+    from fastn.config import LLM_PROVIDERS, infer_provider_from_model
 
     click.echo()
-    click.echo("  LLM Setup \u2014 fastn agent uses an LLM to fill in tool parameters")
-    click.echo("  from your natural language prompt.")
-    click.echo()
-    click.echo("  Choose an LLM provider:")
+    click.echo("  Choose a model for fastn agent:")
     click.echo()
 
-    providers = list(LLM_PROVIDERS.items())
-    for i, (key, info) in enumerate(providers, 1):
-        click.echo(f"    {i}. {info['name']}")
+    # Build flat list: [(provider_key, provider_info, model_name), ...]
+    choices: list = []
+    for pkey, pinfo in LLM_PROVIDERS.items():
+        for m in pinfo.get("models", []):
+            choices.append((pkey, pinfo, m))
 
+    for i, (pkey, pinfo, model_name) in enumerate(choices, 1):
+        default_marker = " *" if model_name == pinfo["default_model"] else ""
+        click.echo(f"    {i:>2}. {model_name}{default_marker}")
+
+    # Extra option: type a custom model name
+    custom_idx = len(choices) + 1
     click.echo()
-    choice = click.prompt("  Provider number", type=int)
-    if choice < 1 or choice > len(providers):
-        click.echo("  Invalid choice.")
+    click.echo(f"    {custom_idx:>2}. Enter a model name")
+    click.echo()
+
+    raw = click.prompt("  Enter number or model name").strip()
+
+    # Determine selected model + provider
+    selected_model: str = ""
+    provider_key: str = ""
+    provider_info: dict = {}
+
+    # If user typed a number, pick from list
+    if raw.isdigit():
+        idx = int(raw)
+        if idx == custom_idx:
+            selected_model = click.prompt("  Model name").strip()
+        elif 1 <= idx <= len(choices):
+            provider_key, provider_info, selected_model = choices[idx - 1]
+        else:
+            click.echo("  Invalid choice.")
+            return None
+    else:
+        # User typed a model name directly
+        selected_model = raw
+
+    if not selected_model:
+        click.echo("  No model selected.")
         return None
 
-    provider_key, provider_info = providers[choice - 1]
+    # If provider wasn't set from the list, infer from the model name
+    if not provider_key:
+        inferred = infer_provider_from_model(selected_model)
+        if inferred and inferred in LLM_PROVIDERS:
+            provider_key = inferred
+            provider_info = LLM_PROVIDERS[inferred]
+        else:
+            # Ask user which provider
+            click.echo()
+            click.echo("  Could not detect provider. Which API?")
+            for i, (pk, pi) in enumerate(LLM_PROVIDERS.items(), 1):
+                click.echo(f"    {i}. {pi['name']}")
+            pchoice = click.prompt("  Enter number", type=int)
+            keys = list(LLM_PROVIDERS.keys())
+            if 1 <= pchoice <= len(keys):
+                provider_key = keys[pchoice - 1]
+                provider_info = LLM_PROVIDERS[provider_key]
+            else:
+                click.echo("  Invalid choice.")
+                return None
 
     # Check if the API key is already in an environment variable
     env_var = provider_info["env_var"]
@@ -115,7 +167,7 @@ def _setup_llm_provider(config: FastnConfig) -> Optional[FastnConfig]:
                 click.echo("  Open the URL above manually.")
 
         click.echo()
-        api_key = click.prompt(f"  {provider_info['name']} API Key")
+        api_key = click.prompt(f"  API Key")
         if not api_key.strip():
             click.echo("  No API key provided.")
             return None
@@ -132,10 +184,10 @@ def _setup_llm_provider(config: FastnConfig) -> Optional[FastnConfig]:
 
     config.llm_provider = provider_key
     config.llm_api_key = api_key
-    config.llm_model = provider_info["default_model"]
+    config.llm_model = selected_model
     save_config(config)
 
-    click.echo(f"\n  \u2713 {provider_info['name']} configured (model: {config.llm_model})")
+    click.echo(f"\n  \u2713 Configured: {selected_model}")
     click.echo(f"  Saved to .fastn/config.json")
     return config
 
@@ -362,73 +414,142 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     return in_cost + out_cost
 
 
-# Each entry: (tool_name, tokens_in, tokens_out, context_tokens,
-#               llm_time, tool_time,
-#               request_bytes, response_bytes, cumulative_context_bytes, status)
-_AgentCallLog = List[tuple]
-
-
 def _print_agent_summary(
-    call_log: _AgentCallLog,
-    total_input: int, total_output: int,
-    total_llm_time: float, total_tool_time: float,
+    call_log: List[dict],
     model: str = "",
 ) -> None:
-    """Print a single benchmark table of all tool calls."""
-    total_time = total_llm_time + total_tool_time
+    """Print a benchmark table showing every call (discovery, LLM, tool).
 
+    Each entry in *call_log* is a dict with ``type`` (``"discovery"``,
+    ``"llm"``, or ``"tool"``), ``name``, ``duration``, ``status``, and
+    type-specific fields (``tokens_in``/``tokens_out`` for LLM,
+    ``resp_bytes`` for api/tool, etc.).
+    """
     click.echo()
     click.echo()
 
     if not call_log:
-        cost = _estimate_cost(model, total_input, total_output)
-        click.echo("  No tool calls.")
-        click.echo(f"  Tokens: {_format_tokens(total_input)} in \u2192 {_format_tokens(total_output)} out")
-        click.echo(f"  Time: {_format_duration(total_time)}  Cost: {_format_cost(cost)}")
+        click.echo("  No calls recorded.")
         return
 
-    # Single consolidated table
-    # Columns: #, Tool, LLM, Tool, Context(tokens), In, Out, Cost
-    click.echo("  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510")
-    click.echo("  \u2502  #   Tool                     LLM      Tool     Context      In    Out       Cost      \u2502")
-    click.echo("  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524")
+    # ── Compute totals ────────────────────────────────────────────────
+    total_time = sum(e.get("duration", 0) for e in call_log)
+    total_tokens_out = sum(e.get("tokens_out", 0) for e in call_log if e["type"] == "llm")
+    total_bytes = sum(e.get("resp_bytes", 0) for e in call_log if e["type"] != "llm")
+    total_cost = sum(
+        _estimate_cost(model, e.get("tokens_in", 0), e.get("tokens_out", 0))
+        for e in call_log if e["type"] == "llm"
+    )
+    api_time = sum(e.get("duration", 0) for e in call_log if e["type"] != "llm")
+    llm_time = sum(e.get("duration", 0) for e in call_log if e["type"] == "llm")
 
-    total_cost = 0.0
+    # Compute total new tokens (sum of deltas) and peak context window
+    _prev = 0
+    total_new_in = 0
+    max_context = 0
+    for e in call_log:
+        if e["type"] == "llm":
+            t_in = e.get("tokens_in", 0)
+            t_out = e.get("tokens_out", 0)
+            delta = t_in - _prev if _prev else t_in
+            total_new_in += delta
+            if t_in > max_context:
+                max_context = t_in
+            _prev = t_in + t_out
+
+    # ── Column widths ─────────────────────────────────────────────────
+    #  #(4) Call(28) Type(5) Duration(8) In(7) Out(6) Ctx(8) Size(8) Cost(9)
+    W = 93  # inner width
+    bar = "\u2500" * W
+
+    click.echo(f"  \u250c{bar}\u2510")
+    click.echo(
+        f"  \u2502  {'#':<4}{'Call':<28}{'Type':<6}{'Duration':>8}"
+        f"{'In':>7}{'Out':>6}{'Ctx':>8}{'Size':>9}{'Cost':>10}  \u2502"
+    )
+    click.echo(f"  \u251c{bar}\u2524")
+
+    prev_context = 0  # track previous prompt_tokens for delta calc
     for i, entry in enumerate(call_log, 1):
-        name = entry[0]
-        t_in, t_out, ctx = entry[1], entry[2], entry[3]
-        llm_t, tool_t = entry[4], entry[5]
-        status = entry[9]
+        etype = entry["type"]
+        name = entry.get("name", "")
+        duration = entry.get("duration", 0)
+        status = entry.get("status", "ok")
 
-        call_cost = _estimate_cost(model, t_in, t_out)
-        total_cost += call_cost
-
-        short_name = name if len(name) <= 23 else name[:20] + "..."
         mark = "\u2713" if status == "ok" else "\u2717"
+        short_name = name if len(name) <= 26 else name[:23] + "..."
+        type_label = "api" if etype == "discovery" else etype
+
+        # Token columns — only for LLM rows
+        # In  = new tokens added since last LLM call (delta)
+        # Out = completion tokens
+        # Ctx = total context window (prompt_tokens)
+        if etype == "llm":
+            t_in = entry.get("tokens_in", 0)   # prompt_tokens (full context)
+            t_out = entry.get("tokens_out", 0)  # completion_tokens
+            delta = t_in - prev_context if prev_context else t_in
+            in_str = _format_tokens(delta)
+            out_str = _format_tokens(t_out)
+            ctx_str = _format_tokens(t_in)
+            prev_context = t_in + t_out  # next delta = new prompt - (this prompt + this completion)
+        else:
+            in_str = "\u2014"
+            out_str = "\u2014"
+            ctx_str = "\u2014"
+
+        # Size column — only for api/tool rows
+        if etype != "llm":
+            resp_bytes = entry.get("resp_bytes", 0)
+            size_str = _format_bytes(resp_bytes) if resp_bytes else "\u2014"
+        else:
+            size_str = "\u2014"
+
+        # Cost column — only for LLM rows
+        if etype == "llm":
+            call_cost = _estimate_cost(model, entry.get("tokens_in", 0), entry.get("tokens_out", 0))
+            cost_str = _format_cost(call_cost)
+        else:
+            cost_str = "\u2014"
 
         click.echo(
-            f"  \u2502  {mark} {i:<2} {short_name:<23}"
-            f" {_format_duration(llm_t):>7}"
-            f" {_format_duration(tool_t):>7}"
-            f" {_format_tokens(ctx):>9}"
-            f" {_format_tokens(t_in):>7}"
-            f" {_format_tokens(t_out):>6}"
-            f" {_format_cost(call_cost):>10}  \u2502"
+            f"  \u2502  {mark} {i:<3}{short_name:<28}{type_label:<6}"
+            f"{_format_duration(duration):>8}"
+            f"{in_str:>7}{out_str:>6}{ctx_str:>8}"
+            f"{size_str:>9}"
+            f"{cost_str:>10}  \u2502"
         )
 
-    click.echo("  \u251c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2524")
+    click.echo(f"  \u251c{bar}\u2524")
+
+    # Total row
+    total_tokens = total_new_in + total_tokens_out
+    ctx_peak = _format_tokens(max_context) if max_context else "\u2014"
     click.echo(
-        f"  \u2502      {'Total':<23}"
-        f" {_format_duration(total_llm_time):>7}"
-        f" {_format_duration(total_tool_time):>7}"
-        f" {_format_tokens(call_log[-1][3]):>9}"
-        f" {_format_tokens(total_input):>7}"
-        f" {_format_tokens(total_output):>6}"
-        f" {_format_cost(total_cost):>10}  \u2502"
+        f"  \u2502  {'':4}{'Total':<28}{'':6}"
+        f"{_format_duration(total_time):>8}"
+        f"{_format_tokens(total_new_in):>7}"
+        f"{_format_tokens(total_tokens_out):>6}"
+        f"{ctx_peak:>8}"
+        f"{_format_bytes(total_bytes):>9}"
+        f"{_format_cost(total_cost):>10}  \u2502"
     )
-    click.echo("  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518")
+
+    # Breakdown row
+    if total_time > 0:
+        api_pct = int(round(100 * api_time / total_time))
+        llm_pct = 100 - api_pct
+        breakdown = f"api {_format_duration(api_time)} ({api_pct}%) \u00b7 llm {_format_duration(llm_time)} ({llm_pct}%)"
+        padding = W - 4 - len(breakdown)
+        click.echo(f"  \u2502{'':>{padding}}{breakdown}    \u2502")
+
+    click.echo(f"  \u2514{bar}\u2518")
     click.echo()
-    click.echo(f"  {_format_duration(total_time)} total  \u00b7  {_format_tokens(total_input + total_output)} tokens  \u00b7  {_format_cost(total_cost)}")
+    click.echo(
+        f"  {_format_duration(total_time)} total  \u00b7  "
+        f"{_format_tokens(total_tokens)} tokens ({_format_tokens(total_new_in)} in, {_format_tokens(total_tokens_out)} out)  \u00b7  "
+        f"peak ctx {_format_tokens(max_context)}  \u00b7  "
+        f"{_format_cost(total_cost)}"
+    )
 
 
 _AGENT_SYSTEM_PROMPT = (
@@ -442,20 +563,20 @@ _AGENT_SYSTEM_PROMPT = (
 def _build_action_map(
     tool_list: list, registry: dict,
 ) -> Dict[str, dict]:
-    """Build a map from function name \u2192 {actionId, connectorId, display_label, action_info}.
+    """Build a map from function name \u2192 {toolId, connectorId, display_label, action_info}.
 
     The getTools API returns tools in OpenAI function-calling format.
-    Each tool has ``actionId`` and ``function.name``.  We use the function
+    Each tool has ``toolId`` and ``function.name``.  We use the function
     name as the key since that's what the LLM will reference in tool calls.
     """
     action_map: Dict[str, dict] = {}
     for tool in tool_list:
-        aid = tool.get("actionId", "")
+        aid = tool.get("toolId", "") or tool.get("actionId", "")
         fn = tool.get("function", {})
         fn_name = fn.get("name", aid)
 
         # Resolve friendly names from registry
-        friendly_tool, friendly_action, tool_id, action_info = (
+        friendly_tool, friendly_action, resolved_connector_id, action_info = (
             _resolve_friendly_names(aid, fn_name, "", None, registry)
         )
         display_label = (
@@ -467,8 +588,8 @@ def _build_action_map(
         # Store the raw schema so _execute_tool_call can re-wrap params
         raw_schema = fn.get("parameters", {})
         action_map[fn_name] = {
-            "actionId": aid,
-            "connectorId": tool_id,
+            "toolId": aid,
+            "connectorId": resolved_connector_id,
             "display_label": display_label,
             "action_info": action_info,
             "inputSchema": raw_schema,
@@ -639,7 +760,7 @@ def _execute_tool_call(
 ) -> dict:
     """Execute a single tool call and return the result.
 
-    Looks up the actionId from the action_map, calls the executeTool API,
+    Looks up the toolId from the action_map, calls the executeTool API,
     and prints status.  When *auto_confirm* is False, prompts the user
     before each execution.
 
@@ -653,7 +774,7 @@ def _execute_tool_call(
     import time as _time
 
     mapping = action_map.get(fn_name, {})
-    action_id = mapping.get("actionId", fn_name)
+    tool_id = mapping.get("toolId", "") or mapping.get("actionId", fn_name)
     connector_id = mapping.get("connectorId", "")
     display_label = mapping.get("display_label", fn_name)
 
@@ -684,7 +805,7 @@ def _execute_tool_call(
 
     execute_payload: dict = {
         "input": {
-            "actionId": action_id,
+            "toolId": tool_id,
             "parameters": exec_parameters,
             "agentId": workspace_id,
         }
@@ -766,7 +887,7 @@ def _convert_tools_for_openai(tool_list: list) -> list:
     ``text``) instead of nested wrappers (``body.channel``, ``body.text``).
     The execution side re-wraps via ``_build_params_from_schema``.
     """
-    from fastn.client import _unwrap_input_schema
+    from fastn._formatters import _unwrap_input_schema
 
     result = []
     for tool in tool_list:
@@ -786,7 +907,7 @@ def _convert_tools_for_openai(tool_list: list) -> list:
             result.append({
                 "type": "function",
                 "function": {
-                    "name": tool.get("name", tool.get("actionId", "")),
+                    "name": tool.get("name", tool.get("toolId", "") or tool.get("actionId", "")),
                     "description": tool.get("description", ""),
                     "parameters": _unwrap_input_schema(params),
                 },
@@ -807,11 +928,16 @@ def _agent_loop_openai(
     headers: dict,
     workspace_id: str,
     connection_id: Optional[str],
+    call_log: Optional[List[dict]] = None,
     max_turns: int = _AGENT_MAX_TURNS,
     auto_confirm: bool = True,
     max_errors: int = 2,
 ) -> tuple:
     """Run the agentic loop using OpenAI's function-calling API.
+
+    *call_log* is pre-seeded with any earlier entries (e.g. discovery).
+    Each LLM call and each tool execution gets its own entry in the log
+    so the summary table can show every call individually.
 
     Returns (final_response, eval_log).
     """
@@ -830,12 +956,8 @@ def _agent_loop_openai(
         {"role": "user", "content": prompt_str},
     ]
 
-    total_input = 0
-    total_output = 0
-    total_llm_time = 0.0
-    total_tool_time = 0.0
-    cumulative_ctx_bytes = 0
-    call_log: _AgentCallLog = []
+    if call_log is None:
+        call_log = []
     eval_log: list = []  # [{tool, args, result, status}] for --eval
     consecutive_errors = 0
 
@@ -847,13 +969,10 @@ def _agent_loop_openai(
             tools=tools if tools else None,
         )
         llm_duration = _time.monotonic() - t0
-        total_llm_time += llm_duration
 
         usage = getattr(response, "usage", None)
         turn_in = getattr(usage, "prompt_tokens", 0) or 0
         turn_out = getattr(usage, "completion_tokens", 0) or 0
-        total_input += turn_in
-        total_output += turn_out
 
         choice = response.choices[0]
         message = choice.message
@@ -864,7 +983,19 @@ def _agent_loop_openai(
             # Show what the LLM chose
             num_calls = len(message.tool_calls)
             chosen = [action_map.get(tc.function.name, {}).get("display_label", tc.function.name) for tc in message.tool_calls]
-            click.echo(f"\n  LLM \u2192 {num_calls} tool{'s' if num_calls != 1 else ''}: {', '.join(chosen)}")
+            chosen_str = ", ".join(chosen)
+
+            # Log the LLM decision
+            call_log.append({
+                "type": "llm",
+                "name": f"{model} \u2192 {num_calls} tool{'s' if num_calls != 1 else ''}",
+                "duration": llm_duration,
+                "tokens_in": turn_in,
+                "tokens_out": turn_out,
+                "status": "ok",
+            })
+
+            click.echo(f"\n  LLM \u2192 {num_calls} tool{'s' if num_calls != 1 else ''}: {chosen_str}")
             click.echo()
 
             for tool_call in message.tool_calls:
@@ -885,7 +1016,6 @@ def _agent_loop_openai(
                 resp_bytes = result.pop("_payload_bytes", 0)
                 ctx_bytes = result.pop("_context_bytes", 0)
                 req_bytes = result.pop("_request_bytes", 0)
-                total_tool_time += tool_dur
                 status = "err" if result.get("error") else "ok"
 
                 if status == "err":
@@ -893,12 +1023,15 @@ def _agent_loop_openai(
                 else:
                     consecutive_errors = 0
 
-                cumulative_ctx_bytes += ctx_bytes
-                call_log.append((
-                    fn_display, turn_in, turn_out, total_input,
-                    llm_duration, tool_dur,
-                    req_bytes, resp_bytes, cumulative_ctx_bytes, status,
-                ))
+                # Log the tool execution
+                call_log.append({
+                    "type": "tool",
+                    "name": fn_display,
+                    "duration": tool_dur,
+                    "req_bytes": req_bytes,
+                    "resp_bytes": resp_bytes,
+                    "status": status,
+                })
 
                 eval_log.append({
                     "tool": fn_display,
@@ -926,16 +1059,19 @@ def _agent_loop_openai(
             if consecutive_errors >= max_errors:
                 break
         else:
-            # Log the final LLM call (no tool, just the response)
-            call_log.append((
-                "llm \u2192 response", turn_in, turn_out, total_input,
-                llm_duration, 0.0,
-                0, 0, cumulative_ctx_bytes, "ok",
-            ))
-            _print_agent_summary(call_log, total_input, total_output, total_llm_time, total_tool_time, model)
+            # Log the final LLM call (response, no tool)
+            call_log.append({
+                "type": "llm",
+                "name": f"{model} \u2192 response",
+                "duration": llm_duration,
+                "tokens_in": turn_in,
+                "tokens_out": turn_out,
+                "status": "ok",
+            })
+            _print_agent_summary(call_log, model)
             return message.content or "", eval_log
 
-    _print_agent_summary(call_log, total_input, total_output, total_llm_time, total_tool_time, model)
+    _print_agent_summary(call_log, model)
     return "Agent reached maximum turns without a final response.", eval_log
 
 
@@ -952,13 +1088,15 @@ def _discover_agent_tools(
     max_tools: int,
     registry: dict,
     verbose: bool = False,
-) -> Tuple[list, Dict[str, dict]]:
+) -> Tuple[list, Dict[str, dict], dict]:
     """Discover available connectors/tools via the getTools API.
 
-    Returns ``(tool_list, action_map)`` where *tool_list* is the raw list
-    of tool dicts from the API and *action_map* maps function names to
-    execution metadata (actionId, connectorId, display_label, etc.).
+    Returns ``(tool_list, action_map, discovery_entry)`` where
+    *discovery_entry* is a call-log dict with timing metadata for the
+    summary table.
     """
+    import time as _time
+
     reg_connectors = registry.get("connectors", {})
 
     discovery_payload: dict = {
@@ -978,20 +1116,32 @@ def _discover_agent_tools(
     if tool_filter:
         discovery_payload["input"]["toolName"] = tool_filter
 
+    t0 = _time.monotonic()
     resp = _verbose_post(GET_TOOLS_URL, headers, discovery_payload)
+    discovery_duration = _time.monotonic() - t0
 
     if resp.status_code >= 400:
         raise click.ClickException(
             f"Connector discovery failed: {resp.status_code} {resp.text}"
         )
 
+    resp_bytes = len(resp.content)
     data = resp.json()
     tool_list = _extract_tool_list(data)
+
+    discovery_entry: dict = {
+        "type": "discovery",
+        "name": f"getTools ({len(tool_list)} tool{'s' if len(tool_list) != 1 else ''})",
+        "duration": discovery_duration,
+        "resp_bytes": resp_bytes,
+        "status": "ok" if tool_list else "err",
+    }
+
     if not tool_list:
-        return [], {}
+        return [], {}, discovery_entry
 
     action_map = _build_action_map(tool_list, registry)
-    return tool_list, action_map
+    return tool_list, action_map, discovery_entry
 
 
 def _run_agent_eval(
@@ -1166,12 +1316,17 @@ def _diagnose_agent_failure(
               help="Stop the agent after this many consecutive tool errors")
 @click.option("--max-tools", default=5, type=int, show_default=True,
               help="Maximum number of tools to pass to the LLM")
+@click.option("--model", "model_override", default=None,
+              help="Override LLM model (e.g. gpt-4o-mini, gpt-4o)")
+@click.option("--setup", "force_setup", is_flag=True, default=False,
+              help="Re-run LLM provider/model setup")
 @click.option("--tenant", default=None, help="Tenant ID (overrides config)")
 @click.pass_context
 def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
           tool_filter: Optional[str], connection_id: Optional[str],
           max_turns: int, skip_confirm: bool, run_eval: bool,
-          max_errors: int, max_tools: int,
+          max_errors: int, max_tools: int, model_override: Optional[str],
+          force_setup: bool,
           tenant: Optional[str]) -> None:
     """Give a goal in plain English \u2014 the agent thinks, picks the right skills and tools, and executes.
 
@@ -1222,8 +1377,8 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
 
     _ensure_fresh_token(config)
 
-    # Check if LLM is configured — if not, run setup
-    if not config.llm_provider or not config.llm_api_key:
+    # Check if LLM is configured — if not (or --setup), run setup
+    if force_setup or not config.llm_provider or not config.llm_api_key:
         config = _setup_llm_provider(config) or config
         if not config.llm_provider:
             raise click.ClickException(
@@ -1243,11 +1398,29 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
 
     provider = config.llm_provider
     api_key = config.llm_api_key
-    model = config.llm_model
-    if not model:
-        from fastn.config import LLM_PROVIDERS
-        provider_info = LLM_PROVIDERS.get(provider, {})
-        model = provider_info.get("default_model", "")
+    # --model overrides config; also infer provider if it changed
+    if model_override:
+        model = model_override
+        from fastn.config import LLM_PROVIDERS, infer_provider_from_model
+        inferred = infer_provider_from_model(model)
+        if inferred and inferred in LLM_PROVIDERS:
+            if inferred != provider:
+                provider = inferred
+                # Try to pick up API key from env for the new provider
+                env_var = LLM_PROVIDERS[provider]["env_var"]
+                env_key = os.environ.get(env_var, "")
+                if env_key:
+                    api_key = env_key
+                elif not api_key:
+                    raise click.ClickException(
+                        f"Set {env_var} or run `fastn agent --setup` to configure {provider}."
+                    )
+    else:
+        model = config.llm_model
+        if not model:
+            from fastn.config import LLM_PROVIDERS
+            provider_info = LLM_PROVIDERS.get(provider, {})
+            model = provider_info.get("default_model", "")
 
     # Step 1: Discover ALL active connectors and tools via getTools API
     click.echo()
@@ -1263,17 +1436,21 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
     click.echo()
     click.echo("  Discovering connectors...")
 
-    tool_list, action_map = _discover_agent_tools(
+    tool_list, action_map, discovery_entry = _discover_agent_tools(
         headers, workspace_id, prompt_str,
         connector, tool_filter, max_tools, registry,
     )
+
+    # Start the call log with the discovery entry
+    call_log: List[dict] = [discovery_entry]
+
     if not tool_list:
         click.echo("  No tools found. Try rephrasing or use --connector to scope.")
         return
 
     tool_names = [v["display_label"] for v in action_map.values()]
     click.echo(f"  \u2713 {len(tool_list)} tool{'s' if len(tool_list) != 1 else ''}: {', '.join(tool_names)}")
-    click.echo(f"  \u2713 LLM: {provider} ({model})")
+    click.echo(f"  \u2713 LLM: {model}")
 
     if provider != "openai":
         raise click.ClickException(
@@ -1287,6 +1464,7 @@ def agent(ctx: click.Context, prompt: tuple, connector: Optional[str],
         result = _agent_loop_openai(
             api_key, model, prompt_str, llm_tools,
             action_map, headers, workspace_id, connection_id,
+            call_log=call_log,
             max_turns=max_turns, auto_confirm=skip_confirm,
             max_errors=max_errors,
         )

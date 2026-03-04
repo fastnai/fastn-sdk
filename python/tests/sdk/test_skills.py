@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 from pytest_httpx import HTTPXMock
 
-from fastn.client import AsyncFastnClient, FastnClient, GRAPHQL_URL
+from fastn.client import AsyncFastnClient, FastnClient
+from fastn._constants import GRAPHQL_URL
 from fastn.exceptions import APIError, AuthError, ConfigError
 
 

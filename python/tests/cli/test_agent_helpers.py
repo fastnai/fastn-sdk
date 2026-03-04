@@ -22,31 +22,31 @@ from fastn.cli.agent_command import (
 
 class TestExtractToolList:
     def test_plain_list(self) -> None:
-        data = [{"actionId": "a1"}, {"actionId": "a2"}]
+        data = [{"toolId": "a1"}, {"toolId": "a2"}]
         assert _extract_tool_list(data) == data
 
     def test_tools_wrapper(self) -> None:
-        data = {"tools": [{"actionId": "a1"}]}
-        assert _extract_tool_list(data) == [{"actionId": "a1"}]
+        data = {"tools": [{"toolId": "a1"}]}
+        assert _extract_tool_list(data) == [{"toolId": "a1"}]
 
     def test_data_wrapper(self) -> None:
-        data = {"data": [{"actionId": "a1"}]}
-        assert _extract_tool_list(data) == [{"actionId": "a1"}]
+        data = {"data": [{"toolId": "a1"}]}
+        assert _extract_tool_list(data) == [{"toolId": "a1"}]
 
     def test_body_list(self) -> None:
-        data = {"body": [{"actionId": "a1"}]}
-        assert _extract_tool_list(data) == [{"actionId": "a1"}]
+        data = {"body": [{"toolId": "a1"}]}
+        assert _extract_tool_list(data) == [{"toolId": "a1"}]
 
     def test_body_dict_with_tools(self) -> None:
-        data = {"body": {"tools": [{"actionId": "a1"}]}}
-        assert _extract_tool_list(data) == [{"actionId": "a1"}]
+        data = {"body": {"tools": [{"toolId": "a1"}]}}
+        assert _extract_tool_list(data) == [{"toolId": "a1"}]
 
     def test_body_single_tool(self) -> None:
-        data = {"body": {"actionId": "a1", "function": {}}}
-        assert _extract_tool_list(data) == [{"actionId": "a1", "function": {}}]
+        data = {"body": {"toolId": "a1", "function": {}}}
+        assert _extract_tool_list(data) == [{"toolId": "a1", "function": {}}]
 
     def test_single_tool_at_top(self) -> None:
-        data = {"actionId": "a1", "function": {"name": "foo"}}
+        data = {"toolId": "a1", "function": {"name": "foo"}}
         assert _extract_tool_list(data) == [data]
 
     def test_non_dict_non_list(self) -> None:
@@ -64,7 +64,7 @@ class TestBuildActionMap:
     def test_basic_mapping(self) -> None:
         tool_list = [
             {
-                "actionId": "act_slack_send",
+                "toolId": "act_slack_send",
                 "function": {"name": "send_message", "parameters": {}},
             },
         ]
@@ -72,12 +72,12 @@ class TestBuildActionMap:
 
         result = _build_action_map(tool_list, registry)
         assert "send_message" in result
-        assert result["send_message"]["actionId"] == "act_slack_send"
+        assert result["send_message"]["toolId"] == "act_slack_send"
 
     def test_multiple_tools(self) -> None:
         tool_list = [
-            {"actionId": "act_a", "function": {"name": "tool_a", "parameters": {}}},
-            {"actionId": "act_b", "function": {"name": "tool_b", "parameters": {}}},
+            {"toolId": "act_a", "function": {"name": "tool_a", "parameters": {}}},
+            {"toolId": "act_b", "function": {"name": "tool_b", "parameters": {}}},
         ]
         registry = {"connectors": {}}
 

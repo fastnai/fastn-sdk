@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class GoogleCustomSearchConnector:
@@ -13,12 +13,12 @@ class GoogleCustomSearchConnector:
     Provides 1 tools.
     """
 
-    def get_links_of_query(
+    def google_custom_search_list_links(
         self,
         cx: Optional[str] = None,
         q: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of links related to a specific query using the getLinksOfQuery endpoint.
+        """Performs a web search using the Google Custom Search API and returns a list of result links matching the specified query. Use this when you need to retrieve URLs from a configured custom search engine for a given search term. Results are scoped to the search engine configuration defined in your API credentials — it does not perform an unrestricted Google web search. Does not return page content, only URLs and result metadata.
 
         Args:
             cx: The custom search engine ID (cx) to use for the Google Custom Search API.

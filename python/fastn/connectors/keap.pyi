@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class KeapConnector:
@@ -13,7 +13,7 @@ class KeapConnector:
     Provides 11 tools.
     """
 
-    def create_appointment(
+    def keap_create_appointment(
         self,
         end_date: str,
         start_date: str,
@@ -24,7 +24,7 @@ class KeapConnector:
         remind_time: Optional[int] = None,
         user: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Creates a new appointment in the system.
+        """Creates a new appointment in Keap CRM. Use this tool when you need to schedule a new appointment for a contact or user. Do not use this tool to modify an existing appointment; use keap_update_appointment instead. Note: creating an appointment may trigger associated Keap automation workflows.
 
         Args:
             end_date: The end date for the event. (required)
@@ -40,7 +40,7 @@ class KeapConnector:
         """
         ...
 
-    def create_contact(
+    def keap_create_contact(
         self,
         email_addresses: List[Any],
         addresses: Optional[List[Any]] = None,
@@ -50,7 +50,7 @@ class KeapConnector:
         opt_in_reason: Optional[str] = None,
         phone_numbers: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Creates a new contact in the system.
+        """Creates a new contact record in Keap CRM. Use this tool when you need to add a new individual to your CRM database. Do not use this tool to update an existing contact; use keap_update_contact instead. Note: creating a contact may trigger associated Keap automation workflows or sequences.
 
         Args:
             email_addresses:  (required)
@@ -65,11 +65,11 @@ class KeapConnector:
         """
         ...
 
-    def delete_appointment(
+    def keap_delete_appointment(
         self,
         appointmentId: str,
     ) -> Dict[str, Any]:
-        """Deletes an existing appointment from the system.
+        """Permanently deletes a specific appointment from Keap CRM, identified by its appointment ID. Use this tool when an appointment must be removed entirely. Do not use this tool to reschedule or modify an appointment; use keap_update_appointment instead. Warning: this action is irreversible and cannot be undone.
 
         Args:
             appointmentId: ID of the appointment. (required)
@@ -78,11 +78,11 @@ class KeapConnector:
         """
         ...
 
-    def delete_contact(
+    def keap_delete_contact(
         self,
         contactId: str,
     ) -> Dict[str, Any]:
-        """Deletes an existing contact from the system.
+        """Permanently deletes a specific contact from Keap CRM, identified by their contact ID. Use this tool only when a contact record must be fully removed. Do not use this tool to update contact information; use keap_update_contact instead. Warning: this action is irreversible and will remove all data associated with that contact.
 
         Args:
             contactId: The ID of the contact in Keap. (required)
@@ -91,20 +91,11 @@ class KeapConnector:
         """
         ...
 
-    def get_affiliates(
-        self,
-    ) -> Dict[str, Any]:
-        """Retrieves a list of affiliates associated with the system.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_appointment(
+    def keap_get_appointment(
         self,
         appointmentId: str,
     ) -> Dict[str, Any]:
-        """Retrieves detailed information about a specific appointment in the system.
+        """Retrieves detailed information about a single appointment in Keap CRM, identified by its appointment ID. Use this tool when you need the full details of one specific appointment. Do not use this tool to list multiple appointments; use keap_list_appointments instead.
 
         Args:
             appointmentId: The ID of the appointment. (required)
@@ -113,20 +104,11 @@ class KeapConnector:
         """
         ...
 
-    def get_appointments(
-        self,
-    ) -> Dict[str, Any]:
-        """Retrieves a list of appointments scheduled in the system.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_contact(
+    def keap_get_contact(
         self,
         contactId: str,
     ) -> Dict[str, Any]:
-        """Retrieves detailed information about a specific contact in the system.
+        """Retrieves detailed information about a single contact in Keap CRM, identified by their contact ID. Use this tool when you need the full profile of one specific contact. Do not use this tool to list multiple contacts; use keap_list_contacts instead.
 
         Args:
             contactId: The ID of the contact in Keap. (required)
@@ -135,26 +117,45 @@ class KeapConnector:
         """
         ...
 
-    def get_contacts(
+    def keap_list_affiliates(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves a list of contacts from the system.
+        """Retrieves a list of all affiliates associated with the Keap account. Use this tool when you need to enumerate affiliates for reporting, lookup, or management purposes. Do not use this tool to retrieve details about a single affiliate.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_users_(
+    def keap_list_appointments(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves a list of users from the system.
+        """Retrieves a list of appointments scheduled in Keap CRM. Use this tool when you need to browse or enumerate multiple appointments. Do not use this tool to fetch details for a single appointment; use keap_get_appointment instead.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def update_appointment(
+    def keap_list_contacts(
         self,
+    ) -> Dict[str, Any]:
+        """Retrieves a list of contacts from Keap CRM. Use this tool when you need to browse or enumerate multiple contact records. Do not use this tool to fetch details for a single contact; use keap_get_contact instead.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def keap_list_users(
+        self,
+    ) -> Dict[str, Any]:
+        """Retrieves a list of all users in the Keap account. Use this tool when you need to enumerate available users for assignment, auditing, or lookup purposes. Do not use this tool to retrieve details about a single user.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def keap_update_appointment(
+        self,
+        appointmentId: str,
         contact_id: int,
         end_date: str,
         start_date: str,
@@ -164,9 +165,10 @@ class KeapConnector:
         title: Optional[str] = None,
         user: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Updates an existing appointment in the system.
+        """Updates the details of an existing appointment in Keap CRM, identified by its appointment ID. Use this tool to modify appointment fields such as date, time, title, or participants. Do not use this tool to create a new appointment; use keap_create_appointment instead.
 
         Args:
+            appointmentId: The ID of the appointment (for update operations). (required)
             contact_id: The Keap ID of the contact associated with the appointment. (required)
             end_date: The end date and time of the appointment (ISO 8601 format). (required)
             start_date: The start date and time of the appointment (ISO 8601 format). (required)

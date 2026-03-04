@@ -65,15 +65,34 @@ LLM_PROVIDERS = {
         "env_var": ENV_OPENAI_API_KEY,
         "pip_package": "openai",
         "key_url": "https://platform.openai.com/api-keys",
-        "models": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"],
-        "default_model": "gpt-4o-mini",
+        "models": [
+            "gpt-4.1",
+            "gpt-4.1-mini",
+            "gpt-4.1-nano",
+            "gpt-4o",
+            "gpt-4o-mini",
+            "gpt-4-turbo",
+            "o3",
+            "o3-mini",
+            "o4-mini",
+            "o1",
+            "o1-mini",
+            "o1-pro",
+        ],
+        "default_model": "gpt-4.1-mini",
     },
     "anthropic": {
         "name": "Anthropic",
         "env_var": ENV_ANTHROPIC_API_KEY,
         "pip_package": "anthropic",
         "key_url": "https://console.anthropic.com/settings/keys",
-        "models": ["claude-sonnet-4-20250514", "claude-haiku-4-20250514"],
+        "models": [
+            "claude-sonnet-4-20250514",
+            "claude-haiku-4-20250514",
+            "claude-opus-4-20250514",
+            "claude-3.5-sonnet-20241022",
+            "claude-3.5-haiku-20241022",
+        ],
         "default_model": "claude-sonnet-4-20250514",
     },
     "gemini": {
@@ -81,10 +100,35 @@ LLM_PROVIDERS = {
         "env_var": ENV_GEMINI_API_KEY,
         "pip_package": "google-genai",
         "key_url": "https://aistudio.google.com/apikey",
-        "models": ["gemini-2.0-flash", "gemini-2.0-flash-lite"],
-        "default_model": "gemini-2.0-flash",
+        "models": [
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+        ],
+        "default_model": "gemini-2.5-flash",
     },
 }
+
+
+# Model-name prefix → provider key mapping for auto-detection
+_MODEL_PREFIX_MAP = {
+    "gpt-": "openai",
+    "o1": "openai",
+    "o3": "openai",
+    "o4": "openai",
+    "claude-": "anthropic",
+    "gemini-": "gemini",
+}
+
+
+def infer_provider_from_model(model_name: str) -> str | None:
+    """Infer the LLM provider key from a model name, or None if unknown."""
+    lower = model_name.lower()
+    for prefix, provider in _MODEL_PREFIX_MAP.items():
+        if lower.startswith(prefix):
+            return provider
+    return None
 
 
 @dataclass

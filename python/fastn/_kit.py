@@ -38,7 +38,6 @@ class _KitSync:
         ``isAIAgentWidgetEnabled``, ``labelsLayout``,
         ``advancedSettings``, and ``widgetsMetrics``.
         """
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         variables = {
             "input": {
@@ -66,7 +65,6 @@ class _KitSync:
             The saved kit metadata (``authenticationApi``,
             ``isCustomAuthenticationEnabled``, ``advancedSettings``).
         """
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         variables = {
             "input": {
@@ -90,7 +88,6 @@ class _KitSync:
             ``active``, ``connectionId``, ``widgetType``, ``labels``,
             ``imageUri``, etc.
         """
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         import json as _json
         inner_query = _json.dumps({
@@ -126,7 +123,6 @@ class _KitSync:
             ``description``, ``actions``, ``events``,
             ``connectedConnectors``, ``externalFlows``, etc.
         """
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         variables = {
             "input": {
@@ -151,7 +147,6 @@ class _KitAsync:
 
     async def get(self) -> Dict[str, Any]:
         """Get kit metadata for the current project (async)."""
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         variables = {
             "input": {
@@ -164,7 +159,6 @@ class _KitAsync:
 
     async def update(self, settings: Dict[str, Any]) -> Dict[str, Any]:
         """Update kit metadata for the current project (async)."""
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         variables = {
             "input": {
@@ -177,7 +171,6 @@ class _KitAsync:
 
     async def list(self, query: str = "", limit: int = 8, offset: int = 0) -> List[Dict[str, Any]]:
         """List kit connectors for the current project (async)."""
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         import json as _json
         inner_query = _json.dumps({
@@ -203,7 +196,6 @@ class _KitAsync:
 
     async def get_connector(self, connector_id: str) -> Dict[str, Any]:
         """Get full details for a specific kit connector (async)."""
-        self._client._ensure_fresh_token()
         project_id = self._client._config.resolve_project_id()
         variables = {
             "input": {

@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class BrightpearlConnector:
@@ -13,7 +13,7 @@ class BrightpearlConnector:
     Provides 9 tools.
     """
 
-    def create_webhook(
+    def brightpearl_create_webhook(
         self,
         bodyTemplate: Optional[str] = None,
         contentType: Optional[str] = None,
@@ -23,7 +23,7 @@ class BrightpearlConnector:
         subscribeTo: Optional[str] = None,
         uriTemplate: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new webhook in the e-commerce system to allow users to receive real-time notifications for specific events.
+        """Creates a new webhook subscription in Brightpearl so that your system receives real-time HTTP callbacks when specific platform events occur (e.g. order created, stock updated). Use this when you want to set up event-driven integrations with Brightpearl. Do not use this to retrieve or update existing webhooks. Note: creating a webhook is a persistent configuration change in Brightpearl that must be explicitly deleted to remove.
 
         Args:
             bodyTemplate: 
@@ -38,11 +38,11 @@ class BrightpearlConnector:
         """
         ...
 
-    def get_category(
+    def brightpearl_get_category(
         self,
         catId: str,
     ) -> Dict[str, Any]:
-        """Fetches product categories from the e-commerce platform to help users navigate and find products in organized groups.
+        """Retrieves the details of a single Brightpearl product category by its category ID, including its name and hierarchy information. Use this when you need metadata for a specific category. Do not use this to browse all categories or to search for products within a category — use brightpearl_search_products for product discovery.
 
         Args:
             catId: Identifier for the category. (required)
@@ -51,12 +51,12 @@ class BrightpearlConnector:
         """
         ...
 
-    def get_price_list(
+    def brightpearl_get_price_list(
         self,
         priceListId: str,
         productId: str,
     ) -> Dict[str, Any]:
-        """Fetches a list of prices for various products in the e-commerce database to enable users to see price variations.
+        """Retrieves the price for a specific product from a named price list in Brightpearl, identified by product ID and price list ID. Use this when you need the price of a product under a particular pricing tier, customer group, or currency. Do not use this to retrieve all prices for a product across all lists — use brightpearl_list_product_prices for that.
 
         Args:
             priceListId: ID of the price list. (required)
@@ -66,11 +66,20 @@ class BrightpearlConnector:
         """
         ...
 
-    def get_product(
+    def brightpearl_get_price_options(
+        self,
+    ) -> Dict[str, Any]:
+        """Retrieves the allowed request options (e.g. supported HTTP methods, headers, and parameters) for the Brightpearl product-price endpoint. Use this to discover what operations and fields are available before making pricing requests. Do not use this to fetch actual product prices — use brightpearl_get_product_prices or brightpearl_get_price_list for that.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def brightpearl_get_product(
         self,
         productIds: str,
     ) -> Dict[str, Any]:
-        """Provides detailed information about a specific product in the e-commerce system, including descriptions, specifications, and availability.
+        """Retrieves detailed information for one or more Brightpearl products by their product IDs, including descriptions, specifications, availability, and attributes. Use this when you have specific product IDs and need full product records. Do not use this to search for products by keyword or filter — use brightpearl_search_products for that.
 
         Args:
             productIds: Comma-separated list of product IDs. (required)
@@ -79,11 +88,20 @@ class BrightpearlConnector:
         """
         ...
 
-    def get_product_prices(
+    def brightpearl_get_product_options(
+        self,
+    ) -> Dict[str, Any]:
+        """Retrieves the allowed request options (e.g. supported HTTP methods, headers, and parameters) for the Brightpearl product endpoint. Use this to discover what operations and fields are supported before making product requests. Do not use this to fetch product details or variations — use brightpearl_get_product for that.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def brightpearl_list_product_prices(
         self,
         productIds: str,
     ) -> Dict[str, Any]:
-        """Retrieves current pricing information for a specific product from the e-commerce platform to assist users in comparing costs.
+        """Retrieves all current pricing information for one or more products in Brightpearl by their product IDs, covering all configured price lists. Use this when you need a full pricing overview for specific products. Do not use this to fetch prices from a single named price list — use brightpearl_get_price_list for that.
 
         Args:
             productIds: Comma-separated list of product IDs. (required)
@@ -92,11 +110,11 @@ class BrightpearlConnector:
         """
         ...
 
-    def get_webhooks(
+    def brightpearl_list_webhooks(
         self,
         id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves the currently configured webhooks from the e-commerce platform to inform users about system events they can subscribe to.
+        """Retrieves the configuration details of all webhooks registered in Brightpearl, including endpoint URLs, subscribed events, and status for each webhook. Use this to review all configured webhooks. Do not use this to create new webhooks or to retrieve details of a single webhook by ID.
 
         Args:
             id: 
@@ -105,31 +123,13 @@ class BrightpearlConnector:
         """
         ...
 
-    def price_options(
-        self,
-    ) -> Dict[str, Any]:
-        """Fetches pricing options for products, allowing users to view different plans, discounts, or subscription types in the e-commerce system.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def product_options(
-        self,
-    ) -> Dict[str, Any]:
-        """Retrieves available options for a specific product, such as sizes, colors, or variations, within the e-commerce store.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def product_search(
+    def brightpearl_search_products(
         self,
         columns: Optional[str] = None,
         firstResult: Optional[str] = None,
         pageSize: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Searches for products in the specified e-commerce database to help users find items that match their query.
+        """Searches the Brightpearl product catalogue using query parameters such as name, SKU, or category to return matching products. Use this when you need to find products by keyword or filter criteria rather than by a known product ID. Do not use this when you already have specific product IDs — use brightpearl_get_product for direct lookups.
 
         Args:
             columns: Specifies the columns to be returned in the response.

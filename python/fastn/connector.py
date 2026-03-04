@@ -15,7 +15,7 @@ How it works:
     3. A ``DynamicConnector`` is created with those tools
     4. ``connector.send_message(channel=..., text=...)`` triggers
        ``DynamicConnector.__getattr__("send_message")`` which returns a
-       closure that calls ``_execute_tool()`` with the correct actionId
+       closure that calls ``_execute_tool()`` with the correct toolId
 
 connection_id / tenant_id support:
     # Per-call — extracted from kwargs before sending to API
@@ -106,7 +106,7 @@ def _apply_migrations(
 
 # Type for the result of _resolve_tool_call
 _ToolResolution = Tuple[
-    str,                    # action_id
+    str,                    # tool_id
     Dict[str, Any],         # tool_info or dep_info
     Dict[str, Any],         # tool_migrations
     Optional[str],          # connection_id
@@ -148,7 +148,7 @@ class _BaseDynamicConnector:
         Handles exact match, underscore-collapsed fallback, and deprecated
         tool migration lookup.
 
-        Returns a tuple of (action_id, tool_info, tool_migrations,
+        Returns a tuple of (tool_id, tool_info, tool_migrations,
         connection_id, connector_id, connector_name, is_deprecated,
         deprecation_message).
 
@@ -176,7 +176,7 @@ class _BaseDynamicConnector:
                     f"'{self._connector_name}.{tool_name}()' has been removed.",
                 )
                 return (
-                    dep_info.get("actionId", ""),
+                    dep_info.get("toolId", "") or dep_info.get("actionId", ""),
                     dep_info,
                     {},
                     self._connection_id,
@@ -190,10 +190,10 @@ class _BaseDynamicConnector:
                 self._connector_name, tool_name, has_tools=bool(self._tools),
             )
 
-        # "actionId" is the server-side identifier for a tool
+        # "toolId" is the server-side identifier for a tool
         tool_migrations = self._migrations.get("tools", {}).get(tool_name, {})
         return (
-            tool_info["actionId"],
+            tool_info.get("toolId", "") or tool_info.get("actionId", ""),
             tool_info,
             tool_migrations,
             self._connection_id,
@@ -224,7 +224,7 @@ class DynamicConnector(_BaseDynamicConnector):
 
     def __getattr__(self, tool_name: str) -> Callable[..., Any]:
         """Resolve a tool name to a sync callable."""
-        (action_id, tool_info, tool_migrations, connection_id,
+        (tool_id, tool_info, tool_migrations, connection_id,
          connector_id, connector_name, is_deprecated, dep_message) = \
             self._resolve_tool_call(tool_name)
 
@@ -234,7 +234,7 @@ class DynamicConnector(_BaseDynamicConnector):
                 call_connection_id = kwargs.pop("connection_id", None) or connection_id
                 call_tenant_id = kwargs.pop("tenant_id", None)
                 return self._execute_fn(
-                    action_id, kwargs, connector_id, tool_info,
+                    tool_id, kwargs, connector_id, tool_info,
                     call_connection_id, call_tenant_id,
                 )
             deprecated_tool_method.__name__ = tool_name
@@ -247,7 +247,7 @@ class DynamicConnector(_BaseDynamicConnector):
             call_connection_id = kwargs.pop("connection_id", None) or connection_id
             call_tenant_id = kwargs.pop("tenant_id", None)
             return self._execute_fn(
-                action_id, kwargs, connector_id, tool_info,
+                tool_id, kwargs, connector_id, tool_info,
                 call_connection_id, call_tenant_id,
             )
         tool_method.__name__ = tool_name
@@ -262,7 +262,7 @@ class AsyncDynamicConnector(_BaseDynamicConnector):
 
     def __getattr__(self, tool_name: str) -> Callable[..., Any]:
         """Resolve a tool name to an async callable."""
-        (action_id, tool_info, tool_migrations, connection_id,
+        (tool_id, tool_info, tool_migrations, connection_id,
          connector_id, connector_name, is_deprecated, dep_message) = \
             self._resolve_tool_call(tool_name)
 
@@ -272,7 +272,7 @@ class AsyncDynamicConnector(_BaseDynamicConnector):
                 call_connection_id = kwargs.pop("connection_id", None) or connection_id
                 call_tenant_id = kwargs.pop("tenant_id", None)
                 return await self._execute_fn(
-                    action_id, kwargs, connector_id, tool_info,
+                    tool_id, kwargs, connector_id, tool_info,
                     call_connection_id, call_tenant_id,
                 )
             deprecated_tool_method.__name__ = tool_name
@@ -285,7 +285,7 @@ class AsyncDynamicConnector(_BaseDynamicConnector):
             call_connection_id = kwargs.pop("connection_id", None) or connection_id
             call_tenant_id = kwargs.pop("tenant_id", None)
             return await self._execute_fn(
-                action_id, kwargs, connector_id, tool_info,
+                tool_id, kwargs, connector_id, tool_info,
                 call_connection_id, call_tenant_id,
             )
         tool_method.__name__ = tool_name

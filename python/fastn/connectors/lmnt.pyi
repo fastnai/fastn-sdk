@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class LmntConnector:
@@ -13,20 +13,11 @@ class LmntConnector:
     Provides 6 tools.
     """
 
-    def account_info(
-        self,
-    ) -> Dict[str, Any]:
-        """Provides account information using the accountInfo connector, allowing users to access details related to their account and its usage.
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def delete_voice(
+    def lmnt_delete_voice(
         self,
         voiceId: str,
     ) -> Dict[str, Any]:
-        """Deletes a specified voice from the system using the deleteVoice connector, allowing for management of voice resources in the application.
+        """Permanently deletes a specific voice from the LMNT platform identified by its voice ID. Use this when a custom voice is no longer needed. This action is irreversible — the voice cannot be recovered after deletion. Do not use this to update a voice — use lmnt_update_voice instead.
 
         Args:
             voiceId: Voice ID for the request. (required)
@@ -35,16 +26,38 @@ class LmntConnector:
         """
         ...
 
-    def list_voices(
+    def lmnt_get_account_info(
         self,
     ) -> Dict[str, Any]:
-        """Lists all available voices for speech synthesis using the listVoices connector, enabling users to choose from different voice options for text-to-speech applications.
+        """Retrieves information about the authenticated LMNT account, including usage statistics and account details. Use this when you need to check account status, remaining credits, or usage limits. Do not use this to retrieve information about a specific voice — use lmnt_get_voice_info instead.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def synthesize_speech(
+    def lmnt_get_voice_info(
+        self,
+        voiceId: str,
+    ) -> Dict[str, Any]:
+        """Retrieves detailed specifications and attributes of a specific LMNT voice identified by its voice ID, such as language, gender, and capability details. Use this when you need full details about one particular voice. Do not use this to list all available voices — use lmnt_list_voices instead.
+
+        Args:
+            voiceId: Voice ID for the request. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def lmnt_list_voices(
+        self,
+    ) -> Dict[str, Any]:
+        """Lists all voices available for speech synthesis on the LMNT platform. Use this when you need to discover which voices are available before generating speech or selecting a voice for text-to-speech. Returns a collection of voice records. Do not use this to retrieve details about a single voice — use lmnt_get_voice_info instead.
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def lmnt_synthesize_speech(
         self,
         conversational: Optional[str] = None,
         format: Optional[str] = None,
@@ -58,7 +71,7 @@ class LmntConnector:
         text: Optional[str] = None,
         voice: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Generates speech from text input using the synthesizeSpeech connector, allowing for text-to-speech conversion in various applications.
+        """Generates an audio speech output from a text input using a specified LMNT voice. Use this when you need to convert text to spoken audio for playback or storage. Returns an audio file or stream. Do not use this to list available voices — use lmnt_list_voices first if you need to select a voice.
 
         Args:
             conversational: Flag indicating whether to use conversational speech.
@@ -77,15 +90,16 @@ class LmntConnector:
         """
         ...
 
-    def update_voice(
+    def lmnt_update_voice(
         self,
         description: str,
         gender: str,
         name: str,
         starred: bool,
         unfreeze: bool,
+        voiceId: str,
     ) -> Dict[str, Any]:
-        """Updates the characteristics of a specific voice using the updateVoice connector, enabling customization of voice settings and attributes.
+        """Updates the characteristics and settings of a specific LMNT voice identified by its voice ID. Use this when you need to modify voice attributes such as name, description, or other configurable properties. This action overwrites the existing voice configuration. Do not use this to delete a voice — use lmnt_delete_voice instead.
 
         Args:
             description: A description of the item. (required)
@@ -93,19 +107,7 @@ class LmntConnector:
             name: The name of the item. (required)
             starred: Indicates if the item is starred. (required)
             unfreeze: Indicates whether to unfreeze the item. (required)
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def voice_info(
-        self,
-        voiceId: str,
-    ) -> Dict[str, Any]:
-        """Retrieves information about the specifications and capabilities of a specific voice using the voiceInfo connector, useful for understanding voice attributes.
-
-        Args:
-            voiceId: Voice ID for the request. (required)
+            voiceId: The ID of the voice. (required)
         Returns:
             API response as a dictionary.
         """

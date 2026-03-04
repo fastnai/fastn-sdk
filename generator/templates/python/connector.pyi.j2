@@ -4,8 +4,17 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+{% for tool in connector.tools %}
+{% for td in tool.typed_dicts %}
+
+class {{ td.name }}(TypedDict, total=False):
+    {% for field in td.fields %}
+    {{ field.name }}: {{ field.type | map_type }}
+    {% endfor %}
+{% endfor %}
+{% endfor %}
 
 class {{ connector.class_name }}:
     """{{ connector.display_name }} connector ({{ connector.category }}).
@@ -19,12 +28,12 @@ class {{ connector.class_name }}:
         self,
         {% for param in tool.params %}
         {% if param.required %}
-        {{ param.name }}: {{ param.type | map_type }},
+        {{ param.name }}: {{ param.typed_dict_name if param.typed_dict_name else (param.type | map_type) }},
         {% endif %}
         {% endfor %}
         {% for param in tool.params %}
         {% if not param.required %}
-        {{ param.name }}: Optional[{{ param.type | map_type }}] = None,
+        {{ param.name }}: Optional[{{ param.typed_dict_name if param.typed_dict_name else (param.type | map_type) }}] = None,
         {% endif %}
         {% endfor %}
     ) -> Dict[str, Any]:

@@ -4,7 +4,7 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class DonorperfectConnector:
@@ -13,11 +13,11 @@ class DonorperfectConnector:
     Provides 10 tools.
     """
 
-    def create_contact(
+    def donorperfect_create_contact(
         self,
         params: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new contact in the system using the createContact tool.
+        """Creates a new contact record in DonorPerfect. Use this tool to add a non-donor contact, such as a staff member, volunteer, or organization representative, to the system. Do not use this tool to add a donor — use donorperfect_create_donor for that. This action creates a permanent contact record in the database.
 
         Args:
             params: Specific parameters for the DonorPerfect API call.
@@ -26,11 +26,11 @@ class DonorperfectConnector:
         """
         ...
 
-    def create_donor(
+    def donorperfect_create_donor(
         self,
         params: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Adds a new donor to the database utilizing the createDonor tool.
+        """Creates a new donor record in DonorPerfect. Use this tool when onboarding a new donor who does not yet exist in the system. Do not use this tool to update an existing donor — use donorperfect_update_donor for that. This action creates a permanent donor record in the database.
 
         Args:
             params: String containing parameters for the DonorPerfect API request.
@@ -39,11 +39,11 @@ class DonorperfectConnector:
         """
         ...
 
-    def delete_donor_flag(
+    def donorperfect_delete_donor_flag(
         self,
         params: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Removes a specific flag from a donor's profile with the deleteDonorFlag tool.
+        """Removes a specific flag from a single donors profile in DonorPerfect. Use this tool when you need to untag or declassify a donor from a particular flag category. Do not use this tool to remove multiple flags in bulk — use donorperfect_delete_flags for that. This action is irreversible.
 
         Args:
             params: Additional parameters for the DonorPerfect API request.
@@ -52,11 +52,11 @@ class DonorperfectConnector:
         """
         ...
 
-    def delete_flags(
+    def donorperfect_delete_flags(
         self,
         params: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Deletes multiple flags from the system using the deleteFlags tool.
+        """Deletes multiple flags from DonorPerfect in a single operation. Use this tool when you need to bulk-remove flag definitions or flag assignments from the system. Do not use this tool to remove a single flag from one specific donor — use donorperfect_delete_donor_flag for that. This action is irreversible.
 
         Args:
             params: String containing parameters for the DonorPerfect API call.
@@ -65,11 +65,11 @@ class DonorperfectConnector:
         """
         ...
 
-    def get_donor(
+    def donorperfect_get_donor(
         self,
         donor_id: str,
     ) -> Dict[str, Any]:
-        """Fetches the specific details of a donor using their unique identifier with the getDonor tool.
+        """Retrieves the full profile details of a specific donor from DonorPerfect using their unique donor ID. Use this tool when you have a known donor ID and need to fetch their complete record. Do not use this tool if you only have an email address — use donorperfect_get_donor_by_email instead.
 
         Args:
             donor_id: The ID of the donor. (required)
@@ -78,11 +78,11 @@ class DonorperfectConnector:
         """
         ...
 
-    def get_donor_by_email(
+    def donorperfect_get_donor_by_email(
         self,
         email: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Obtains donor information based on their email address with the getDonorByEmail tool.
+        """Retrieves a donors profile from DonorPerfect using their email address. Use this tool when you have a donors email and need to look up their record, ID, or contact details. Do not use this tool if you already have the donors unique ID — use donorperfect_get_donor instead. Returns a single matching donor record if found.
 
         Args:
             email: 
@@ -91,20 +91,20 @@ class DonorperfectConnector:
         """
         ...
 
-    def get_donors(
+    def donorperfect_list_donors(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves a list of donors from the database through the getDonors tool.
+        """Retrieves a list of donors from the DonorPerfect database. Use this tool to get a broad set of donor records, for example to audit, export, or process multiple donors at once. Do not use this tool if you need a single donor by ID or email — use donorperfect_get_donor or donorperfect_get_donor_by_email instead.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def save_address(
+    def donorperfect_save_address(
         self,
         params: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Saves a new address for a contact using the saveAddress tool.
+        """Saves a new or updated mailing address for a contact in DonorPerfect. Use this tool to add or overwrite address information associated with a contact record. Do not use this tool to update other donor profile fields — use donorperfect_update_donor for that.
 
         Args:
             params: Additional parameters for the DonorPerfect API request.
@@ -113,11 +113,11 @@ class DonorperfectConnector:
         """
         ...
 
-    def save_flags(
+    def donorperfect_save_flags(
         self,
         params: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Applies flags to a donor’s profile with the saveFlags tool.
+        """Applies one or more flags to a donors profile in DonorPerfect. Use this tool to tag a donor with classification or segmentation flags for reporting or workflow purposes. Do not use this tool to remove flags — use donorperfect_delete_donor_flag or donorperfect_delete_flags for that.
 
         Args:
             params: Additional parameters for the DonorPerfect API request.
@@ -126,11 +126,11 @@ class DonorperfectConnector:
         """
         ...
 
-    def update_donor(
+    def donorperfect_update_donor(
         self,
         params: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Updates the details of an existing donor in the system with the updateDonor tool.
+        """Updates the profile details of an existing donor in DonorPerfect. Use this tool to modify fields such as name, contact information, or other donor attributes for an existing record identified by donor ID. Do not use this tool to create a new donor — use donorperfect_create_donor for that. This action overwrites the specified fields on the donor record.
 
         Args:
             params: String containing parameters for the DonorPerfect API call.

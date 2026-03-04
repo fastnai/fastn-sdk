@@ -4,8 +4,40 @@ Do not edit manually. Regenerate with `fastn connector sync`.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
+
+class _TallyCreateFormSettings(TypedDict, total=False):
+    closeDate: str
+    closeMessageDescription: str
+    closeMessageTitle: str
+    closeTime: str
+    closeTimezone: str
+    hasPartialSubmissions: bool
+    hasProgressBar: bool
+    hasRespondentEmailNotifications: bool
+    hasSelfEmailNotifications: bool
+    isClosed: bool
+    language: str
+    pageAutoJump: bool
+    password: str
+    redirectOnCompletion: str
+    respondentEmailBody: str
+    respondentEmailFromName: str
+    respondentEmailReplyTo: str
+    respondentEmailSubject: str
+    respondentEmailTo: str
+    saveForLater: bool
+    selfEmailBody: str
+    selfEmailFromName: str
+    selfEmailReplyTo: str
+    selfEmailSubject: str
+    selfEmailTo: str
+    styles: str
+    submissionsDataRetentionDuration: int
+    submissionsDataRetentionUnit: str
+    submissionsLimit: int
+    uniqueSubmissionKey: str
 
 class TallyConnector:
     """Tally connector ().
@@ -13,15 +45,15 @@ class TallyConnector:
     Provides 14 tools.
     """
 
-    def create_form(
+    def tally_create_form(
         self,
         status: str,
         blocks: Optional[List[Any]] = None,
-        settings: Optional[Dict[str, Any]] = None,
+        settings: Optional[_TallyCreateFormSettings] = None,
         templateId: Optional[str] = None,
         workspaceId: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new form in the specified application for data collection.
+        """Creates a new form in the authenticated Tally account for data collection. Use this tool when you need to build a new form from scratch. Do not use this tool to update an existing form or retrieve existing forms — use tally_list_forms or tally_get_form instead. This action permanently creates a new form resource in Tally.
 
         Args:
             status: Current status of the form. (required)
@@ -34,7 +66,7 @@ class TallyConnector:
         """
         ...
 
-    def create_webhook(
+    def tally_create_webhook(
         self,
         eventTypes: List[Any],
         formId: str,
@@ -43,7 +75,7 @@ class TallyConnector:
         httpHeaders: Optional[List[Any]] = None,
         signingSecret: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Creates a new webhook in the specified application to receive real-time notifications.
+        """Creates a new webhook in the authenticated Tally account to receive real-time event notifications at a specified URL. Use this tool when you need to set up an integration that listens for Tally events such as form submissions. Do not use this tool to list existing webhooks — use tally_list_webhooks instead. This action registers a new active webhook endpoint.
 
         Args:
             eventTypes: The list of event types that will trigger the webhook. (required)
@@ -57,11 +89,11 @@ class TallyConnector:
         """
         ...
 
-    def create_workspace(
+    def tally_create_workspace(
         self,
         name: str,
     ) -> Dict[str, Any]:
-        """Creates a new workspace within the specified application to organize projects and tasks.
+        """Creates a new workspace in the authenticated Tally account. Use this tool when you need to set up a new workspace to organize forms and projects. Do not use this tool to update an existing workspace. This action permanently creates a new workspace resource in Tally.
 
         Args:
             name: The name of the workspace to create. (required)
@@ -70,20 +102,20 @@ class TallyConnector:
         """
         ...
 
-    def get_acc_info(
+    def tally_get_account_info(
         self,
     ) -> Dict[str, Any]:
-        """Retrieves account information for the authenticated user in the specified application.
+        """Retrieves account profile information for the currently authenticated Tally user, including name, email, and account settings. Use this tool when you need to identify or verify the authenticated users details. Do not use this tool to list organization members — use tally_list_users instead. Does not modify any data.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_form(
+    def tally_get_form(
         self,
         formId: str,
     ) -> Dict[str, Any]:
-        """Retrieves a specific form by its ID in the specified application.
+        """Retrieves full details of a specific Tally form identified by formId, including its title, status, and configuration. Use this tool when you need metadata about a single form. Do not use this tool to list all forms — use tally_list_forms instead, or to retrieve submissions — use tally_list_submissions instead. Does not modify any data.
 
         Args:
             formId: The unique identifier of the form to retrieve. (required)
@@ -92,11 +124,24 @@ class TallyConnector:
         """
         ...
 
-    def get_form_questions(
+    def tally_get_workspace(
+        self,
+        workspaceId: str,
+    ) -> Dict[str, Any]:
+        """Retrieves details of a specific Tally workspace identified by workspaceId, including its name and configuration. Use this tool when you need full details of a single workspace. Do not use this tool to list all workspaces — use tally_list_workspaces instead. Does not modify any data.
+
+        Args:
+            workspaceId: The unique identifier of the workspace to retrieve. (required)
+        Returns:
+            API response as a dictionary.
+        """
+        ...
+
+    def tally_list_form_questions(
         self,
         formId: str,
     ) -> Dict[str, Any]:
-        """Retrieves the questions associated with a specific form in the specified application.
+        """Lists all questions defined in a specific Tally form identified by formId. Use this tool when you need to inspect the structure or fields of a form. Do not use this tool to retrieve form submissions — use tally_list_submissions instead. Does not modify any data.
 
         Args:
             formId: The unique identifier of the form to retrieve questions from. (required)
@@ -105,13 +150,13 @@ class TallyConnector:
         """
         ...
 
-    def get_forms(
+    def tally_list_forms(
         self,
         limit: Optional[str] = None,
         page: Optional[str] = None,
         workspaceIds: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of all forms available in the specified application.
+        """Lists all forms available in the authenticated Tally account. Use this tool when you need to discover existing forms before accessing form-specific resources such as submissions or questions. Do not use this tool to retrieve details of a single form — use tally_get_form instead. Does not modify any data.
 
         Args:
             limit: The maximum number of forms to return in the response.
@@ -122,11 +167,11 @@ class TallyConnector:
         """
         ...
 
-    def get_invites(
+    def tally_list_invites(
         self,
         organizationId: str,
     ) -> Dict[str, Any]:
-        """Retrieves a list of invites sent within the specified application.
+        """Lists all pending and sent invites for a specific Tally organization identified by organizationId. Use this tool when you need to review who has been invited to join an organization. Do not use this tool to list current users — use tally_list_users instead. Does not modify any data.
 
         Args:
             organizationId: Unique identifier of the organization whose invites are to be retrieved. (required)
@@ -135,17 +180,19 @@ class TallyConnector:
         """
         ...
 
-    def get_submissions(
+    def tally_list_submissions(
         self,
+        formId: str,
         afterId: Optional[str] = None,
         endDate: Optional[str] = None,
         filter: Optional[str] = None,
         page: Optional[str] = None,
         startDate: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves submissions for a specific form in the specified application.
+        """Lists all submissions received for a specific Tally form identified by formId. Use this tool when you need to retrieve respondent data collected by a form. Do not use this tool to retrieve the form structure or questions — use tally_get_form or tally_list_form_questions instead. Does not modify any data.
 
         Args:
+            formId: The unique identifier of the Tally form to get submissions from. (required)
             afterId: Returns submissions after the specified submission ID for pagination.
             endDate: The end date for restricting the submission return range.
             filter: Filter criteria to narrow down the submissions.
@@ -156,11 +203,11 @@ class TallyConnector:
         """
         ...
 
-    def get_users(
+    def tally_list_users(
         self,
         organizationId: str,
     ) -> Dict[str, Any]:
-        """Retrieves a list of users in the specified application.
+        """Lists all users belonging to a specific Tally organization identified by organizationId. Use this tool when you need to review the members of an organization. Do not use this tool to retrieve account information for the authenticated user — use tally_get_account_info instead. Does not modify any data.
 
         Args:
             organizationId: The unique identifier of the organization to retrieve users for. (required)
@@ -169,25 +216,27 @@ class TallyConnector:
         """
         ...
 
-    def get_webhook_events(
+    def tally_list_webhook_events(
         self,
+        webhookId: str,
         page: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves events from webhooks in the specified application.
+        """Lists all events fired by a specific Tally webhook identified by webhookId. Use this tool when you need to inspect the event history or delivery log for a particular webhook. Do not use this tool to list all webhooks — use tally_list_webhooks instead. Does not modify any data.
 
         Args:
+            webhookId: Unique identifier of the webhook whose events are to be retrieved. (required)
             page: The page number to fetch in the webhook events pagination.
         Returns:
             API response as a dictionary.
         """
         ...
 
-    def get_webhooks(
+    def tally_list_webhooks(
         self,
         limit: Optional[str] = None,
         page: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of all webhooks configured in the specified application.
+        """Lists all webhooks configured in the authenticated Tally account. Use this tool when you need to audit or review existing webhook integrations. Do not use this tool to retrieve events for a specific webhook — use tally_list_webhook_events instead. Does not modify any data.
 
         Args:
             limit: Maximum number of webhook records to return per page.
@@ -197,24 +246,11 @@ class TallyConnector:
         """
         ...
 
-    def get_workspace(
-        self,
-        workspaceId: str,
-    ) -> Dict[str, Any]:
-        """Retrieves details of a specific workspace in the specified application.
-
-        Args:
-            workspaceId: The unique identifier of the workspace to retrieve. (required)
-        Returns:
-            API response as a dictionary.
-        """
-        ...
-
-    def get_workspaces(
+    def tally_list_workspaces(
         self,
         page: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Retrieves a list of all workspaces available in the specified application.
+        """Lists all workspaces available in the authenticated Tally account. Use this tool when you need to discover existing workspaces before accessing workspace-specific resources. Do not use this tool to retrieve details of a single workspace — use tally_get_workspace instead. Does not modify any data.
 
         Args:
             page: The page number of workspaces to retrieve for paginated results.

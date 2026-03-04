@@ -37,7 +37,7 @@ class TestConvertToolsForOpenai:
     def test_basic_conversion(self):
         tool_list = [
             {
-                "actionId": "act_slack_send",
+                "toolId": "act_slack_send",
                 "function": {
                     "name": "send_message",
                     "description": "Send a message",
@@ -71,7 +71,7 @@ class TestConvertToolsForOpenai:
         """Tools with inputSchema instead of function.parameters."""
         tool_list = [
             {
-                "actionId": "act_test",
+                "toolId": "act_test",
                 "name": "test_tool",
                 "description": "A test tool",
                 "inputSchema": {
@@ -89,7 +89,7 @@ class TestConvertToolsForOpenai:
     def test_multiple_tools(self):
         tool_list = [
             {
-                "actionId": "act_1",
+                "toolId": "act_1",
                 "function": {
                     "name": "tool_a",
                     "description": "Tool A",
@@ -97,7 +97,7 @@ class TestConvertToolsForOpenai:
                 },
             },
             {
-                "actionId": "act_2",
+                "toolId": "act_2",
                 "function": {
                     "name": "tool_b",
                     "description": "Tool B",
@@ -118,7 +118,7 @@ class TestConvertToolsForOpenai:
         """Schema without wrapper key should remain flat."""
         tool_list = [
             {
-                "actionId": "act_flat",
+                "toolId": "act_flat",
                 "function": {
                     "name": "flat_tool",
                     "description": "Flat schema tool",
@@ -147,7 +147,7 @@ class TestBuildActionMapExtended:
     def test_with_registry_resolution(self):
         tool_list = [
             {
-                "actionId": "act_slack_send_message",
+                "toolId": "act_slack_send_message",
                 "function": {
                     "name": "send_message_fn",
                     "description": "Send a message",
@@ -162,7 +162,7 @@ class TestBuildActionMapExtended:
                     "display_name": "Slack",
                     "tools": {
                         "send_message": {
-                            "actionId": "act_slack_send_message",
+                            "toolId": "act_slack_send_message",
                             "name": "sendMessage",
                             "description": "Send a message",
                         },
@@ -173,13 +173,13 @@ class TestBuildActionMapExtended:
         action_map = _build_action_map(tool_list, registry)
         assert "send_message_fn" in action_map
         entry = action_map["send_message_fn"]
-        assert entry["actionId"] == "act_slack_send_message"
+        assert entry["toolId"] == "act_slack_send_message"
         assert entry["connectorId"] == "conn_slack_001"
 
     def test_without_registry(self):
         tool_list = [
             {
-                "actionId": "act_unknown",
+                "toolId": "act_unknown",
                 "function": {
                     "name": "unknown_tool",
                     "description": "Unknown",
@@ -189,12 +189,12 @@ class TestBuildActionMapExtended:
         ]
         action_map = _build_action_map(tool_list, {"connectors": {}})
         assert "unknown_tool" in action_map
-        assert action_map["unknown_tool"]["actionId"] == "act_unknown"
+        assert action_map["unknown_tool"]["toolId"] == "act_unknown"
 
     def test_display_label_format(self):
         tool_list = [
             {
-                "actionId": "act_slack_send_message",
+                "toolId": "act_slack_send_message",
                 "function": {
                     "name": "send_message",
                     "description": "Send",
@@ -209,7 +209,7 @@ class TestBuildActionMapExtended:
                     "display_name": "Slack",
                     "tools": {
                         "send_message": {
-                            "actionId": "act_slack_send_message",
+                            "toolId": "act_slack_send_message",
                         },
                     },
                 },
@@ -235,7 +235,7 @@ class TestExecuteToolCall:
 
         action_map = {
             "send_message": {
-                "actionId": "act_slack_send",
+                "toolId": "act_slack_send",
                 "connectorId": "conn_001",
                 "display_label": "slack.send_message",
                 "tool_info": {},
@@ -260,7 +260,7 @@ class TestExecuteToolCall:
 
         action_map = {
             "test_tool": {
-                "actionId": "act_test",
+                "toolId": "act_test",
                 "connectorId": "",
                 "display_label": "test_tool",
                 "tool_info": {},
@@ -287,7 +287,7 @@ class TestExecuteToolCall:
 
         action_map = {
             "send_message": {
-                "actionId": "act_send",
+                "toolId": "act_send",
                 "connectorId": "",
                 "display_label": "slack.send_message",
                 "tool_info": {},
@@ -305,7 +305,7 @@ class TestExecuteToolCall:
         """When auto_confirm is False and user declines, tool is skipped."""
         action_map = {
             "test": {
-                "actionId": "act_test",
+                "toolId": "act_test",
                 "connectorId": "",
                 "display_label": "test",
                 "tool_info": {},
@@ -330,7 +330,7 @@ class TestExecuteToolCall:
 
         action_map = {
             "test": {
-                "actionId": "act_test",
+                "toolId": "act_test",
                 "connectorId": "conn_001",
                 "display_label": "test",
                 "tool_info": {},
@@ -356,7 +356,7 @@ class TestExecuteToolCall:
 
         action_map = {
             "list_items": {
-                "actionId": "act_list",
+                "toolId": "act_list",
                 "connectorId": "",
                 "display_label": "list_items",
                 "tool_info": {},
@@ -374,7 +374,7 @@ class TestExecuteToolCall:
 
     @patch("fastn.cli.agent_command._verbose_post")
     def test_unknown_tool_uses_fn_name_as_action_id(self, mock_post):
-        """If tool not in action_map, use fn_name as actionId."""
+        """If tool not in action_map, use fn_name as toolId."""
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {"body": {"ok": True}}
@@ -386,7 +386,7 @@ class TestExecuteToolCall:
             {}, {}, "ws_123", None, auto_confirm=True,
         )
         payload = mock_post.call_args[0][2]
-        assert payload["input"]["actionId"] == "unknown_tool"
+        assert payload["input"]["toolId"] == "unknown_tool"
 
 
 # ===================================================================
@@ -395,45 +395,67 @@ class TestExecuteToolCall:
 
 class TestPrintAgentSummary:
     def test_no_calls(self, capsys):
-        _print_agent_summary([], 100, 50, 0.5, 0.0, "gpt-4o")
+        _print_agent_summary([], "gpt-4o")
         captured = capsys.readouterr()
-        assert "No tool calls" in captured.out
-        assert "Tokens:" in captured.out
+        assert "No calls recorded" in captured.out
 
-    def test_single_call(self, capsys):
+    def test_single_tool_call(self, capsys):
         call_log = [
-            ("slack.send_message", 100, 50, 100, 0.25, 0.1, 500, 200, 200, "ok"),
+            {"type": "tool", "name": "slack.send_message", "duration": 0.1,
+             "req_bytes": 500, "resp_bytes": 200, "status": "ok"},
         ]
-        _print_agent_summary(call_log, 100, 50, 0.25, 0.1, "gpt-4o")
+        _print_agent_summary(call_log, "gpt-4o")
         captured = capsys.readouterr()
         assert "slack.send_message" in captured.out
         assert "Total" in captured.out
 
-    def test_multiple_calls(self, capsys):
+    def test_discovery_and_llm_and_tool(self, capsys):
+        """Full pipeline: discovery + LLM + tool + LLM response — all visible."""
+        # tokens_in = total prompt_tokens (context window grows each turn)
+        # Turn 1: 80 in, 40 out → delta=80 (first), prev=120
+        # Turn 2: 250 in, 60 out → delta=250-120=130 (tool results), prev=310
+        # Turn 3: 400 in, 80 out → delta=400-310=90, prev=480
         call_log = [
-            ("slack.list_channels", 80, 40, 80, 0.2, 0.1, 400, 1000, 1000, "ok"),
-            ("slack.send_message", 120, 60, 200, 0.3, 0.15, 500, 200, 1200, "ok"),
+            {"type": "discovery", "name": "getTools (3 tools)", "duration": 1.0,
+             "resp_bytes": 2000, "status": "ok"},
+            {"type": "llm", "name": "gpt-4o \u2192 1 tool", "duration": 0.2,
+             "tokens_in": 80, "tokens_out": 40, "status": "ok"},
+            {"type": "tool", "name": "slack.list_channels", "duration": 0.1,
+             "req_bytes": 400, "resp_bytes": 1000, "status": "ok"},
+            {"type": "llm", "name": "gpt-4o \u2192 1 tool", "duration": 0.3,
+             "tokens_in": 250, "tokens_out": 60, "status": "ok"},
+            {"type": "tool", "name": "slack.send_message", "duration": 0.15,
+             "req_bytes": 500, "resp_bytes": 200, "status": "ok"},
+            {"type": "llm", "name": "gpt-4o \u2192 response", "duration": 0.25,
+             "tokens_in": 400, "tokens_out": 80, "status": "ok"},
         ]
-        _print_agent_summary(call_log, 200, 100, 0.5, 0.25, "gpt-4o")
+        _print_agent_summary(call_log, "gpt-4o")
         captured = capsys.readouterr()
+        assert "getTools" in captured.out
         assert "slack.list_channels" in captured.out
         assert "slack.send_message" in captured.out
+        assert "response" in captured.out
         assert "Total" in captured.out
+        assert "api" in captured.out  # breakdown
+        assert "llm" in captured.out  # breakdown
+        assert "Ctx" in captured.out  # context column header
+        assert "peak ctx" in captured.out  # footer shows peak context
 
     def test_error_call_marked(self, capsys):
         call_log = [
-            ("slack.send_message", 100, 50, 100, 0.25, 0.1, 500, 200, 200, "err"),
+            {"type": "tool", "name": "slack.send_message", "duration": 0.1,
+             "req_bytes": 500, "resp_bytes": 200, "status": "err"},
         ]
-        _print_agent_summary(call_log, 100, 50, 0.25, 0.1, "gpt-4o")
+        _print_agent_summary(call_log, "gpt-4o")
         captured = capsys.readouterr()
-        assert "✗" in captured.out  # Error mark
+        assert "\u2717" in captured.out  # Error mark
 
     def test_long_tool_name_truncated(self, capsys):
         call_log = [
-            ("very_long_tool_name.very_long_action_name_that_exceeds_limit",
-             100, 50, 100, 0.25, 0.1, 500, 200, 200, "ok"),
+            {"type": "tool", "name": "very_long_tool_name.very_long_action_name_that_exceeds_limit",
+             "duration": 0.1, "req_bytes": 500, "resp_bytes": 200, "status": "ok"},
         ]
-        _print_agent_summary(call_log, 100, 50, 0.25, 0.1, "gpt-4o")
+        _print_agent_summary(call_log, "gpt-4o")
         captured = capsys.readouterr()
         assert "..." in captured.out
 

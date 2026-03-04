@@ -61,18 +61,27 @@ def _map_type(param_type: str, language: str) -> str:
     return type_map.get(param_type, "Any" if language == "python" else "any")
 
 
-def _extract_tool_params(tool_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _extract_tool_params(
+    tool_data: Dict[str, Any], tool_name: str = "",
+) -> List[Dict[str, Any]]:
     """Extract the inner user-facing params from a tool's inputSchema.
 
-    The inputSchema has a top-level wrapper key (e.g., "body" or "param")
-    whose properties are the actual parameters the user passes as kwargs.
-    We extract those inner properties so stubs match the SDK calling convention:
+    Processes ALL top-level wrapper keys (body, url, param, headers, etc.)
+    and flattens their inner properties into a single param list that
+    matches the SDK calling convention.  This mirrors the runtime routing
+    logic in ``_build_params_from_schema`` (client.py).
 
-        # Registry inputSchema structure:
-        # { "properties": { "param": { "properties": { "email": {...} }, "required": ["email"] } } }
+    For inner params that are objects with their own properties, attaches
+    ``typed_dict_name`` and ``sub_params`` for TypedDict stub generation.
+
+        # Registry inputSchema structure (multi-wrapper):
+        # { "properties": {
+        #     "body": { "properties": { "title": {...}, "body": {...} }, ... },
+        #     "url":  { "properties": { "OWNER": {...}, "REPO": {...} }, ... }
+        # } }
         #
-        # SDK usage:  fastn.slack.getuserbyemail(email="khalid@fastn.ai")
-        # Stub:       def getuserbyemail(self, email: str) -> Dict[str, Any]: ...
+        # SDK usage:  fastn.github.github_create_issue(title="bug", OWNER="org", REPO="repo")
+        # Stub:       def github_create_issue(self, OWNER: str, REPO: str, title: str, ...) -> ...: ...
     """
     params: List[Dict[str, Any]] = []
     input_schema = tool_data.get("inputSchema", {})
@@ -89,28 +98,88 @@ def _extract_tool_params(tool_data: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "type": param_info.get("type", "string"),
                 "required": param_info.get("required", False),
                 "description": param_info.get("description", ""),
+                "typed_dict_name": None,
             })
         return params
 
-    # Get the first (and usually only) top-level property — the wrapper key
-    # e.g., "param", "body", "query"
-    wrapper_key = next(iter(schema_props), None)
-    if wrapper_key is None:
-        return params
+    # Iterate ALL top-level properties.  Object-typed entries with inner
+    # properties are treated as wrappers (body, url, param, headers, …)
+    # whose contents are flattened into the user-facing param list.
+    seen_names: set = set()
+    top_required = set(input_schema.get("required", []))
 
-    wrapper_schema = schema_props[wrapper_key]
-    inner_props = wrapper_schema.get("properties", {})
-    inner_required = set(wrapper_schema.get("required", []))
+    for wrapper_key, wrapper_data in sorted(schema_props.items()):
+        if (
+            isinstance(wrapper_data, dict)
+            and wrapper_data.get("type") == "object"
+            and wrapper_data.get("properties")
+        ):
+            # Wrapper — extract inner properties as flat user-facing params
+            inner_props = wrapper_data["properties"]
+            inner_required = set(wrapper_data.get("required", []))
 
-    for param_name, param_info in sorted(inner_props.items()):
-        safe_param_name = _sanitize_identifier(param_name)
-        params.append({
-            "name": safe_param_name,
-            "camel_name": _to_camel_case(safe_param_name),
-            "type": param_info.get("type", "string"),
-            "required": param_name in inner_required,
-            "description": param_info.get("description", ""),
-        })
+            for param_name, param_info in sorted(inner_props.items()):
+                safe_param_name = _sanitize_identifier(param_name)
+                if safe_param_name in seen_names:
+                    continue  # deduplicate across wrappers (first wins)
+                seen_names.add(safe_param_name)
+
+                param_dict: Dict[str, Any] = {
+                    "name": safe_param_name,
+                    "camel_name": _to_camel_case(safe_param_name),
+                    "type": param_info.get("type", "string"),
+                    "required": param_name in inner_required,
+                    "description": param_info.get("description", ""),
+                    "typed_dict_name": None,
+                }
+
+                # Nested object with own properties → TypedDict
+                if (
+                    param_info.get("type") == "object"
+                    and param_info.get("properties")
+                    and tool_name
+                ):
+                    td_name = (
+                        "_" + _to_pascal_case(tool_name)
+                        + _to_pascal_case(safe_param_name)
+                    )
+                    sub_required = set(param_info.get("required", []))
+                    sub_params = []
+                    for sp_name, sp_info in sorted(
+                        param_info["properties"].items()
+                    ):
+                        safe_sp = _sanitize_identifier(sp_name)
+                        sub_params.append({
+                            "name": safe_sp,
+                            "camel_name": _to_camel_case(safe_sp),
+                            "type": sp_info.get("type", "string"),
+                            "required": sp_name in sub_required,
+                            "description": sp_info.get("description", ""),
+                        })
+                    param_dict["typed_dict_name"] = td_name
+                    param_dict["sub_params"] = sub_params
+
+                params.append(param_dict)
+        else:
+            # Flat (non-wrapper) top-level field
+            safe_param_name = _sanitize_identifier(wrapper_key)
+            if safe_param_name in seen_names:
+                continue
+            seen_names.add(safe_param_name)
+            params.append({
+                "name": safe_param_name,
+                "camel_name": _to_camel_case(safe_param_name),
+                "type": (
+                    wrapper_data.get("type", "string")
+                    if isinstance(wrapper_data, dict) else "string"
+                ),
+                "required": wrapper_key in top_required,
+                "description": (
+                    wrapper_data.get("description", "")
+                    if isinstance(wrapper_data, dict) else ""
+                ),
+                "typed_dict_name": None,
+            })
 
     return params
 
@@ -137,17 +206,27 @@ def parse_registry(registry_data: Dict[str, Any]) -> Dict[str, Any]:
 
         for tool_name, tool_data in sorted(raw_tools.items()):
             safe_tool_name = _sanitize_identifier(tool_name)
-            params = _extract_tool_params(tool_data)
+            params = _extract_tool_params(tool_data, tool_name=tool_name)
 
             # Sort: required params first, then optional
             params.sort(key=lambda p: (not p["required"], p["name"]))
 
+            # Collect TypedDict definitions from nested-object params
+            typed_dicts = []
+            for param in params:
+                if param.get("typed_dict_name"):
+                    typed_dicts.append({
+                        "name": param["typed_dict_name"],
+                        "fields": param["sub_params"],
+                    })
+
             tools.append({
                 "name": safe_tool_name,
                 "camel_name": _to_camel_case(safe_tool_name),
-                "action_id": tool_data.get("actionId", ""),
+                "action_id": tool_data.get("toolId", "") or tool_data.get("actionId", ""),
                 "description": tool_data.get("description", ""),
                 "params": params,
+                "typed_dicts": typed_dicts,
             })
 
         connectors.append({
