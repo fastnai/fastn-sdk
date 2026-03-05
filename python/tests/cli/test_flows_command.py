@@ -46,8 +46,8 @@ _SAMPLE_FLOWS_GQL = {
         "apis": {
             "pageInfo": {"totalCount": 2},
             "edges": [
-                {"node": {"id": "testflow", "name": "Test Flow", "description": "A test flow", "status": "active", "version": "1", "updatedAt": "2025-01-01", "deployedAt": "2025-01-01", "metaData": {"flowType": "integration", "architecture": "sequential", "isAsync": False}}},
-                {"node": {"id": "syncflow", "name": "Sync Flow", "description": "Syncs data", "status": "paused", "version": "2", "updatedAt": "2025-02-01", "deployedAt": "2025-02-01", "metaData": None}},
+                {"node": {"id": "testflow", "name": "Test Flow", "description": "A test flow", "status": "DEPLOYED", "version": "1", "updatedAt": "2025-01-01", "deployedAt": "2025-01-01", "metaData": {"flowType": "integration", "architecture": "sequential", "isAsync": False}}},
+                {"node": {"id": "syncflow", "name": "Sync Flow", "description": "Syncs data", "status": "CONNECT", "version": "2", "updatedAt": "2025-02-01", "deployedAt": "2025-02-01", "metaData": None}},
             ],
         }
     }
@@ -84,12 +84,40 @@ class TestFlowsListCommand:
         mock_post.return_value = _mock_response(json_data=_SAMPLE_FLOWS_GQL)
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["flow", "ls", "--status", "active"])
+        result = runner.invoke(cli, ["flow", "ls", "--status", "deployed"])
 
         assert result.exit_code == 0
         assert "Test Flow" in result.output
         assert "Sync Flow" not in result.output
         assert "1 flow(s) found" in result.output
+
+    @patch("fastn.cli.flows_command._verbose_post")
+    @patch("fastn.cli.flows_command.load_config")
+    def test_flows_list_with_friendly_label(self, mock_load, mock_post):
+        """Filters flows by friendly status label."""
+        mock_load.return_value = _mock_config()
+        mock_post.return_value = _mock_response(json_data=_SAMPLE_FLOWS_GQL)
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["flow", "ls", "--status", "pending"])
+
+        assert result.exit_code == 0
+        assert "Sync Flow" in result.output
+        assert "Test Flow" not in result.output
+        assert "1 flow(s) found" in result.output
+
+    @patch("fastn.cli.flows_command._verbose_post")
+    @patch("fastn.cli.flows_command.load_config")
+    def test_flows_list_invalid_status(self, mock_load, mock_post):
+        """Rejects invalid status values."""
+        mock_load.return_value = _mock_config()
+        mock_post.return_value = _mock_response(json_data=_SAMPLE_FLOWS_GQL)
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["flow", "ls", "--status", "DEPL"])
+
+        assert result.exit_code == 1
+        assert "Invalid status" in result.output
 
     @patch("fastn.cli.flows_command._verbose_post")
     @patch("fastn.cli.flows_command.load_config")
