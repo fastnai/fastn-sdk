@@ -82,9 +82,7 @@ def _require_auth():
 def _flows_api_post(headers, endpoint, payload):
     """POST to the flows REST API and handle common errors."""
     url = f"{FLOWS_API_URL}/{endpoint}"
-    api_headers = dict(headers)
-    api_headers["x-fastn-custom-auth"] = "true"
-    resp = _verbose_post(url, headers=api_headers, payload=payload)
+    resp = _verbose_post(url, headers=headers, payload=payload)
 
     if resp.status_code == 401:
         _handle_401(resp)
@@ -139,7 +137,7 @@ def _gql_post(headers, query, variables):
 
 @cli.group(
     cls=OrderedGroup,
-    command_order=["ls", "generate", "run", "deploy", "schema", "get-run", "update", "delete"],
+    command_order=["ls", "generate", "run", "deploy", "schema", "update", "delete"],
 )
 @click.option("-v", "--verbose", is_flag=True, default=False, help="Show API calls (cURL) and responses")
 @click.pass_context
@@ -153,7 +151,6 @@ def flow(ctx, verbose):
       fastn flow generate             Generate a new flow
       fastn flow run <flow_name>     Run a flow
       fastn flow schema <flow_name>  Discover flow input schema
-      fastn flow get-run <run_id>    Check run status
       fastn flow delete <flow_id>    Delete a flow
       fastn flow update <flow_id>    Update a flow
     """
@@ -666,39 +663,6 @@ def schema(flow_name):
     }
 
     click.echo(json.dumps(tool, indent=2))
-
-
-# ---------------------------------------------------------------------------
-# fastn flow get-run
-# ---------------------------------------------------------------------------
-
-@flow.command(name="get-run")
-@click.argument("run_id")
-def get_run(run_id):
-    """Check the status of a flow run.
-
-    \b
-    Examples:
-      fastn flow get-run run_xyz123
-    """
-    _config, headers, _project_id = _require_auth()
-
-    result = _flows_api_post(headers, "get_run", {"run_id": run_id})
-
-    click.echo()
-    if isinstance(result, dict):
-        click.echo(f"  Run ID:    {result.get('run_id', run_id)}")
-        click.echo(f"  Status:    {result.get('status', 'unknown')}")
-        if result.get("started_at"):
-            click.echo(f"  Started:   {result['started_at']}")
-        if result.get("completed_at"):
-            click.echo(f"  Completed: {result['completed_at']}")
-        if result.get("result"):
-            click.echo(f"  Result:    {json.dumps(result['result'], indent=2)}")
-        if result.get("error"):
-            click.echo(f"  Error:     {result['error']}")
-    else:
-        click.echo(json.dumps(result, indent=2))
 
 
 # ---------------------------------------------------------------------------

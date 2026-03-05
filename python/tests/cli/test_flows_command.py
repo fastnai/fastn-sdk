@@ -859,45 +859,6 @@ class TestFlowsSchemaCommand:
 # fastn flow get-run
 # ---------------------------------------------------------------------------
 
-class TestFlowsGetRunCommand:
-    @patch("fastn.cli.flows_command._verbose_post")
-    @patch("fastn.cli.flows_command.load_config")
-    def test_flows_get_run_success(self, mock_load, mock_post):
-        """Shows run status details."""
-        mock_load.return_value = _mock_config()
-        mock_post.return_value = _mock_response(
-            json_data={"body": {
-                "run_id": "run_abc",
-                "status": "completed",
-                "started_at": "2025-01-01T10:00:00Z",
-                "completed_at": "2025-01-01T10:01:00Z",
-                "result": {"ok": True},
-            }}
-        )
-
-        runner = CliRunner()
-        result = runner.invoke(cli, ["flow", "get-run", "run_abc"])
-
-        assert result.exit_code == 0
-        assert "completed" in result.output
-        assert "run_abc" in result.output
-
-    @patch("fastn.cli.flows_command._verbose_post")
-    @patch("fastn.cli.flows_command.load_config")
-    def test_flows_get_run_not_found(self, mock_load, mock_post):
-        """Handles run not found error."""
-        mock_load.return_value = _mock_config()
-        mock_post.return_value = _mock_response(
-            status_code=404, json_data={"error": "RUN_NOT_FOUND"}
-        )
-
-        runner = CliRunner()
-        result = runner.invoke(cli, ["flow", "get-run", "nonexistent"])
-
-        assert result.exit_code != 0
-        assert "not found" in result.output.lower()
-
-
 # ---------------------------------------------------------------------------
 # fastn flow delete
 # ---------------------------------------------------------------------------
