@@ -737,8 +737,8 @@ class _FlowsSync:
         Fetches flows from the workspace via the ``apis`` GraphQL query.
 
         Args:
-            status: Optional filter -- ``"active"``, ``"paused"``, ``"draft"``,
-                or ``None`` for all.
+            status: Optional filter -- ``"DEPLOYED"``, ``"DRAFT"``, etc.
+                or ``None`` for all.  Case-insensitive.
 
         Returns:
             A list of flow summary dicts with ``flow_id``, ``name``,

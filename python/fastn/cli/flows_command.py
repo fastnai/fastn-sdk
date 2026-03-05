@@ -158,8 +158,8 @@ def flow(ctx):
 
 
 @flow.command(name="ls")
-@click.option("--status", default=None, type=click.Choice(["active", "paused", "draft"]),
-              help="Filter flows by status")
+@click.option("--status", "-s", default=None,
+              help="Filter flows by status (e.g. deployed, pending)")
 def flow_ls(status):
     """List all flows in the current project."""
     _list_flows(status)
@@ -187,9 +187,13 @@ def _list_flows(status):
         node = (edge or {}).get("node") or {}
         items.append(node)
 
-    # Client-side status filter
+    # Client-side status filter (case-insensitive, accepts friendly labels too)
+    _LABEL_TO_RAW = {"PENDING": "CONNECT", "DEPLOYED": "DEPLOYED"}
     if status:
-        items = [f for f in items if f.get("status") == status]
+        status_upper = status.upper()
+        # Map friendly label back to raw API value
+        raw_match = _LABEL_TO_RAW.get(status_upper, status_upper)
+        items = [f for f in items if (f.get("status") or "").upper() == raw_match]
 
     if not items:
         click.echo("No flows found in this project.")
@@ -200,7 +204,13 @@ def _list_flows(status):
     click.echo(f"  {'─' * 25} {'─' * 10} {'─' * 10} {'─' * 36}")
     for f in items:
         name = (f.get("name") or "")[:25]
-        fstatus = (f.get("status") or "")[:10]
+        raw_status = f.get("status") or ""
+        # Map internal API statuses to user-friendly labels
+        _STATUS_LABELS = {
+            "CONNECT": "Pending",
+            "DEPLOYED": "Deployed",
+        }
+        fstatus = _STATUS_LABELS.get(raw_status, raw_status)[:10]
         version = (f.get("version") or "")[:10]
         fid = f.get("id", "")
         click.echo(f"  {name:<25} {fstatus:<10} {version:<10} {fid}")
