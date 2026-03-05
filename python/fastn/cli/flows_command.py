@@ -82,7 +82,9 @@ def _require_auth():
 def _flows_api_post(headers, endpoint, payload):
     """POST to the flows REST API and handle common errors."""
     url = f"{FLOWS_API_URL}/{endpoint}"
-    resp = _verbose_post(url, headers=headers, payload=payload)
+    api_headers = dict(headers)
+    api_headers["x-fastn-custom-auth"] = "true"
+    resp = _verbose_post(url, headers=api_headers, payload=payload)
 
     if resp.status_code == 401:
         _handle_401(resp)
@@ -139,14 +141,15 @@ def _gql_post(headers, query, variables):
     cls=OrderedGroup,
     command_order=["ls", "generate", "run", "deploy", "schema", "get-run", "update", "delete"],
 )
+@click.option("-v", "--verbose", is_flag=True, default=False, help="Show API calls (cURL) and responses")
 @click.pass_context
-def flow(ctx):
+def flow(ctx, verbose):
     """Build and run automated workflows between your connected apps.
 
     \b
     Usage:
       fastn flow ls                  List all flows
-      fastn flow ls --status active  List only active flows
+      fastn flow ls --status deployed  List only deployed flows
       fastn flow generate             Generate a new flow
       fastn flow run <flow_name>     Run a flow
       fastn flow schema <flow_name>  Discover flow input schema
@@ -154,14 +157,21 @@ def flow(ctx):
       fastn flow delete <flow_id>    Delete a flow
       fastn flow update <flow_id>    Update a flow
     """
-    pass
+    if verbose:
+        ctx.ensure_object(dict)
+        ctx.obj["verbose"] = True
 
 
 @flow.command(name="ls")
 @click.option("--status", "-s", default=None,
               help="Filter flows by status (e.g. deployed, pending)")
-def flow_ls(status):
+@click.option("-v", "--verbose", is_flag=True, default=False, help="Show API calls (cURL) and responses")
+@click.pass_context
+def flow_ls(ctx, status, verbose):
     """List all flows in the current project."""
+    if verbose:
+        ctx.ensure_object(dict)
+        ctx.obj["verbose"] = True
     _list_flows(status)
 
 

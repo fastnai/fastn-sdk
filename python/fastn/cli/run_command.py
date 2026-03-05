@@ -137,13 +137,18 @@ def run(ctx: click.Context, connector_name: str, tool_name: Optional[str], tenan
     params = _parse_extra_args(ctx.args)
 
     # If no args were passed and there are fields, prompt interactively
+    # (skip prompting when all fields are optional — just run with defaults)
     if not params and fields:
         desc = tool_info.get("description", "")
         click.echo()
         click.echo(f"  {connector_name}.{tool_name}")
         if desc:
             click.echo(f"  {desc}")
-        params = _prompt_for_params(fields, required_fields)
+        if required_fields:
+            params = _prompt_for_params(fields, required_fields)
+        else:
+            click.echo("  (all fields optional — running with defaults)")
+            params = {}
 
     # Build execute payload — dynamically route params based on the schema
     from fastn.client import _build_params_from_schema
