@@ -189,8 +189,14 @@ def _list_flows(status):
 
     # Client-side status filter (case-insensitive, accepts friendly labels too)
     _LABEL_TO_RAW = {"PENDING": "CONNECT", "DEPLOYED": "DEPLOYED"}
+    _VALID_STATUSES = {"CONNECT", "DEPLOYED", "PENDING"}
     if status:
         status_upper = status.upper()
+        if status_upper not in _VALID_STATUSES:
+            valid_list = ", ".join(sorted(_VALID_STATUSES))
+            raise click.ClickException(
+                f"Invalid status '{status}'. Valid statuses: {valid_list}"
+            )
         # Map friendly label back to raw API value
         raw_match = _LABEL_TO_RAW.get(status_upper, status_upper)
         items = [f for f in items if (f.get("status") or "").upper() == raw_match]
