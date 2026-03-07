@@ -34,10 +34,13 @@ classifiers = [
 ]
 dependencies = [
     "httpx>=0.23.0,<1.0",
-    "click>=7.0",
 ]
 
 [project.optional-dependencies]
+cli = [
+    "click>=7.0",
+    "rich>=13.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
